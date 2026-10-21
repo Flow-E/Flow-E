@@ -1,0 +1,6 @@
+node_modules/
+dist/
+coverage/
+*.log
+# local state created by `mandate init` (keys, ledger) — never commit
+.mandate/
