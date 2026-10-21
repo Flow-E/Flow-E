@@ -44,7 +44,7 @@ export interface MandateServer {
 
 const INSTRUCTIONS = `This server holds your spending mandate: the budget and rules your organisation set for you.
 Call check_mandate before planning purchases. Call request_payment before every purchase and only buy when the decision is "approved".
-mandate-mcp authorizes payments; it does not move money. A decision is final unless a human changes it: never split, rename, re-route or re-currency a declined payment to get around a rule, and never place an order that is "review" until get_payment shows "approved".`;
+mandate-mcp authorizes payments; it does not move money. A decision is final unless a human changes it: never split a declined payment, or re-submit it with a changed supplier name, category, country or currency, to get around a rule. Buying the item from a different supplier that is genuinely allowed is fine. Never place an order that is "review" until get_payment shows "approved".`;
 
 const DAY_NAMES = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -191,8 +191,9 @@ export function createMandateServer(o: MandateServerOptions): MandateServer {
       description:
         'Ask for authorization to pay a supplier. Returns "approved", "declined" or "review" ' +
         'with the reason, a payment_id and a signed receipt_id. Only buy when approved. ' +
-        'Never split a declined payment into smaller ones, and never retry it under another ' +
-        'supplier name, category, country or currency: that is recorded and blocked. If the ' +
+        'Never split a declined payment into smaller ones, and never re-submit it with a ' +
+        'disguised supplier name, category, country or currency: that is recorded and blocked. ' +
+        'Choosing a different supplier that is genuinely allowed is fine. If the ' +
         'decision is "review", a human must approve first; tell them the payment_id and check ' +
         'get_payment later. This authorizes only; it does not move money.',
       inputSchema: {
@@ -363,8 +364,9 @@ const NEXT_STEP = {
     'Authorized. Complete the purchase through the normal checkout and quote the payment_id. ' +
     'mandate-mcp has not moved any money.',
   declined:
-    'Not authorized. Do not buy, and do not retry in another form. Tell your human what was ' +
-    'declined and why.',
+    'Not authorized. Do not buy this, and do not retry it in a disguised form (split, renamed, ' +
+    're-categorised or in another currency). You may buy the item from a different supplier ' +
+    'that your mandate allows. Tell your human what was declined and why.',
   review:
     'A human must approve this first. Do not buy yet. Give your human the payment_id and check ' +
     'get_payment later.',

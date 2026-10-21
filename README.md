@@ -1,21 +1,88 @@
 # mandate-mcp
 
-> **Status: early development (v0.1).** The policy engine, agent credentials, signed ledger, MCP
-> server and human controls work; demo mode and release prep come next. Nothing here moves real money.
-
 Give an AI agent a **mandate**: a verified identity, a budget and rules, human approval above a
 threshold, a kill switch, and a signed receipt for every decision. `mandate-mcp` is an open-source
-MCP server that _authorizes_ payments an agent asks for. It never holds or moves funds.
+[MCP](https://modelcontextprotocol.io) server that **authorizes** the payments an agent asks for.
+It never holds or moves money.
 
-## Connect an agent
+> **Status: v0.1, early.** Everything below works locally. It has not had an external security
+> review, and it is not a compliance product. See [Security model](#security-model).
+
+> **Not on npm yet, and the name is not final.** The npm packages called `mandate-mcp` and
+> `mandate` belong to **other, unrelated projects**. Do not run `npx mandate-mcp` or `npx mandate`
+> expecting this code. Until the release, install from a checkout as shown below.
+
+## The 60-second pitch
+
+AI agents are starting to buy things: lab supplies, compute, data, travel. Most companies won't
+let them, because there is no trustworthy way to give an agent a budget and rules, see every
+decision, and stop it instantly.
+
+`mandate-mcp` is that missing layer, and you can add it to an agent in five minutes:
+
+- **Know Your Agent.** Each agent carries a signed credential that names a responsible person.
+- **A mandate per agent.** Daily budget, per-payment limit, allowed suppliers, categories,
+  countries and currencies, and a threshold above which a human must approve.
+- **Humans stay in charge.** An approval queue, a freeze per agent, and a kill switch, from the CLI
+  or a local control panel. The agent has no tool to approve, change rules or unfreeze itself.
+- **Proof.** Every decision and every human action lands in an append-only, hash-chained ledger,
+  and each one gets a signed receipt that an auditor can verify offline.
+
+v1 is free and runs on your machine. Real payment rails, a hosted team dashboard and compliance
+features come later (see the [roadmap](#roadmap)).
+
+## Try it in 5 minutes
+
+You need Node.js 22.12 or later, git, and Claude Code or Claude Desktop.
 
 ```sh
-npx mandate init                      # once: issuer keys and a starter mandate.yaml
-npx mandate agent add lab-procurement # once per agent: a signed credential
+git clone <this repository> mandate && cd mandate
+npm install && npm run build && npm link   # puts the `mandate` command on your PATH
+cd .. && mandate demo
 ```
 
-Then start one MCP server per agent. Use **absolute paths**, because the client starts the server
-from its own working directory.
+This sets up a folder called `mandate-demo` holding a **fictional** company, two agents, a supplier
+catalog and fresh keys. It also starts the control panel and prints three things:
+
+1. **A command that connects Claude** to the demo agent: `claude mcp add …` for Claude Code, or a
+   JSON block for Claude Desktop. Run it, then start Claude.
+2. **A link to the control panel.** Open it to watch requests arrive.
+3. **A prompt to paste into Claude.** It asks Claude to buy five lab items from the catalog.
+
+You should then see Claude:
+
+- get **declined** buying the cheapest buffer, because the supplier is on the demo blocklist;
+- get **approved** buying it from an allowed supplier instead, cancellable for 10 minutes because
+  it is a first payment to that supplier;
+- send the CHF 6,500 centrifuge to **review**. You approve it in the panel, and Claude sees the
+  approval when it checks again;
+- get **declined** for the CHF 9,000 column set, which is over the per-payment limit. Splitting it
+  into smaller payments is caught too;
+- get **declined** for glassware from a supplier that is not on the approved list.
+
+Run `mandate demo --reset` to start over. Every company, person, supplier and price in the
+demo is invented; supplier names all start with "Example".
+
+## Use it with your own agents
+
+```sh
+mandate init                       # issuer keys in .mandate/ and a starter mandate.yaml
+# edit mandate.yaml: your agents, budgets, suppliers, categories
+mandate check                      # validate it
+mandate agent add lab-procurement  # a signed credential for one agent
+```
+
+Then connect each agent with its own MCP server. Use **absolute paths** throughout, because the
+client starts the server from its own working directory and may not share your `PATH`.
+
+**Claude Code:**
+
+```sh
+claude mcp add mandate \
+  -e MANDATE_HOME=/absolute/path/to/project/.mandate \
+  -e MANDATE_CONFIG=/absolute/path/to/project/mandate.yaml \
+  -- node /absolute/path/to/mandate/dist/cli/index.js serve --agent lab-procurement
+```
 
 **Claude Desktop** (`claude_desktop_config.json`):
 
@@ -23,8 +90,13 @@ from its own working directory.
 {
   "mcpServers": {
     "mandate": {
-      "command": "npx",
-      "args": ["-y", "mandate-mcp", "serve", "--agent", "lab-procurement"],
+      "command": "node",
+      "args": [
+        "/absolute/path/to/mandate/dist/cli/index.js",
+        "serve",
+        "--agent",
+        "lab-procurement"
+      ],
       "env": {
         "MANDATE_HOME": "/absolute/path/to/project/.mandate",
         "MANDATE_CONFIG": "/absolute/path/to/project/mandate.yaml"
@@ -34,148 +106,185 @@ from its own working directory.
 }
 ```
 
-**Claude Code**:
+`mandate demo` prints both snippets with the real paths filled in. Any MCP client that supports
+stdio servers works the same way.
 
-```sh
-claude mcp add mandate   -e MANDATE_HOME=/absolute/path/to/project/.mandate   -e MANDATE_CONFIG=/absolute/path/to/project/mandate.yaml   -- npx -y mandate-mcp serve --agent lab-procurement
-```
+### What the agent can do
 
-On Windows, use `"command": "cmd", "args": ["/c", "npx", "-y", "mandate-mcp", …]` (or `-- cmd /c npx …`
-for Claude Code). Until the package is on npm, replace `npx -y mandate-mcp` with
-`node /absolute/path/to/mandate-mcp/dist/cli/index.js`.
+| Tool              | What it does                                                                       |
+| ----------------- | ---------------------------------------------------------------------------------- |
+| `check_mandate`   | Remaining budget today, limits, allowed currencies, categories and suppliers       |
+| `request_payment` | Runs the rules, records the decision, and returns it with a payment id and receipt |
+| `get_payment`     | Current status of one of the agent's own payments                                  |
+| `list_payments`   | The agent's recent payments                                                        |
 
-The agent gets four tools:
-
-| Tool              | What it does                                                                   |
-| ----------------- | ------------------------------------------------------------------------------ |
-| `check_mandate`   | Remaining budget today, limits, allowed currencies, categories and suppliers   |
-| `request_payment` | Runs the rules, records the decision, returns it with a payment id and receipt |
-| `get_payment`     | Status of one of the agent's own payments                                      |
-| `list_payments`   | The agent's recent payments                                                    |
-
-There is no tool to approve, change policy or unfreeze. The server re-reads `mandate.yaml` and
-the credential on every call, so an owner's edit (`status: frozen`, a lower budget) applies at
-once. To try it with the MCP Inspector:
-
-```sh
-npx @modelcontextprotocol/inspector --cli -e MANDATE_HOME=$PWD/.mandate -e MANDATE_CONFIG=$PWD/mandate.yaml   npx mandate serve --agent lab-procurement --method tools/list
-```
-
-## Human control
-
-Only the owner can approve, decline, freeze, or cancel. The agent's tools cannot do any of these.
-Every action is a signed ledger entry that records who acted, when, and an optional note.
-
-```sh
-npx mandate approve <payment-id> --note "Checked the quote"   # or: decline
-npx mandate freeze lab-procurement                          # one agent; unfreeze to undo
-npx mandate freeze --all                                    # kill switch: every payment is declined
-npx mandate unfreeze --all                                  # release it (frozen agents stay frozen)
-npx mandate cooloff-cancel <payment-id>                     # within 10 min of a first payment to a supplier
-npx mandate export --out ledger.csv                         # the whole ledger as CSV
-npx mandate panel                                           # the control panel in your browser
-```
-
-`--by` sets the name recorded for an action (default: your OS user name). Changes take effect on
-the agent's next request; no restart is needed.
-
-The **control panel** shows live payment requests, the approval queue, cooling-off payments, each
-agent's budget for today, the ledger with its integrity check, a freeze button per agent, the kill
-switch, and a CSV export. It is built to be safe on a shared machine:
-
-- It listens on `127.0.0.1` only and refuses requests whose `Host` is not a loopback name, which
-  blocks DNS-rebinding attacks.
-- Each start prints a new random 256-bit token inside the link's `#fragment`, so the token never
-  appears in server or proxy logs. The page removes it from the address bar. Every API call sends
-  the token as a header, which other websites cannot forge.
-- A strict Content-Security-Policy allows no inline scripts. Supplier names and memos come from the
-  agent, so the page renders them as text and never as HTML. The CSV export defuses spreadsheet
-  formulas.
+That is the whole list. No tool can approve, decline, freeze, unfreeze or change a rule.
 
 ## How a payment request is decided
 
-Every request runs through these rules, in this order. The first decline stops evaluation.
-`review` (a human must approve) only happens when every hard rule passed.
+Each request runs through these rules in order. The first decline stops evaluation. `review` (a
+human must approve) only applies once every hard rule has passed.
 
-| #   | Rule                                        | Outcome when it fails |
-| --- | ------------------------------------------- | --------------------- |
-| 1   | Global kill switch, then agent status       | declined              |
-| 2   | Know Your Agent credential                  | declined              |
-| 3   | Amount above 0; currency allowed            | declined              |
-| 4   | Country not blocked                         | declined              |
-| 5   | Supplier not blocked; on allowlist if set   | declined              |
-| 6   | Category (MCC) allowed                      | declined              |
-| 7   | Per-payment limit (in base currency)        | declined              |
-| 8   | Daily budget (approved + pending review)    | declined              |
-| 9   | Velocity: max N requests per rolling minute | declined              |
-| 10  | Split detection: same supplier, 10 minutes  | declined              |
-| 11  | Business hours (optional)                   | review                |
-| 12  | Human-approval threshold                    | review                |
-| 13  | Cooling-off: first payment to a supplier    | cancellable 10 min    |
+| #   | Rule                                                               | If it fails        |
+| --- | ------------------------------------------------------------------ | ------------------ |
+| 1   | Global kill switch, then the agent's status                        | declined           |
+| 2   | Know Your Agent credential: signature, issuer, agent, dates, scope | declined           |
+| 3   | Amount above 0; currency in the allowed list                       | declined           |
+| 4   | Country not on the global or the agent's blocked list              | declined           |
+| 5   | Supplier not blocked; on the allowlist if the agent has one        | declined           |
+| 6   | Merchant category code (MCC) allowed                               | declined           |
+| 7   | Per-payment limit, in the base currency                            | declined           |
+| 8   | Daily budget: today's approved **and pending** spend plus this one | declined           |
+| 9   | Velocity: at most N requests per rolling minute (declines count)   | declined           |
+| 10  | Split detection: same supplier within 10 min, sum over the limit   | declined           |
+| 11  | Business hours (optional)                                          | review             |
+| 12  | Human-approval threshold                                           | review             |
+| 13  | Cooling-off: the first approved payment to a new supplier          | cancellable 10 min |
 
-Every decision returns a trace naming each rule and the numbers it used. Money is handled in
-integer minor units; foreign amounts are converted with a static rate table and rounded up.
+Every decision comes with a trace that names each rule and the numbers it used. Money is handled as
+whole cents, never as floats. Foreign amounts are converted with your static rate table and rounded
+**up**, so a limit is never under-counted. Any error inside the engine produces `declined`.
 
-> The blocked-country list in the example is a demo. It is **not** sanctions screening and not
-> legal advice: configure your own screening.
+Good to know:
 
-## Know Your Agent credentials
+- **Split detection** also catches a genuine second order from the same supplier inside 10 minutes
+  when the two together exceed the per-payment limit. Pending reviews count towards that sum.
+- **Supplier names** are compared case- and whitespace-insensitively. Names can be imitated, so
+  later versions will use verified supplier identities.
 
-```sh
-npx mandate init                      # issuer key pair in .mandate/ and a starter mandate.yaml
-npx mandate agent add lab-procurement # signed credential in .mandate/credentials/
-```
-
-- The issuer key is Ed25519. `.mandate/issuer.key` is written with mode `0600` and never printed;
-  on Windows, protect the folder with NTFS permissions instead. `init` refuses to overwrite an
-  existing key, because that would invalidate every credential.
-- A credential names the agent, its responsible owner and organisation, its scopes, and when it
-  was issued and expires (default 90 days). It is checked on **every** request: signature, issuer,
-  agent id, validity window and scope. A failure is a decline with a clear reason.
-- In v1 the credential file is a bearer token: whoever holds it can act as that agent. Keep it as
-  safe as a password. To stop an agent at once, freeze it.
-
-## Ledger and receipts
-
-Every decision is written to an append-only SQLite ledger (`.mandate/ledger.db`) and gets a
-signed receipt.
-
-- Each entry stores the SHA-256 hash of the entry before it, so changing, removing or reordering
-  any entry breaks the chain. SQL triggers refuse `UPDATE` and `DELETE`.
-- Each entry hash is signed with the issuer key. Someone who edits the file and recomputes the
-  hashes still cannot forge the signatures.
-- A receipt is the entry plus its signature, as canonical JSON. Anyone with only the issuer
-  **public** key can verify it offline.
+## Human control
 
 ```sh
-npx mandate audit                          # check the whole chain; names the first broken entry
-npx mandate receipt <receipt-or-payment-id> > receipt.json
-npx mandate verify receipt.json            # signature, hash, and position in the local ledger
-npx mandate verify receipt.json --pubkey issuer.pub --offline   # an auditor with only the public key
+mandate approve <payment-id> --note "Checked the quote"   # or: decline
+mandate freeze lab-procurement                          # one agent; unfreeze undoes it
+mandate freeze --all                                    # kill switch: decline everything
+mandate unfreeze --all                                  # release it (frozen agents stay frozen)
+mandate cooloff-cancel <payment-id>                     # within the 10-minute window
+mandate export --out ledger.csv                         # the whole ledger as CSV
+mandate panel                                           # the control panel in your browser
 ```
 
-**Who sees what.** The MCP server process reads the issuer private key so that it can sign
-receipts. The model only sees tool results: no tool returns keys, credentials or signatures, and
-an agent can only read its own payments.
+Each action is a signed ledger entry that records who acted (`--by`, which defaults to your OS user
+name), when, and an optional note. It takes effect on the agent's next request; nothing needs a
+restart. You can also set `status: frozen` or `paused` for an agent in `mandate.yaml`, and that too
+applies at once.
 
-Limits, stated plainly: the issuer private key can rewrite history, so protect it. Deleting
-entries from the **end** of the ledger is not visible to `audit` alone. Any receipt someone else
-holds for a removed entry fails `verify`, and anchoring the ledger head externally is on the
-roadmap.
+The **control panel** shows the approval queue, payments in their cooling-off window, each agent's
+budget for today, the ledger with a live integrity check, a freeze button per agent, the kill
+switch, and a CSV export.
+
+## Security model
+
+**What it protects.** An agent cannot spend outside its mandate, cannot give itself more authority,
+and cannot hide what it did. You can stop it at once, and anyone can check the record later.
+
+**Trust boundaries.**
+
+- **The model** sees only tool results. No tool returns keys, credentials or signatures, and an
+  agent can read only its own payments. All input is validated with zod before the engine sees it.
+- **The MCP server process** holds the issuer private key, so that it can sign receipts. Anyone who
+  can read `.mandate/issuer.key` can issue credentials and sign ledger entries: guard it like a
+  production secret.
+- **The human owner** acts through the CLI or the panel, both on the same machine.
+
+**Know Your Agent.** The issuer key is Ed25519. The private key is written with mode `0600` and
+never printed. On Windows, protect the folder with NTFS permissions instead, because Windows
+ignores Unix file modes. Credentials are checked on **every** request, against your issuer public
+key only, never against a key the credential carries itself. In v1 a credential file is a bearer
+token: whoever holds it can act as that agent.
+
+**Ledger.** Entries are append-only (SQL triggers refuse `UPDATE` and `DELETE`). Each entry's
+SHA-256 hash covers all its fields and the previous entry's hash, and each hash is signed with the
+issuer key. Signatures are domain-separated, so a receipt signature can never pass as a credential.
+`audit` checks the sequence, the links, the hashes and every signature, and names the first
+broken entry.
+
+**Control panel.**
+
+- It listens on `127.0.0.1` only and rejects any `Host` header that is not a loopback name, which
+  blocks DNS rebinding.
+- Each start creates a fresh 256-bit token, carried in the link's `#fragment` so it never reaches a
+  server log. The page then removes it from the address bar.
+- Every API call needs that token as a header, which other websites cannot forge (no CSRF).
+- A strict Content-Security-Policy forbids inline scripts. Text written by the agent is rendered as
+  text, never as HTML. The CSV export defuses spreadsheet formulas.
+
+**Fail closed.** Any engine error, a missing or broken `mandate.yaml`, or a missing credential means
+the payment is not authorized.
+
+**Known limits, stated plainly.**
+
+- The issuer private key can rewrite history. Protect it.
+- Deleting entries from the **end** of the ledger leaves a valid, shorter chain, so `audit` alone
+  cannot see it. Any receipt that someone else holds for a removed entry then fails `verify`.
+  Anchoring the ledger head externally is on the roadmap.
+- Exchange rates are static. Blocked-country and blocked-supplier lists are whatever you configure.
+- No accounts: `--by` is a label, not an authenticated identity.
+
+> **Not legal advice.** The country list in the examples is a demo and is **not** sanctions
+> screening. `mandate-mcp` makes no claim of regulatory compliance. Configure your own screening.
+
+## Ledger, receipts and audit
+
+```sh
+mandate audit                                     # check the whole chain
+mandate receipt <receipt-or-payment-id> > receipt.json
+mandate verify receipt.json                       # signature, hash and position in the ledger
+mandate verify receipt.json --pubkey issuer.pub --offline   # an auditor with only the public key
+```
+
+All commands accept `--home <dir>` and `--config <file>`, or the `MANDATE_HOME` and
+`MANDATE_CONFIG` environment variables.
 
 ## Configuration
 
-See [`mandate.example.yaml`](mandate.example.yaml). Validate a file with:
+`mandate.yaml` is plain YAML. Unknown keys are errors, so a typo cannot silently switch off a rule.
+Amounts are in normal units of the base currency.
 
-```sh
-npx mandate check mandate.yaml
+```yaml
+organisation: 'Example Labs AG (fictional)'
+base_currency: CHF
+timezone: Europe/Zurich # defines "today" and business hours
+fx: { EUR: 0.93, USD: 0.80 } # base-currency units per unit; static in v1
+blocked_countries: [RU, BY, IR, KP] # demo list, NOT sanctions screening
+blocked_suppliers: []
+business_hours: { days: [1, 2, 3, 4, 5], start: '08:00', end: '18:00' }
+agents:
+  lab-procurement:
+    owner: 'Dr. A. Muster, Head of Lab (fictional)'
+    status: active # active | paused | frozen
+    daily_budget: 20000
+    per_payment_limit: 8000
+    approval_above: 5000 # optional; leave out for no human review
+    currencies: [CHF, EUR]
+    categories: ['5169', '5047'] # merchant category codes
+    suppliers: { mode: allowlist, allow: ['Example Reagents AG'], block: [] } # or mode: any
+    blocked_countries: []
+    velocity_per_minute: 6
+    business_hours_only: false
 ```
 
 ## Roadmap
 
-1. ~~Project skeleton~~ · 2. ~~Policy engine~~ · 3. ~~Know Your Agent credentials~~ · 4. ~~Hash-chained
-   ledger and signed receipts~~ · 5. ~~MCP server~~ · 6. ~~Human control (CLI and local panel)~~ · 7. Demo mode
-   and docs · 8. Release
+**v1 (this package)**: policy engine · Know Your Agent credentials · signed hash-chained ledger ·
+MCP server · human control and local panel · demo. Release preparation is next.
+
+**Later**, in a hosted version:
+
+- real payment rails through adapters (Stripe, cards, stablecoins) and live exchange rates;
+- a multi-user team dashboard with accounts, live sanctions screening, and an external anchor for
+  the ledger head;
+- money as a flow (streams and escrow) instead of lump sums;
+- an Intent Exchange, where buyers' agents post demand backed by escrow and sellers' agents bid;
+- agent buying unions, agent credit and insurance.
+
+## Development
+
+```sh
+npm install
+npm run build && npm test && npm run lint
+node dist/cli/index.js demo   # the demo from a checkout
+```
 
 ## Licence
 

@@ -6,3 +6,4 @@ export * from './ledger/index.js';
 export * from './mcp/index.js';
 export * from './control/index.js';
 export * from './panel/index.js';
+export * from './demo/index.js';

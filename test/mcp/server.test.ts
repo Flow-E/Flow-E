@@ -195,7 +195,8 @@ describe('request_payment', () => {
   it('declines, with the reason, and still records it', async () => {
     const body = (await buy({ country: 'ru' })).json();
     expect(body).toMatchObject({ decision: 'declined', rule: 'COUNTRY' });
-    expect(body.next_step).toMatch(/do not retry/);
+    expect(body.next_step).toMatch(/do not retry it in a disguised form/);
+    expect(body.next_step).toMatch(/different supplier that your mandate allows/);
     expect(mandateServer.ledger.payments('lab-procurement')).toHaveLength(1);
   });
 

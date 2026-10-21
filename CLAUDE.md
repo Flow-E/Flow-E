@@ -16,7 +16,9 @@ src/mcp (tools, zod schemas) · src/panel (localhost control panel) · src/cli (
 
 ## Commands
 
-npm run build · npm test · npm run lint · npm run typecheck · npm run coverage · npx mandate demo
+npm run build · npm test · npm run lint · npm run typecheck · npm run coverage · node dist/cli/index.js demo
+
+The npm names `mandate-mcp` and `mandate` belong to other projects; the package name is decided in build step 8. Never write `npx mandate-mcp` or `npx mandate` in docs or printed hints: that runs a stranger's package. Printed commands derive the name from package.json.
 
 ## Conventions
 

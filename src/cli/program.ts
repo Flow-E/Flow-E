@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { Command, InvalidArgumentError } from 'commander';
 import { ConfigError, parseConfig } from '../config/schema.js';
 import { formatMoney } from '../engine/money.js';
@@ -11,6 +12,8 @@ import { runAudit, runReceipt, runVerify, type CommandResult } from './ledger-co
 import { serveStdio } from '../mcp/stdio.js';
 import { DEFAULT_PANEL_PORT, PanelError, startPanel } from '../panel/server.js';
 import { ActionError } from '../control/actions.js';
+import { DemoError, demoServeCommand, setupDemo } from '../demo/setup.js';
+import { demoInstructions } from './demo-command.js';
 import {
   defaultActor,
   runCooloffCancel,
@@ -20,16 +23,9 @@ import {
 } from './control-commands.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as {
+  name: string;
   version: string;
 };
-
-/** Commands from later build steps are listed now so `--help` shows the whole surface. */
-function planned(step: number) {
-  return () => {
-    process.stderr.write(`Not implemented yet (build step ${step}).\n`);
-    process.exitCode = 1;
-  };
-}
 
 interface GlobalOptions {
   home: string;
@@ -45,7 +41,8 @@ function report(err: unknown): void {
     err instanceof LedgerError ||
     err instanceof ReceiptError ||
     err instanceof ActionError ||
-    err instanceof PanelError;
+    err instanceof PanelError ||
+    err instanceof DemoError;
   process.stderr.write(`${known ? err.message : `Unexpected error: ${(err as Error).message}`}\n`);
   process.exitCode = 1;
 }
@@ -267,8 +264,43 @@ Press Ctrl+C to stop.
     });
   program
     .command('demo')
-    .description('run with fictional demo agents and suppliers')
-    .action(planned(7));
+    .description('set up a fictional demo, start the panel and print a prompt for Claude')
+    .option('--dir <dir>', 'demo folder (created if missing)', 'mandate-demo')
+    .option('--port <n>', 'control panel port', positiveInt, DEFAULT_PANEL_PORT)
+    .option('--no-panel', 'do not start the control panel')
+    .option('--reset', 'delete the demo folder first (only one made by "mandate demo")', false)
+    .action(async (_opts: unknown, cmd: Command) => {
+      const o = cmd.opts<{ dir: string; port: number; panel: boolean; reset: boolean }>();
+      try {
+        const setup = setupDemo({ dir: o.dir, reset: o.reset, now: Date.now() });
+        const serve = demoServeCommand(setup, {
+          cliPath: realpathSync(process.argv[1] ?? fileURLToPath(import.meta.url)),
+          nodePath: process.execPath,
+          packageName: pkg.name,
+          version: pkg.version,
+          platform: process.platform,
+        });
+        const panel = o.panel
+          ? await startPanel({
+              home: setup.home,
+              configPath: setup.configPath,
+              port: o.port,
+              actor: 'demo owner (panel)',
+            })
+          : null;
+        process.stdout.write(demoInstructions(setup, serve, panel?.url ?? null) + '\n');
+        if (panel) {
+          process.stdout.write('\nThe panel keeps running. Press Ctrl+C to stop it.\n');
+          const stop = () => {
+            void panel.close().then(() => process.exit(0));
+          };
+          process.once('SIGINT', stop);
+          process.once('SIGTERM', stop);
+        }
+      } catch (err) {
+        report(err);
+      }
+    });
 
   return program;
 }
