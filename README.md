@@ -1,11 +1,65 @@
 # mandate-mcp
 
-> **Status: early development (v0.1).** The policy engine, agent credentials and signed ledger
-> work; the MCP server and control panel are being built. Nothing here moves real money.
+> **Status: early development (v0.1).** The policy engine, agent credentials, signed ledger and
+> MCP server work; the human control panel is being built. Nothing here moves real money.
 
 Give an AI agent a **mandate**: a verified identity, a budget and rules, human approval above a
 threshold, a kill switch, and a signed receipt for every decision. `mandate-mcp` is an open-source
 MCP server that _authorizes_ payments an agent asks for. It never holds or moves funds.
+
+## Connect an agent
+
+```sh
+npx mandate init                      # once: issuer keys and a starter mandate.yaml
+npx mandate agent add lab-procurement # once per agent: a signed credential
+```
+
+Then start one MCP server per agent. Use **absolute paths**, because the client starts the server
+from its own working directory.
+
+**Claude Desktop** (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "mandate": {
+      "command": "npx",
+      "args": ["-y", "mandate-mcp", "serve", "--agent", "lab-procurement"],
+      "env": {
+        "MANDATE_HOME": "/absolute/path/to/project/.mandate",
+        "MANDATE_CONFIG": "/absolute/path/to/project/mandate.yaml"
+      }
+    }
+  }
+}
+```
+
+**Claude Code**:
+
+```sh
+claude mcp add mandate   -e MANDATE_HOME=/absolute/path/to/project/.mandate   -e MANDATE_CONFIG=/absolute/path/to/project/mandate.yaml   -- npx -y mandate-mcp serve --agent lab-procurement
+```
+
+On Windows, use `"command": "cmd", "args": ["/c", "npx", "-y", "mandate-mcp", …]` (or `-- cmd /c npx …`
+for Claude Code). Until the package is on npm, replace `npx -y mandate-mcp` with
+`node /absolute/path/to/mandate-mcp/dist/cli/index.js`.
+
+The agent gets four tools:
+
+| Tool              | What it does                                                                   |
+| ----------------- | ------------------------------------------------------------------------------ |
+| `check_mandate`   | Remaining budget today, limits, allowed currencies, categories and suppliers   |
+| `request_payment` | Runs the rules, records the decision, returns it with a payment id and receipt |
+| `get_payment`     | Status of one of the agent's own payments                                      |
+| `list_payments`   | The agent's recent payments                                                    |
+
+There is no tool to approve, change policy or unfreeze. The server re-reads `mandate.yaml` and
+the credential on every call, so an owner's edit (`status: frozen`, a lower budget) applies at
+once. To try it with the MCP Inspector:
+
+```sh
+npx @modelcontextprotocol/inspector --cli -e MANDATE_HOME=$PWD/.mandate -e MANDATE_CONFIG=$PWD/mandate.yaml   npx mandate serve --agent lab-procurement --method tools/list
+```
 
 ## How a payment request is decided
 
@@ -69,6 +123,10 @@ npx mandate verify receipt.json            # signature, hash, and position in th
 npx mandate verify receipt.json --pubkey issuer.pub --offline   # an auditor with only the public key
 ```
 
+**Who sees what.** The MCP server process reads the issuer private key so that it can sign
+receipts. The model only sees tool results: no tool returns keys, credentials or signatures, and
+an agent can only read its own payments.
+
 Limits, stated plainly: the issuer private key can rewrite history, so protect it. Deleting
 entries from the **end** of the ledger is not visible to `audit` alone. Any receipt someone else
 holds for a removed entry fails `verify`, and anchoring the ledger head externally is on the
@@ -85,7 +143,7 @@ npx mandate check mandate.yaml
 ## Roadmap
 
 1. ~~Project skeleton~~ · 2. ~~Policy engine~~ · 3. ~~Know Your Agent credentials~~ · 4. ~~Hash-chained
-   ledger and signed receipts~~ · 5. MCP server · 6. Human control (CLI and local panel) · 7. Demo mode
+   ledger and signed receipts~~ · 5. ~~MCP server~~ · 6. Human control (CLI and local panel) · 7. Demo mode
    and docs · 8. Release
 
 ## Licence

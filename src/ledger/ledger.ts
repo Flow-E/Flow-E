@@ -256,28 +256,55 @@ export class Ledger {
     return entry ? toReceipt(this.issuer, entry) : undefined;
   }
 
-  /** This agent's payments, shaped for the policy engine. */
-  paymentViews(agentId: string): LedgerEntryView[] {
+  /** This agent's payments, oldest first. */
+  payments(agentId: string): PaymentRecord[] {
     return this.db
       .prepare<[string, string], Row>(
         'SELECT * FROM entries WHERE agent_id = ? AND type = ? ORDER BY seq',
       )
       .all(agentId, PAYMENT_DECISION)
-      .map((row) => {
-        const data = JSON.parse(row.data) as {
-          payment_id: string;
-          request: { merchant: string };
-          decision: 'approved' | 'declined' | 'review';
-          amount_base: number | null;
-        };
-        return {
-          id: data.payment_id,
-          merchant: data.request.merchant,
-          amountBase: data.amount_base ?? 0,
-          status: data.decision,
-          createdAt: Date.parse(row.created_at),
-        };
-      });
+      .map(toPayment);
+  }
+
+  /** One of this agent's payments, by payment id or receipt id. Other agents' payments are invisible. */
+  payment(agentId: string, id: string): PaymentRecord | undefined {
+    const entry = this.find(id);
+    if (!entry || entry.type !== PAYMENT_DECISION || entry.agent_id !== agentId) return undefined;
+    return toPayment({ ...entry, data: canonicalJson(entry.data) });
+  }
+
+  /** This agent's payments, shaped for the policy engine. */
+  paymentViews(agentId: string): LedgerEntryView[] {
+    return this.payments(agentId).map((p) => ({
+      id: p.paymentId,
+      merchant: p.request.merchant,
+      amountBase: p.amountBase ?? 0,
+      status: p.status,
+      createdAt: Date.parse(p.createdAt),
+    }));
+  }
+
+  /**
+   * Read this agent's payments, decide, and record the decision in one write transaction, so
+   * concurrent requests (even from other processes) cannot both spend the same budget.
+   */
+  decide(
+    agentId: string,
+    run: (views: LedgerEntryView[]) => {
+      paymentId: string;
+      request: PaymentRequest;
+      result: EvaluationResult;
+      baseCurrency: string;
+      now: number;
+    },
+  ): { receipt: Receipt; result: EvaluationResult } {
+    if (!this.signer) throw new LedgerError('The ledger was opened read-only.');
+    return this.db
+      .transaction(() => {
+        const decision = run(this.paymentViews(agentId));
+        return { receipt: this.appendDecision({ agentId, ...decision }), result: decision.result };
+      })
+      .immediate();
   }
 
   /**
@@ -341,6 +368,54 @@ export class Ledger {
     const count = expectedSeq - 1;
     return { ok: true, entries: count, head: count === 0 ? null : { seq: count, hash: prevHash } };
   }
+}
+
+/** A payment as the agent and the owner see it. */
+export interface PaymentRecord {
+  paymentId: string;
+  receiptId: string;
+  agentId: string;
+  status: 'approved' | 'declined' | 'review';
+  rule: string | null;
+  reason: string;
+  request: {
+    merchant: string;
+    amount: number;
+    currency: string;
+    category: string;
+    country: string;
+    memo?: string;
+  };
+  amountBase: number | null;
+  baseCurrency: string;
+  createdAt: string;
+  cancellableUntil: string | null;
+}
+
+function toPayment(row: Row): PaymentRecord {
+  const d = JSON.parse(row.data) as {
+    payment_id: string;
+    request: PaymentRecord['request'];
+    decision: PaymentRecord['status'];
+    rule: string | null;
+    reason: string;
+    amount_base: number | null;
+    base_currency: string;
+    cancellable_until: string | null;
+  };
+  return {
+    paymentId: d.payment_id,
+    receiptId: row.id,
+    agentId: row.agent_id,
+    status: d.decision,
+    rule: d.rule,
+    reason: d.reason,
+    request: d.request,
+    amountBase: d.amount_base,
+    baseCurrency: d.base_currency,
+    createdAt: row.created_at,
+    cancellableUntil: d.cancellable_until,
+  };
 }
 
 function fromRow(row: Row): Entry {

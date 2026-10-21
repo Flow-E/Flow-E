@@ -4,6 +4,7 @@ export {
   PAYMENT_DECISION,
   newId,
   type AuditResult,
+  type PaymentRecord,
   type Signer,
 } from './ledger.js';
 export {

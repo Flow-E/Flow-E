@@ -200,18 +200,41 @@ const perPaymentLimit: Rule = ({ mandate, ctx, facts }) => {
 
 // 8. Daily budget ----------------------------------------------------------------------------
 
-const dailyBudget: Rule = ({ mandate, ctx, facts }) => {
-  const amt = amountBase(facts);
-  const today = localTime(ctx.now, ctx.policy.timezone).date;
+export interface DailySpend {
+  /** Local calendar date, YYYY-MM-DD. */
+  date: string;
+  approved: number;
+  pending: number;
+  remaining: number;
+}
+
+/** Today's committed spend in base minor units: approved plus pending review. */
+export function dailySpend(
+  ledger: readonly LedgerEntryView[],
+  now: number,
+  timezone: string,
+  dailyBudgetBase: number,
+): DailySpend {
+  const date = localTime(now, timezone).date;
   let approved = 0;
   let pending = 0;
-  for (const e of ctx.ledger) {
-    if (localTime(e.createdAt, ctx.policy.timezone).date !== today) continue;
+  for (const e of ledger) {
+    if (localTime(e.createdAt, timezone).date !== date) continue;
     if (e.status === 'approved') approved += e.amountBase;
     else if (e.status === 'review') pending += e.amountBase;
   }
+  return { date, approved, pending, remaining: Math.max(0, dailyBudgetBase - approved - pending) };
+}
+
+const dailyBudget: Rule = ({ mandate, ctx, facts }) => {
+  const amt = amountBase(facts);
+  const {
+    date: today,
+    approved,
+    pending,
+    remaining,
+  } = dailySpend(ctx.ledger, ctx.now, ctx.policy.timezone, mandate.dailyBudget);
   const committed = approved + pending;
-  const remaining = Math.max(0, mandate.dailyBudget - committed);
   const data = {
     date: today,
     approvedTodayBase: approved,

@@ -8,6 +8,7 @@ import { LedgerError } from '../ledger/ledger.js';
 import { ReceiptError } from '../ledger/receipt.js';
 import { DEFAULT_SCOPE, runAgentAdd, runInit } from './kya-commands.js';
 import { runAudit, runReceipt, runVerify, type CommandResult } from './ledger-commands.js';
+import { serveStdio } from '../mcp/stdio.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as {
   version: string;
@@ -134,7 +135,15 @@ export function buildProgram(): Command {
   program
     .command('serve')
     .description('start the MCP server (stdio) for one agent')
-    .action(planned(5));
+    .requiredOption('--agent <id>', 'agent to serve; needs a mandate and a credential')
+    .action(async (_opts: unknown, cmd: Command) => {
+      const o = cmd.optsWithGlobals<GlobalOptions & { agent: string }>();
+      try {
+        await serveStdio({ home: o.home, configPath: o.config, agentId: o.agent });
+      } catch (err) {
+        report(err);
+      }
+    });
   program.command('approve <id>').description('approve a payment in review').action(planned(6));
   program.command('decline <id>').description('decline a payment in review').action(planned(6));
   program

@@ -3,3 +3,4 @@ export { ConfigError, parseConfig, type AgentConfig, type MandateConfig } from '
 export * from './kya/index.js';
 export { canonicalJson } from './crypto/canonical.js';
 export * from './ledger/index.js';
+export * from './mcp/index.js';
