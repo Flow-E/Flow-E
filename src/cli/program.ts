@@ -4,7 +4,10 @@ import { ConfigError, parseConfig } from '../config/schema.js';
 import { formatMoney } from '../engine/money.js';
 import { CredentialError } from '../kya/credential.js';
 import { KeyStoreError } from '../kya/store.js';
+import { LedgerError } from '../ledger/ledger.js';
+import { ReceiptError } from '../ledger/receipt.js';
 import { DEFAULT_SCOPE, runAgentAdd, runInit } from './kya-commands.js';
+import { runAudit, runReceipt, runVerify, type CommandResult } from './ledger-commands.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as {
   version: string;
@@ -26,9 +29,24 @@ interface GlobalOptions {
 /** Print expected errors plainly and set a failing exit code. None of them carry key material. */
 function report(err: unknown): void {
   const known =
-    err instanceof ConfigError || err instanceof KeyStoreError || err instanceof CredentialError;
+    err instanceof ConfigError ||
+    err instanceof KeyStoreError ||
+    err instanceof CredentialError ||
+    err instanceof LedgerError ||
+    err instanceof ReceiptError;
   process.stderr.write(`${known ? err.message : `Unexpected error: ${(err as Error).message}`}\n`);
   process.exitCode = 1;
+}
+
+/** Print a command's result; a failed check exits 1. */
+function emit(run: () => CommandResult): void {
+  try {
+    const result = run();
+    (result.ok ? process.stdout : process.stderr).write(result.text + '\n');
+    if (!result.ok) process.exitCode = 1;
+  } catch (err) {
+    report(err);
+  }
 }
 
 function positiveInt(value: string): number {
@@ -140,9 +158,30 @@ export function buildProgram(): Command {
   program.command('export').description('export the ledger as CSV').action(planned(6));
   program
     .command('verify <receipt>')
-    .description('verify a signed receipt and its chain position')
-    .action(planned(4));
-  program.command('audit').description('verify the whole ledger hash chain').action(planned(4));
+    .description('verify a signed receipt (offline, public key only) and its chain position')
+    .option('--pubkey <file>', 'issuer public key (default: <home>/issuer.pub)')
+    .option('--ledger <file>', 'ledger to check the position in (default: <home>/ledger.db)')
+    .option('--offline', 'check signature and hash only, without a ledger')
+    .action((receipt: string, _opts: unknown, cmd: Command) => {
+      const o = cmd.optsWithGlobals<
+        GlobalOptions & { pubkey?: string; ledger?: string; offline?: boolean }
+      >();
+      emit(() => runVerify({ ...o, receipt }));
+    });
+  program
+    .command('audit')
+    .description('verify the whole ledger: sequence, hash chain and every signature')
+    .option('--ledger <file>', 'ledger file (default: <home>/ledger.db)')
+    .action((_opts: unknown, cmd: Command) => {
+      emit(() => runAudit(cmd.optsWithGlobals<GlobalOptions & { ledger?: string }>()));
+    });
+  program
+    .command('receipt <id>')
+    .description('print the signed receipt for a receipt id or payment id')
+    .option('--ledger <file>', 'ledger file (default: <home>/ledger.db)')
+    .action((id: string, _opts: unknown, cmd: Command) => {
+      emit(() => runReceipt({ ...cmd.optsWithGlobals<GlobalOptions & { ledger?: string }>(), id }));
+    });
   program
     .command('demo')
     .description('run with fictional demo agents and suppliers')

@@ -25,6 +25,8 @@ npm run build · npm test · npm run lint · npm run typecheck · npm run covera
 - Demo data is fictional and labelled as such. No real company names as suppliers.
 - Never log private keys, tokens, or full credentials.
 - TypeScript stays on 5.9 until typescript-eslint supports TS 7.
+- better-sqlite3 ships prebuilt binaries; its node-gyp install script is denied (`allowScripts` in package.json) so installs need no C++ toolchain.
+- The ledger is append-only: status changes are new entries, never row updates.
 
 ## Out of scope for v1
 

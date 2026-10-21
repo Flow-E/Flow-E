@@ -1,7 +1,7 @@
 # mandate-mcp
 
-> **Status: early development (v0.1).** The policy engine and agent credentials work; the MCP
-> server, ledger and control panel are being built. Nothing here moves real money.
+> **Status: early development (v0.1).** The policy engine, agent credentials and signed ledger
+> work; the MCP server and control panel are being built. Nothing here moves real money.
 
 Give an AI agent a **mandate**: a verified identity, a budget and rules, human approval above a
 threshold, a kill switch, and a signed receipt for every decision. `mandate-mcp` is an open-source
@@ -50,6 +50,30 @@ npx mandate agent add lab-procurement # signed credential in .mandate/credential
 - In v1 the credential file is a bearer token: whoever holds it can act as that agent. Keep it as
   safe as a password. To stop an agent at once, freeze it.
 
+## Ledger and receipts
+
+Every decision is written to an append-only SQLite ledger (`.mandate/ledger.db`) and gets a
+signed receipt.
+
+- Each entry stores the SHA-256 hash of the entry before it, so changing, removing or reordering
+  any entry breaks the chain. SQL triggers refuse `UPDATE` and `DELETE`.
+- Each entry hash is signed with the issuer key. Someone who edits the file and recomputes the
+  hashes still cannot forge the signatures.
+- A receipt is the entry plus its signature, as canonical JSON. Anyone with only the issuer
+  **public** key can verify it offline.
+
+```sh
+npx mandate audit                          # check the whole chain; names the first broken entry
+npx mandate receipt <receipt-or-payment-id> > receipt.json
+npx mandate verify receipt.json            # signature, hash, and position in the local ledger
+npx mandate verify receipt.json --pubkey issuer.pub --offline   # an auditor with only the public key
+```
+
+Limits, stated plainly: the issuer private key can rewrite history, so protect it. Deleting
+entries from the **end** of the ledger is not visible to `audit` alone. Any receipt someone else
+holds for a removed entry fails `verify`, and anchoring the ledger head externally is on the
+roadmap.
+
 ## Configuration
 
 See [`mandate.example.yaml`](mandate.example.yaml). Validate a file with:
@@ -60,8 +84,8 @@ npx mandate check mandate.yaml
 
 ## Roadmap
 
-1. ~~Project skeleton~~ · 2. ~~Policy engine~~ · 3. ~~Know Your Agent credentials~~ · 4. Hash-chained
-   ledger and signed receipts · 5. MCP server · 6. Human control (CLI and local panel) · 7. Demo mode
+1. ~~Project skeleton~~ · 2. ~~Policy engine~~ · 3. ~~Know Your Agent credentials~~ · 4. ~~Hash-chained
+   ledger and signed receipts~~ · 5. MCP server · 6. Human control (CLI and local panel) · 7. Demo mode
    and docs · 8. Release
 
 ## Licence
