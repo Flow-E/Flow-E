@@ -7,6 +7,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runAgentAdd, runInit } from '../../src/cli/kya-commands.js';
 import { loadIssuer, storePaths } from '../../src/kya/store.js';
 import { newId } from '../../src/ledger/ledger.js';
+import {
+  cancelCoolingOff,
+  resolvePayment,
+  setAgentFrozen,
+  setKillSwitch,
+} from '../../src/control/actions.js';
 import { createMandateServer, type MandateServer } from '../../src/mcp/server.js';
 import { evaluate } from '../../src/engine/evaluate.js';
 import { MINUTE, NOW, context, credential, mandate, request } from '../engine/fixtures.js';
@@ -354,5 +360,73 @@ describe('startup', () => {
         agentId: 'lab-procurement',
       }),
     ).toThrow(/mandate init/);
+  });
+});
+
+describe('human control, seen through the agent tools', () => {
+  const human = () => ({ by: 'M. Keller', now });
+
+  it('a payment in review becomes approved after a human acts, and get_payment shows it', async () => {
+    const made = (await buy({ amount: '6000' })).json();
+    now += 5 * MINUTE;
+    resolvePayment(mandateServer.ledger, made.payment_id as string, 'approved', {
+      ...human(),
+      note: 'Quote checked',
+    });
+    expect((await call('get_payment', { id: made.payment_id })).json()).toMatchObject({
+      status: 'approved',
+      decided_by: 'M. Keller',
+      decided_at: '2026-10-21T10:05:00.000Z',
+      note_from_human: 'Quote checked',
+      cancellable_until: '2026-10-21T10:15:00.000Z',
+    });
+  });
+
+  it('a payment in review becomes declined after a human acts', async () => {
+    const made = (await buy({ amount: '6000' })).json();
+    resolvePayment(mandateServer.ledger, made.payment_id as string, 'declined', human());
+    expect((await call('get_payment', { id: made.payment_id })).json().status).toBe('declined');
+    expect((await call('check_mandate')).json().today).toMatchObject({
+      pending_review: 'CHF 0.00',
+    });
+  });
+
+  it('a cancelled payment shows as cancelled and no longer counts against the budget', async () => {
+    const made = (await buy()).json();
+    cancelCoolingOff(mandateServer.ledger, made.payment_id as string, human());
+    expect((await call('get_payment', { id: made.payment_id })).json().status).toBe('cancelled');
+    expect((await call('check_mandate')).json().today).toMatchObject({ approved: 'CHF 0.00' });
+  });
+
+  it('freezing the agent declines its next request; unfreezing restores it', async () => {
+    setAgentFrozen(mandateServer.ledger, 'lab-procurement', true, human());
+    expect((await call('check_mandate')).json().agent).toMatchObject({ status: 'frozen' });
+    expect((await buy()).json()).toMatchObject({ decision: 'declined', rule: 'AGENT_STATUS' });
+    setAgentFrozen(mandateServer.ledger, 'lab-procurement', false, human());
+    expect((await buy()).json()).toMatchObject({ decision: 'approved' });
+  });
+
+  it('freezing another agent does not affect this one', async () => {
+    setAgentFrozen(mandateServer.ledger, 'marketing-bot', true, human());
+    expect((await buy()).json()).toMatchObject({ decision: 'approved' });
+  });
+
+  it('the kill switch declines every request until it is released', async () => {
+    setKillSwitch(mandateServer.ledger, true, human());
+    expect((await call('check_mandate')).json().agent).toMatchObject({
+      status: 'blocked: the organisation kill switch is on',
+    });
+    expect((await buy()).json()).toMatchObject({ decision: 'declined', rule: 'KILL_SWITCH' });
+    setKillSwitch(mandateServer.ledger, false, human());
+    expect((await buy()).json()).toMatchObject({ decision: 'approved' });
+  });
+
+  it('the agent tools still cannot approve, freeze or unfreeze anything', async () => {
+    const { tools } = await client.listTools();
+    const names = tools.map((t) => t.name).join(' ');
+    expect(names).not.toMatch(/approve|decline|freeze|kill|cancel|policy|resolve/);
+    await expect(
+      client.callTool({ name: 'approve_payment', arguments: { id: 'x' } }),
+    ).resolves.toMatchObject({ isError: true });
   });
 });

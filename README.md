@@ -1,7 +1,7 @@
 # mandate-mcp
 
-> **Status: early development (v0.1).** The policy engine, agent credentials, signed ledger and
-> MCP server work; the human control panel is being built. Nothing here moves real money.
+> **Status: early development (v0.1).** The policy engine, agent credentials, signed ledger, MCP
+> server and human controls work; demo mode and release prep come next. Nothing here moves real money.
 
 Give an AI agent a **mandate**: a verified identity, a budget and rules, human approval above a
 threshold, a kill switch, and a signed receipt for every decision. `mandate-mcp` is an open-source
@@ -60,6 +60,37 @@ once. To try it with the MCP Inspector:
 ```sh
 npx @modelcontextprotocol/inspector --cli -e MANDATE_HOME=$PWD/.mandate -e MANDATE_CONFIG=$PWD/mandate.yaml   npx mandate serve --agent lab-procurement --method tools/list
 ```
+
+## Human control
+
+Only the owner can approve, decline, freeze, or cancel. The agent's tools cannot do any of these.
+Every action is a signed ledger entry that records who acted, when, and an optional note.
+
+```sh
+npx mandate approve <payment-id> --note "Checked the quote"   # or: decline
+npx mandate freeze lab-procurement                          # one agent; unfreeze to undo
+npx mandate freeze --all                                    # kill switch: every payment is declined
+npx mandate unfreeze --all                                  # release it (frozen agents stay frozen)
+npx mandate cooloff-cancel <payment-id>                     # within 10 min of a first payment to a supplier
+npx mandate export --out ledger.csv                         # the whole ledger as CSV
+npx mandate panel                                           # the control panel in your browser
+```
+
+`--by` sets the name recorded for an action (default: your OS user name). Changes take effect on
+the agent's next request; no restart is needed.
+
+The **control panel** shows live payment requests, the approval queue, cooling-off payments, each
+agent's budget for today, the ledger with its integrity check, a freeze button per agent, the kill
+switch, and a CSV export. It is built to be safe on a shared machine:
+
+- It listens on `127.0.0.1` only and refuses requests whose `Host` is not a loopback name, which
+  blocks DNS-rebinding attacks.
+- Each start prints a new random 256-bit token inside the link's `#fragment`, so the token never
+  appears in server or proxy logs. The page removes it from the address bar. Every API call sends
+  the token as a header, which other websites cannot forge.
+- A strict Content-Security-Policy allows no inline scripts. Supplier names and memos come from the
+  agent, so the page renders them as text and never as HTML. The CSV export defuses spreadsheet
+  formulas.
 
 ## How a payment request is decided
 
@@ -143,7 +174,7 @@ npx mandate check mandate.yaml
 ## Roadmap
 
 1. ~~Project skeleton~~ · 2. ~~Policy engine~~ · 3. ~~Know Your Agent credentials~~ · 4. ~~Hash-chained
-   ledger and signed receipts~~ · 5. ~~MCP server~~ · 6. Human control (CLI and local panel) · 7. Demo mode
+   ledger and signed receipts~~ · 5. ~~MCP server~~ · 6. ~~Human control (CLI and local panel)~~ · 7. Demo mode
    and docs · 8. Release
 
 ## Licence

@@ -1,9 +1,15 @@
 export {
   Ledger,
   LedgerError,
+  AGENT_FREEZE,
+  ALL_AGENTS,
+  KILL_SWITCH,
+  PAYMENT_CANCELLED,
   PAYMENT_DECISION,
+  PAYMENT_RESOLVED,
   newId,
   type AuditResult,
+  type Controls,
   type PaymentRecord,
   type Signer,
 } from './ledger.js';

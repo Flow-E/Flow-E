@@ -50,7 +50,21 @@ CREATE TRIGGER IF NOT EXISTS entries_no_delete BEFORE DELETE ON entries
 BEGIN SELECT RAISE(ABORT, 'the ledger is append-only'); END;
 `;
 
+/** Entry types. Status changes are new entries; nothing is ever updated in place. */
 export const PAYMENT_DECISION = 'payment.decision';
+/** A human approved or declined a payment that was in review. */
+export const PAYMENT_RESOLVED = 'payment.resolved';
+/** A human cancelled an approved payment inside its cooling-off window. */
+export const PAYMENT_CANCELLED = 'payment.cancelled';
+export const AGENT_FREEZE = 'control.agent_freeze';
+export const KILL_SWITCH = 'control.kill_switch';
+/** agent_id used for entries that concern every agent. */
+export const ALL_AGENTS = '*';
+
+export interface Controls {
+  killSwitch: { on: boolean; by: string; at: string } | null;
+  frozen: Record<string, { frozen: boolean; by: string; at: string }>;
+}
 
 export class LedgerError extends Error {
   override name = 'LedgerError';
@@ -256,21 +270,51 @@ export class Ledger {
     return entry ? toReceipt(this.issuer, entry) : undefined;
   }
 
-  /** This agent's payments, oldest first. */
-  payments(agentId: string): PaymentRecord[] {
-    return this.db
-      .prepare<[string, string], Row>(
-        'SELECT * FROM entries WHERE agent_id = ? AND type = ? ORDER BY seq',
-      )
-      .all(agentId, PAYMENT_DECISION)
-      .map(toPayment);
+  /**
+   * Payments with their current status, oldest first: the engine's decision with any later
+   * human approval, decline or cancellation folded in. One agent's, or everyone's.
+   */
+  payments(agentId?: string): PaymentRecord[] {
+    const types = [PAYMENT_DECISION, PAYMENT_RESOLVED, PAYMENT_CANCELLED];
+    const rows =
+      agentId === undefined
+        ? this.db
+            .prepare<string[], Row>('SELECT * FROM entries WHERE type IN (?, ?, ?) ORDER BY seq')
+            .all(...types)
+        : this.db
+            .prepare<string[], Row>(
+              'SELECT * FROM entries WHERE agent_id = ? AND type IN (?, ?, ?) ORDER BY seq',
+            )
+            .all(agentId, ...types);
+    return foldPayments(rows);
   }
 
   /** One of this agent's payments, by payment id or receipt id. Other agents' payments are invisible. */
   payment(agentId: string, id: string): PaymentRecord | undefined {
-    const entry = this.find(id);
-    if (!entry || entry.type !== PAYMENT_DECISION || entry.agent_id !== agentId) return undefined;
-    return toPayment({ ...entry, data: canonicalJson(entry.data) });
+    return this.payments(agentId).find((p) => p.paymentId === id || p.receiptId === id);
+  }
+
+  /** Kill switch and per-agent freezes, as last set by a human. */
+  controls(): Controls {
+    const controls: Controls = { killSwitch: null, frozen: {} };
+    const rows = this.db
+      .prepare<[string, string], Row>('SELECT * FROM entries WHERE type IN (?, ?) ORDER BY seq')
+      .all(KILL_SWITCH, AGENT_FREEZE);
+    for (const row of rows) {
+      const d = JSON.parse(row.data) as { on?: boolean; frozen?: boolean; by: string };
+      if (row.type === KILL_SWITCH) {
+        controls.killSwitch = { on: d.on === true, by: d.by, at: row.created_at };
+      } else {
+        controls.frozen[row.agent_id] = { frozen: d.frozen === true, by: d.by, at: row.created_at };
+      }
+    }
+    return controls;
+  }
+
+  /** Run reads and appends as one write transaction, serialised against other processes. */
+  write<T>(run: () => T): T {
+    if (!this.signer) throw new LedgerError('The ledger was opened read-only.');
+    return this.db.transaction(run).immediate();
   }
 
   /** This agent's payments, shaped for the policy engine. */
@@ -298,13 +342,10 @@ export class Ledger {
       now: number;
     },
   ): { receipt: Receipt; result: EvaluationResult } {
-    if (!this.signer) throw new LedgerError('The ledger was opened read-only.');
-    return this.db
-      .transaction(() => {
-        const decision = run(this.paymentViews(agentId));
-        return { receipt: this.appendDecision({ agentId, ...decision }), result: decision.result };
-      })
-      .immediate();
+    return this.write(() => {
+      const decision = run(this.paymentViews(agentId));
+      return { receipt: this.appendDecision({ agentId, ...decision }), result: decision.result };
+    });
   }
 
   /**
@@ -375,7 +416,9 @@ export interface PaymentRecord {
   paymentId: string;
   receiptId: string;
   agentId: string;
-  status: 'approved' | 'declined' | 'review';
+  status: 'approved' | 'declined' | 'review' | 'cancelled';
+  /** The engine's original decision. */
+  engineDecision: 'approved' | 'declined' | 'review';
   rule: string | null;
   reason: string;
   request: {
@@ -390,32 +433,71 @@ export interface PaymentRecord {
   baseCurrency: string;
   createdAt: string;
   cancellableUntil: string | null;
+  /** "engine", or the person who last changed the status. */
+  decidedBy: string;
+  /** When a human last changed the status; null if never. */
+  updatedAt: string | null;
+  note: string | null;
 }
 
-function toPayment(row: Row): PaymentRecord {
-  const d = JSON.parse(row.data) as {
-    payment_id: string;
-    request: PaymentRecord['request'];
-    decision: PaymentRecord['status'];
-    rule: string | null;
-    reason: string;
-    amount_base: number | null;
-    base_currency: string;
-    cancellable_until: string | null;
-  };
-  return {
-    paymentId: d.payment_id,
-    receiptId: row.id,
-    agentId: row.agent_id,
-    status: d.decision,
-    rule: d.rule,
-    reason: d.reason,
-    request: d.request,
-    amountBase: d.amount_base,
-    baseCurrency: d.base_currency,
-    createdAt: row.created_at,
-    cancellableUntil: d.cancellable_until,
-  };
+interface DecisionData {
+  payment_id: string;
+  request: PaymentRecord['request'];
+  decision: PaymentRecord['engineDecision'];
+  rule: string | null;
+  reason: string;
+  amount_base: number | null;
+  base_currency: string;
+  cancellable_until: string | null;
+}
+
+interface HumanActionData {
+  payment_id: string;
+  status?: 'approved' | 'declined';
+  by: string;
+  note: string | null;
+  cancellable_until?: string | null;
+}
+
+function foldPayments(rows: Row[]): PaymentRecord[] {
+  const byId = new Map<string, PaymentRecord>();
+  for (const row of rows) {
+    if (row.type === PAYMENT_DECISION) {
+      const d = JSON.parse(row.data) as DecisionData;
+      byId.set(d.payment_id, {
+        paymentId: d.payment_id,
+        receiptId: row.id,
+        agentId: row.agent_id,
+        status: d.decision,
+        engineDecision: d.decision,
+        rule: d.rule,
+        reason: d.reason,
+        request: d.request,
+        amountBase: d.amount_base,
+        baseCurrency: d.base_currency,
+        createdAt: row.created_at,
+        cancellableUntil: d.cancellable_until,
+        decidedBy: 'engine',
+        updatedAt: null,
+        note: null,
+      });
+      continue;
+    }
+    const d = JSON.parse(row.data) as HumanActionData;
+    const p = byId.get(d.payment_id);
+    if (!p) continue;
+    p.decidedBy = d.by;
+    p.updatedAt = row.created_at;
+    p.note = d.note;
+    if (row.type === PAYMENT_CANCELLED) {
+      p.status = 'cancelled';
+      p.cancellableUntil = null;
+    } else if (d.status) {
+      p.status = d.status;
+      p.cancellableUntil = d.cancellable_until ?? null;
+    }
+  }
+  return [...byId.values()];
 }
 
 function fromRow(row: Row): Entry {

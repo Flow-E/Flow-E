@@ -4,3 +4,5 @@ export * from './kya/index.js';
 export { canonicalJson } from './crypto/canonical.js';
 export * from './ledger/index.js';
 export * from './mcp/index.js';
+export * from './control/index.js';
+export * from './panel/index.js';

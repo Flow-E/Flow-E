@@ -9,6 +9,15 @@ import { ReceiptError } from '../ledger/receipt.js';
 import { DEFAULT_SCOPE, runAgentAdd, runInit } from './kya-commands.js';
 import { runAudit, runReceipt, runVerify, type CommandResult } from './ledger-commands.js';
 import { serveStdio } from '../mcp/stdio.js';
+import { DEFAULT_PANEL_PORT, PanelError, startPanel } from '../panel/server.js';
+import { ActionError } from '../control/actions.js';
+import {
+  defaultActor,
+  runCooloffCancel,
+  runExport,
+  runFreeze,
+  runResolve,
+} from './control-commands.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as {
   version: string;
@@ -34,7 +43,9 @@ function report(err: unknown): void {
     err instanceof KeyStoreError ||
     err instanceof CredentialError ||
     err instanceof LedgerError ||
-    err instanceof ReceiptError;
+    err instanceof ReceiptError ||
+    err instanceof ActionError ||
+    err instanceof PanelError;
   process.stderr.write(`${known ? err.message : `Unexpected error: ${(err as Error).message}`}\n`);
   process.exitCode = 1;
 }
@@ -144,27 +155,90 @@ export function buildProgram(): Command {
         report(err);
       }
     });
-  program.command('approve <id>').description('approve a payment in review').action(planned(6));
-  program.command('decline <id>').description('decline a payment in review').action(planned(6));
-  program
-    .command('freeze [agent]')
-    .description('freeze one agent, or all with --all (kill switch)')
-    .option('--all', 'freeze every agent')
-    .action(planned(6));
-  program
-    .command('unfreeze [agent]')
-    .description('unfreeze one agent, or all with --all')
-    .option('--all', 'unfreeze every agent')
-    .action(planned(6));
-  program
-    .command('cooloff-cancel <id>')
-    .description('cancel a payment still inside its cooling-off window')
-    .action(planned(6));
+  type ActOptions = GlobalOptions & { by: string; note?: string };
+  const actorOptions = (c: Command) =>
+    c
+      .option('--by <name>', 'who is acting, recorded in the ledger', defaultActor())
+      .option('--note <text>', 'note recorded with the action');
+
+  for (const [name, status] of [
+    ['approve', 'approved'],
+    ['decline', 'declined'],
+  ] as const) {
+    actorOptions(
+      program.command(`${name} <payment-id>`).description(`${name} a payment waiting for review`),
+    ).action((id: string, _opts: unknown, cmd: Command) => {
+      const o = cmd.optsWithGlobals<ActOptions>();
+      emit(() => runResolve({ ...o, id, status, now: Date.now() }));
+    });
+  }
+  for (const [name, frozen] of [
+    ['freeze', true],
+    ['unfreeze', false],
+  ] as const) {
+    actorOptions(
+      program
+        .command(`${name} [agent]`)
+        .description(
+          frozen
+            ? 'freeze one agent, or every agent with --all (kill switch)'
+            : 'unfreeze one agent, or release the kill switch with --all',
+        )
+        .option('--all', frozen ? 'turn the kill switch on' : 'turn the kill switch off', false),
+    ).action((agent: string | undefined, _opts: unknown, cmd: Command) => {
+      const o = cmd.optsWithGlobals<ActOptions & { all: boolean }>();
+      emit(() => runFreeze({ ...o, agent, frozen, now: Date.now() }));
+    });
+  }
+  actorOptions(
+    program
+      .command('cooloff-cancel <payment-id>')
+      .description('cancel an approved payment still inside its 10-minute cooling-off window'),
+  ).action((id: string, _opts: unknown, cmd: Command) => {
+    emit(() => runCooloffCancel({ ...cmd.optsWithGlobals<ActOptions>(), id, now: Date.now() }));
+  });
   program
     .command('panel')
-    .description('open the local control panel on localhost:4848')
-    .action(planned(6));
-  program.command('export').description('export the ledger as CSV').action(planned(6));
+    .description('start the local control panel (127.0.0.1 only, token-protected)')
+    .option('--port <n>', 'port', positiveInt, DEFAULT_PANEL_PORT)
+    .option(
+      '--by <name>',
+      'who is acting, recorded in the ledger',
+      defaultActor().replace('(cli)', '(panel)'),
+    )
+    .action(async (_opts: unknown, cmd: Command) => {
+      const o = cmd.optsWithGlobals<GlobalOptions & { port: number; by: string }>();
+      try {
+        const panel = await startPanel({
+          home: o.home,
+          configPath: o.config,
+          port: o.port,
+          actor: o.by,
+        });
+        process.stdout.write(
+          `Control panel running. Open this link (it contains your access token; do not share it):
+
+  ${panel.url}
+
+Press Ctrl+C to stop.
+`,
+        );
+        const stop = () => {
+          void panel.close().then(() => process.exit(0));
+        };
+        process.once('SIGINT', stop);
+        process.once('SIGTERM', stop);
+      } catch (err) {
+        report(err);
+      }
+    });
+  program
+    .command('export')
+    .description('export the whole ledger as CSV (stdout, or --out file)')
+    .option('--out <file>', 'write to this file instead of stdout')
+    .action((_opts: unknown, cmd: Command) => {
+      emit(() => runExport(cmd.optsWithGlobals<GlobalOptions & { out?: string }>()));
+    });
   program
     .command('verify <receipt>')
     .description('verify a signed receipt (offline, public key only) and its chain position')

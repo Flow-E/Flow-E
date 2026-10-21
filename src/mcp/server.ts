@@ -16,6 +16,7 @@ import type { Credential, PaymentRequest } from '../engine/types.js';
 import { PAYMENT_SCOPE, signatureCheck, type CredentialFile } from '../kya/credential.js';
 import { loadSigningIssuer, readCredential, type SigningIssuer } from '../kya/store.js';
 import { Ledger, newId, type PaymentRecord } from '../ledger/ledger.js';
+import { effectiveStatus } from '../control/actions.js';
 import { join } from 'node:path';
 
 /**
@@ -129,13 +130,16 @@ export function createMandateServer(o: MandateServerOptions): MandateServer {
           m.dailyBudget,
         );
         const hours = policy.businessHours;
+        const controls = ledger.controls();
         return text({
           agent: {
             id: agent.id,
             name: credential?.claims.agent_name ?? agent.id,
             owner: agent.owner,
             organisation: credential?.claims.organisation ?? config.organisation ?? null,
-            status: agent.status,
+            status: controls.killSwitch?.on
+              ? 'blocked: the organisation kill switch is on'
+              : effectiveStatus(agent.status, controls, agent.id),
             credential_expires: credential?.claims.expires_at ?? 'no valid credential',
           },
           base_currency: policy.baseCurrency,
@@ -250,24 +254,32 @@ export function createMandateServer(o: MandateServerOptions): MandateServer {
         };
         const now = clock();
         const paymentId = newId('pay');
-        const { receipt, result } = ledger.decide(agent.id, (views) => ({
-          paymentId,
-          request,
-          baseCurrency: policy.baseCurrency,
-          now,
-          result: evaluate(
-            { id: agent.id, status: agent.status, credential },
-            agent.mandate,
+        const { receipt, result } = ledger.decide(agent.id, (views) => {
+          // Read inside the write transaction: a freeze that lands first always wins.
+          const controls = ledger.controls();
+          return {
+            paymentId,
             request,
-            {
-              now,
-              killSwitch: false,
-              ledger: views,
-              policy,
-              kya: { issuer: issuer.id, requiredScope: PAYMENT_SCOPE, verifySignature },
-            },
-          ),
-        }));
+            baseCurrency: policy.baseCurrency,
+            now,
+            result: evaluate(
+              {
+                id: agent.id,
+                status: effectiveStatus(agent.status, controls, agent.id),
+                credential,
+              },
+              agent.mandate,
+              request,
+              {
+                now,
+                killSwitch: controls.killSwitch?.on === true,
+                ledger: views,
+                policy,
+                kya: { issuer: issuer.id, requiredScope: PAYMENT_SCOPE, verifySignature },
+              },
+            ),
+          };
+        });
         const base = (n: number | null) =>
           n === null ? null : formatMoney(n, policy.baseCurrency, policy.currencyDecimals);
         return text({
@@ -296,7 +308,8 @@ export function createMandateServer(o: MandateServerOptions): MandateServer {
       title: 'Get a payment',
       description:
         'Current status of one of your payments, by payment_id (or receipt_id). A payment in ' +
-        '"review" becomes "approved" or "declined" once a human decides. Read-only.',
+        '"review" becomes "approved" or "declined" once a human decides; an approved payment can ' +
+        'become "cancelled" if a human cancels it during cooling-off. Read-only.',
       inputSchema: {
         id: z.string().trim().min(1).max(100).describe('The payment_id from request_payment.'),
       },
@@ -372,6 +385,9 @@ function publicPayment(p: PaymentRecord, decimals?: Readonly<Record<string, numb
     memo: p.request.memo ?? null,
     requested_at: p.createdAt,
     cancellable_until: p.cancellableUntil,
+    decided_by: p.decidedBy,
+    decided_at: p.updatedAt,
+    note_from_human: p.note,
   };
 }
 
