@@ -4,3 +4,5 @@ coverage/
 *.log
 # local state created by `imprest init` (keys, ledger) — never commit
 .imprest/
+# default folder of "imprest demo" when run inside the repository (fictional data, has keys)
+imprest-demo/
