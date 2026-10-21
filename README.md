@@ -1,7 +1,7 @@
 # mandate-mcp
 
-> **Status: early development (v0.1).** The policy engine works; the MCP server, credentials,
-> ledger and control panel are being built. Nothing here moves real money.
+> **Status: early development (v0.1).** The policy engine and agent credentials work; the MCP
+> server, ledger and control panel are being built. Nothing here moves real money.
 
 Give an AI agent a **mandate**: a verified identity, a budget and rules, human approval above a
 threshold, a kill switch, and a signed receipt for every decision. `mandate-mcp` is an open-source
@@ -34,6 +34,22 @@ integer minor units; foreign amounts are converted with a static rate table and 
 > The blocked-country list in the example is a demo. It is **not** sanctions screening and not
 > legal advice: configure your own screening.
 
+## Know Your Agent credentials
+
+```sh
+npx mandate init                      # issuer key pair in .mandate/ and a starter mandate.yaml
+npx mandate agent add lab-procurement # signed credential in .mandate/credentials/
+```
+
+- The issuer key is Ed25519. `.mandate/issuer.key` is written with mode `0600` and never printed;
+  on Windows, protect the folder with NTFS permissions instead. `init` refuses to overwrite an
+  existing key, because that would invalidate every credential.
+- A credential names the agent, its responsible owner and organisation, its scopes, and when it
+  was issued and expires (default 90 days). It is checked on **every** request: signature, issuer,
+  agent id, validity window and scope. A failure is a decline with a clear reason.
+- In v1 the credential file is a bearer token: whoever holds it can act as that agent. Keep it as
+  safe as a password. To stop an agent at once, freeze it.
+
 ## Configuration
 
 See [`mandate.example.yaml`](mandate.example.yaml). Validate a file with:
@@ -44,7 +60,7 @@ npx mandate check mandate.yaml
 
 ## Roadmap
 
-1. ~~Project skeleton~~ · 2. ~~Policy engine~~ · 3. Know Your Agent credentials · 4. Hash-chained
+1. ~~Project skeleton~~ · 2. ~~Policy engine~~ · 3. ~~Know Your Agent credentials~~ · 4. Hash-chained
    ledger and signed receipts · 5. MCP server · 6. Human control (CLI and local panel) · 7. Demo mode
    and docs · 8. Release
 

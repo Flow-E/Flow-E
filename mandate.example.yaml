@@ -1,4 +1,5 @@
-# Example mandate. Supplier names are fictional.
+# Example mandate. The organisation and supplier names are fictional.
+organisation: 'Example Labs AG (fictional)'
 base_currency: CHF
 timezone: Europe/Zurich
 fx: { EUR: 0.93, USD: 0.80, USDC: 0.80 } # static in v1; adapter later

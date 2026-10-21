@@ -21,6 +21,7 @@
   },
   "files": [
     "dist",
+    "mandate.example.yaml",
     "README.md",
     "LICENSE"
   ],

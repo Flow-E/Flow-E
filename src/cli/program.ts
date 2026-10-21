@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { Command } from 'commander';
+import { Command, InvalidArgumentError } from 'commander';
 import { ConfigError, parseConfig } from '../config/schema.js';
 import { formatMoney } from '../engine/money.js';
+import { CredentialError } from '../kya/credential.js';
+import { KeyStoreError } from '../kya/store.js';
+import { DEFAULT_SCOPE, runAgentAdd, runInit } from './kya-commands.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as {
   version: string;
@@ -15,30 +18,81 @@ function planned(step: number) {
   };
 }
 
+interface GlobalOptions {
+  home: string;
+  config: string;
+}
+
+/** Print expected errors plainly and set a failing exit code. None of them carry key material. */
+function report(err: unknown): void {
+  const known =
+    err instanceof ConfigError || err instanceof KeyStoreError || err instanceof CredentialError;
+  process.stderr.write(`${known ? err.message : `Unexpected error: ${(err as Error).message}`}\n`);
+  process.exitCode = 1;
+}
+
+function positiveInt(value: string): number {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1) throw new InvalidArgumentError('Use a whole number above 0.');
+  return n;
+}
+
 export function buildProgram(): Command {
   const program = new Command('mandate')
     .description(
       'Give AI agents a mandate: identity, budgets and rules, human approval, a kill switch and ' +
         'signed receipts. Authorizes payments only; never moves real money.',
     )
-    .version(pkg.version);
+    .version(pkg.version)
+    .option(
+      '--home <dir>',
+      'state directory (keys, credentials)',
+      process.env.MANDATE_HOME ?? '.mandate',
+    )
+    .option('--config <file>', 'mandate file', process.env.MANDATE_CONFIG ?? 'mandate.yaml');
 
   program
     .command('init')
     .description('create the local issuer key pair and a starter mandate.yaml')
-    .action(planned(3));
+    .action((_opts: unknown, cmd: Command) => {
+      try {
+        process.stdout.write(runInit(cmd.optsWithGlobals<GlobalOptions>()) + '\n');
+      } catch (err) {
+        report(err);
+      }
+    });
 
   const agent = program.command('agent').description('manage agents and their credentials');
   agent
     .command('add <id>')
-    .description('issue a signed Know Your Agent credential for an agent')
-    .action(planned(3));
+    .description('issue a signed Know Your Agent credential for an agent in mandate.yaml')
+    .option('--name <name>', 'display name of the agent (default: its id)')
+    .option('--org <organisation>', 'organisation (default: "organisation" in mandate.yaml)')
+    .option('--days <n>', 'days until the credential expires', positiveInt, 90)
+    .option('--scope <scope...>', 'granted scopes', DEFAULT_SCOPE)
+    .option('--force', 'reissue, replacing an existing credential', false)
+    .action((id: string, _opts: unknown, cmd: Command) => {
+      const o = cmd.optsWithGlobals<
+        GlobalOptions & {
+          name?: string;
+          org?: string;
+          days: number;
+          scope: string[];
+          force: boolean;
+        }
+      >();
+      try {
+        process.stdout.write(runAgentAdd({ ...o, id, now: Date.now() }) + '\n');
+      } catch (err) {
+        report(err);
+      }
+    });
 
   program
     .command('check [file]')
     .description('validate mandate.yaml and print each agent’s mandate')
-    .action((file: string | undefined) => {
-      const path = file ?? 'mandate.yaml';
+    .action((file: string | undefined, _opts: unknown, cmd: Command) => {
+      const path = file ?? cmd.optsWithGlobals<GlobalOptions>().config;
       try {
         const { policy, agents } = parseConfig(readFileSync(path, 'utf8'));
         const fmt = (n: number) => formatMoney(n, policy.baseCurrency, policy.currencyDecimals);

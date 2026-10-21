@@ -40,6 +40,7 @@ const agentSchema = z.strictObject({
 });
 
 export const configSchema = z.strictObject({
+  organisation: z.string().min(1).optional(),
   base_currency: currencyCode,
   timezone: z.string().default('UTC'),
   fx: z.record(currencyCode, z.union([z.number().positive(), z.string()])).default({}),
@@ -69,6 +70,8 @@ export interface AgentConfig {
 }
 
 export interface MandateConfig {
+  /** Shown on credentials issued for these agents. */
+  organisation?: string;
   policy: GlobalPolicy;
   agents: Record<string, AgentConfig>;
 }
@@ -160,5 +163,5 @@ function toEngine(raw: RawConfig): MandateConfig {
     businessHours: { days: raw.business_hours.days, startMinute, endMinute },
   };
   if (decimals) policy.currencyDecimals = decimals;
-  return { policy, agents };
+  return raw.organisation ? { organisation: raw.organisation, policy, agents } : { policy, agents };
 }
