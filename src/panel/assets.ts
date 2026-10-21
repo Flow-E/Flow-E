@@ -9,14 +9,14 @@ export const INDEX_HTML = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mandate control panel</title>
+<title>Imprest control panel</title>
 <link rel="stylesheet" href="/app.css">
 <script src="/app.js" defer></script>
 </head>
 <body>
 <header class="top">
   <div>
-    <h1>Mandate</h1>
+    <h1>Imprest</h1>
     <p class="sub">Local control panel · authorizes payments, never moves money</p>
   </div>
   <div class="kill" id="kill"></div>
@@ -126,7 +126,7 @@ footer { max-width: 1100px; margin: 0 auto; padding: 0 24px 32px; }
 
 export const APP_JS = `'use strict';
 (function () {
-  var TOKEN_KEY = 'mandate-panel-token';
+  var TOKEN_KEY = 'imprest-panel-token';
   var token = '';
   // Take the token from the link's #fragment (never sent to the server), keep it for this tab
   // only, and remove it from the address bar. Also runs when the link is pasted into an open tab.
@@ -184,7 +184,7 @@ export const APP_JS = `'use strict';
       init.body = JSON.stringify(body);
     }
     return fetch(path, init).then(function (res) {
-      if (res.status === 401) throw new Error('The panel token is missing or wrong. Open the link printed by "mandate panel".');
+      if (res.status === 401) throw new Error('The panel token is missing or wrong. Open the link printed by "imprest panel".');
       return res;
     });
   }
@@ -297,7 +297,7 @@ export const APP_JS = `'use strict';
   // Redraw only when the data changed, so polling never steals a click, focus or a selection.
   var lastState = '';
   function refresh() {
-    if (!token) { showError('No panel token. Open the link printed by "mandate panel".'); return; }
+    if (!token) { showError('No panel token. Open the link printed by "imprest panel".'); return; }
     api('GET', '/api/state')
       .then(function (res) { return res.text(); })
       .then(function (body) {
@@ -316,7 +316,7 @@ export const APP_JS = `'use strict';
     $('export').addEventListener('click', function () {
       api('GET', '/api/export.csv')
         .then(function (res) {
-          var name = (/filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '') || [])[1] || 'mandate-ledger.csv';
+          var name = (/filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '') || [])[1] || 'imprest-ledger.csv';
           return res.blob().then(function (blob) { return { blob: blob, name: name }; });
         })
         .then(function (r) {

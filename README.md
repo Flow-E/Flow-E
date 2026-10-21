@@ -1,16 +1,18 @@
-# mandate-mcp
+# Imprest
 
 Give an AI agent a **mandate**: a verified identity, a budget and rules, human approval above a
-threshold, a kill switch, and a signed receipt for every decision. `mandate-mcp` is an open-source
+threshold, a kill switch, and a signed receipt for every decision. **Imprest** is an open-source
 [MCP](https://modelcontextprotocol.io) server that **authorizes** the payments an agent asks for.
 It never holds or moves money.
 
-> **Status: v0.1, early.** Everything below works locally. It has not had an external security
-> review, and it is not a compliance product. See [Security model](#security-model).
+> **Why "Imprest"?** In accounting, an _imprest_ is a fixed float of money entrusted to someone
+> for a purpose, spent within rules, accounted for item by item, and topped back up. That is what
+> an agent's budget should be.
 
-> **Not on npm yet, and the name is not final.** The npm packages called `mandate-mcp` and
-> `mandate` belong to **other, unrelated projects**. Do not run `npx mandate-mcp` or `npx mandate`
-> expecting this code. Until the release, install from a checkout as shown below.
+> **Status: v0.1, early, not yet on npm.** It will be published as `@imprest-hq/mcp`. Until then,
+> install from a checkout as shown below. Everything here works locally. It has not had an
+> external security review, and it is not a compliance product. See
+> [Security model](#security-model).
 
 ## The 60-second pitch
 
@@ -18,7 +20,7 @@ AI agents are starting to buy things: lab supplies, compute, data, travel. Most 
 let them, because there is no trustworthy way to give an agent a budget and rules, see every
 decision, and stop it instantly.
 
-`mandate-mcp` is that missing layer, and you can add it to an agent in five minutes:
+Imprest is that missing layer, and you can add it to an agent in five minutes:
 
 - **Know Your Agent.** Each agent carries a signed credential that names a responsible person.
 - **A mandate per agent.** Daily budget, per-payment limit, allowed suppliers, categories,
@@ -36,12 +38,12 @@ features come later (see the [roadmap](#roadmap)).
 You need Node.js 22.12 or later, git, and Claude Code or Claude Desktop.
 
 ```sh
-git clone <this repository> mandate && cd mandate
-npm install && npm run build && npm link   # puts the `mandate` command on your PATH
-cd .. && mandate demo
+git clone <this repository> imprest && cd imprest
+npm install && npm run build && npm link   # puts the `imprest` command on your PATH
+cd .. && imprest demo
 ```
 
-This sets up a folder called `mandate-demo` holding a **fictional** company, two agents, a supplier
+This sets up a folder called `imprest-demo` holding a **fictional** company, two agents, a supplier
 catalog and fresh keys. It also starts the control panel and prints three things:
 
 1. **A command that connects Claude** to the demo agent: `claude mcp add …` for Claude Code, or a
@@ -60,16 +62,16 @@ You should then see Claude:
   into smaller payments is caught too;
 - get **declined** for glassware from a supplier that is not on the approved list.
 
-Run `mandate demo --reset` to start over. Every company, person, supplier and price in the
+Run `imprest demo --reset` to start over. Every company, person, supplier and price in the
 demo is invented; supplier names all start with "Example".
 
 ## Use it with your own agents
 
 ```sh
-mandate init                       # issuer keys in .mandate/ and a starter mandate.yaml
+imprest init                       # issuer keys in .imprest/ and a starter mandate.yaml
 # edit mandate.yaml: your agents, budgets, suppliers, categories
-mandate check                      # validate it
-mandate agent add lab-procurement  # a signed credential for one agent
+imprest check                      # validate it
+imprest agent add lab-procurement  # a signed credential for one agent
 ```
 
 Then connect each agent with its own MCP server. Use **absolute paths** throughout, because the
@@ -78,10 +80,10 @@ client starts the server from its own working directory and may not share your `
 **Claude Code:**
 
 ```sh
-claude mcp add mandate \
-  -e MANDATE_HOME=/absolute/path/to/project/.mandate \
-  -e MANDATE_CONFIG=/absolute/path/to/project/mandate.yaml \
-  -- node /absolute/path/to/mandate/dist/cli/index.js serve --agent lab-procurement
+claude mcp add imprest \
+  -e IMPREST_HOME=/absolute/path/to/project/.imprest \
+  -e IMPREST_CONFIG=/absolute/path/to/project/mandate.yaml \
+  -- node /absolute/path/to/imprest/dist/cli/index.js serve --agent lab-procurement
 ```
 
 **Claude Desktop** (`claude_desktop_config.json`):
@@ -89,24 +91,25 @@ claude mcp add mandate \
 ```json
 {
   "mcpServers": {
-    "mandate": {
+    "imprest": {
       "command": "node",
       "args": [
-        "/absolute/path/to/mandate/dist/cli/index.js",
+        "/absolute/path/to/imprest/dist/cli/index.js",
         "serve",
         "--agent",
         "lab-procurement"
       ],
       "env": {
-        "MANDATE_HOME": "/absolute/path/to/project/.mandate",
-        "MANDATE_CONFIG": "/absolute/path/to/project/mandate.yaml"
+        "IMPREST_HOME": "/absolute/path/to/project/.imprest",
+        "IMPREST_CONFIG": "/absolute/path/to/project/mandate.yaml"
       }
     }
   }
 }
 ```
 
-`mandate demo` prints both snippets with the real paths filled in. Any MCP client that supports
+`imprest demo` prints both snippets with the real paths filled in. After the first npm release,
+`npx -y @imprest-hq/mcp serve …` will replace the `node …/dist/cli/index.js serve …` part. Any MCP client that supports
 stdio servers works the same way.
 
 ### What the agent can do
@@ -155,13 +158,13 @@ Good to know:
 ## Human control
 
 ```sh
-mandate approve <payment-id> --note "Checked the quote"   # or: decline
-mandate freeze lab-procurement                          # one agent; unfreeze undoes it
-mandate freeze --all                                    # kill switch: decline everything
-mandate unfreeze --all                                  # release it (frozen agents stay frozen)
-mandate cooloff-cancel <payment-id>                     # within the 10-minute window
-mandate export --out ledger.csv                         # the whole ledger as CSV
-mandate panel                                           # the control panel in your browser
+imprest approve <payment-id> --note "Checked the quote"   # or: decline
+imprest freeze lab-procurement                          # one agent; unfreeze undoes it
+imprest freeze --all                                    # kill switch: decline everything
+imprest unfreeze --all                                  # release it (frozen agents stay frozen)
+imprest cooloff-cancel <payment-id>                     # within the 10-minute window
+imprest export --out ledger.csv                         # the whole ledger as CSV
+imprest panel                                           # the control panel in your browser
 ```
 
 Each action is a signed ledger entry that records who acted (`--by`, which defaults to your OS user
@@ -183,7 +186,7 @@ and cannot hide what it did. You can stop it at once, and anyone can check the r
 - **The model** sees only tool results. No tool returns keys, credentials or signatures, and an
   agent can read only its own payments. All input is validated with zod before the engine sees it.
 - **The MCP server process** holds the issuer private key, so that it can sign receipts. Anyone who
-  can read `.mandate/issuer.key` can issue credentials and sign ledger entries: guard it like a
+  can read `.imprest/issuer.key` can issue credentials and sign ledger entries: guard it like a
   production secret.
 - **The human owner** acts through the CLI or the panel, both on the same machine.
 
@@ -222,19 +225,19 @@ the payment is not authorized.
 - No accounts: `--by` is a label, not an authenticated identity.
 
 > **Not legal advice.** The country list in the examples is a demo and is **not** sanctions
-> screening. `mandate-mcp` makes no claim of regulatory compliance. Configure your own screening.
+> screening. Imprest makes no claim of regulatory compliance. Configure your own screening.
 
 ## Ledger, receipts and audit
 
 ```sh
-mandate audit                                     # check the whole chain
-mandate receipt <receipt-or-payment-id> > receipt.json
-mandate verify receipt.json                       # signature, hash and position in the ledger
-mandate verify receipt.json --pubkey issuer.pub --offline   # an auditor with only the public key
+imprest audit                                     # check the whole chain
+imprest receipt <receipt-or-payment-id> > receipt.json
+imprest verify receipt.json                       # signature, hash and position in the ledger
+imprest verify receipt.json --pubkey issuer.pub --offline   # an auditor with only the public key
 ```
 
-All commands accept `--home <dir>` and `--config <file>`, or the `MANDATE_HOME` and
-`MANDATE_CONFIG` environment variables.
+All commands accept `--home <dir>` and `--config <file>`, or the `IMPREST_HOME` and
+`IMPREST_CONFIG` environment variables.
 
 ## Configuration
 

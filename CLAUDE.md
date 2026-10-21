@@ -1,4 +1,4 @@
-# mandate-mcp
+# Imprest (`@imprest-hq/mcp`)
 
 Open-source MCP server that lets companies give AI agents a mandate: identity, budgets and rules, human approval, a kill switch, and signed receipts. v1 authorizes payments only; it never moves real money.
 
@@ -20,7 +20,11 @@ npm run build · npm test · npm run lint · npm run typecheck · npm run covera
 
 CI (.github/workflows/ci.yml) runs on Ubuntu with Node 22 and 24; Windows only on manual dispatch. Keep it lean: the account has a monthly Actions budget.
 
-The npm names `mandate-mcp` and `mandate` belong to other projects; the package name is decided in build step 8. Never write `npx mandate-mcp` or `npx mandate` in docs or printed hints: that runs a stranger's package. Printed commands derive the name from package.json.
+## Naming
+
+- Brand **Imprest**: package `@imprest-hq/mcp`, CLI `imprest`, state folder `.imprest/`, env `IMPREST_HOME`/`IMPREST_CONFIG`, signed-data ids `imprest-issuer:`, `imprest-credential/v1`, `imprest-receipt/v1`.
+- "Mandate" stays as the concept word: `mandate.yaml`, the `check_mandate` tool, the `Mandate` type.
+- Never write `npx mandate-mcp` or `npx mandate`: those npm names belong to other people. Don't put `npx @imprest-hq/mcp` in instructions until the npm org is registered and the package is published. Printed commands take the package name from package.json.
 
 ## Conventions
 

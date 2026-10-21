@@ -25,10 +25,10 @@ export function generateKeyPair(): PemKeyPair {
   return { publicKeyPem: publicKey, privateKeyPem: privateKey };
 }
 
-/** A stable short id for a public key: "mandate-issuer:" + first 16 hex of SHA-256(SPKI). */
+/** A stable short id for a public key: "imprest-issuer:" + first 16 hex of SHA-256(SPKI). */
 export function issuerIdFor(publicKey: KeyObject): string {
   const der = publicKey.export({ type: 'spki', format: 'der' });
-  return `mandate-issuer:${createHash('sha256').update(der).digest('hex').slice(0, 16)}`;
+  return `imprest-issuer:${createHash('sha256').update(der).digest('hex').slice(0, 16)}`;
 }
 
 export function publicKeyOf(privateKey: KeyObject): KeyObject {

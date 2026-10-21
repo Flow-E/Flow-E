@@ -9,8 +9,8 @@ import type { Credential, CredentialClaims, SignatureCheck } from '../engine/typ
  * against the issuer public key held by the owner, never against a key carried in the credential.
  */
 
-export const CREDENTIAL_FORMAT = 'mandate-credential/v1';
-export const CREDENTIAL_DOMAIN = 'mandate-credential-v1';
+export const CREDENTIAL_FORMAT = 'imprest-credential/v1';
+export const CREDENTIAL_DOMAIN = 'imprest-credential-v1';
 export const PAYMENT_SCOPE = 'payments:request';
 export const MAX_VALID_DAYS = 3650;
 

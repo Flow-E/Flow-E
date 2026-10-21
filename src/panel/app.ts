@@ -249,7 +249,7 @@ export function createPanelApp(o: PanelAppOptions): Hono {
     const date = new Date(clock()).toISOString().slice(0, 10);
     return c.body(exportCsv(o.ledger), 200, {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="mandate-ledger-${date}.csv"`,
+      'Content-Disposition': `attachment; filename="imprest-ledger-${date}.csv"`,
     });
   });
 

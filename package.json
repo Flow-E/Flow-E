@@ -1,15 +1,14 @@
 {
-  "name": "mandate-mcp",
+  "name": "@imprest-hq/mcp",
   "version": "0.1.0",
-  "description": "Give AI agents a mandate: identity, budgets and rules, human approval, a kill switch and signed receipts. An MCP server that authorizes payments; it never moves real money.",
+  "description": "Imprest: give AI agents a spending mandate. Identity, budgets and rules, human approval, a kill switch and signed receipts, as an MCP server. Authorizes payments; never moves money.",
   "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22.12"
   },
   "bin": {
-    "mandate": "dist/cli/index.js",
-    "mandate-mcp": "dist/cli/index.js"
+    "imprest": "dist/cli/index.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -26,13 +25,18 @@
     "CHANGELOG.md",
     "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
+    "imprest",
     "mcp",
     "model-context-protocol",
     "ai-agents",
-    "payments",
+    "agent-payments",
     "spend-control",
     "mandate",
+    "know-your-agent",
     "audit"
   ],
   "scripts": {

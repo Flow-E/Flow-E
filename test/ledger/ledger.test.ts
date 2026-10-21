@@ -316,7 +316,7 @@ describe('opening', () => {
     const other = generateKeyPair();
     expect(() =>
       Ledger.open(s.path, {
-        issuer: 'mandate-issuer:other',
+        issuer: 'imprest-issuer:other',
         privateKey: createPrivateKey(other.privateKeyPem),
       }),
     ).toThrow(/belongs to issuer .*Refusing to mix keys/);

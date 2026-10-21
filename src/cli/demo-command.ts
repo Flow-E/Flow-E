@@ -9,7 +9,7 @@ import {
   type ServeCommand,
 } from '../demo/setup.js';
 
-/** The text `mandate demo` prints: how to connect Claude, where the panel is, what to paste. */
+/** The text `imprest demo` prints: how to connect Claude, where the panel is, what to paste. */
 export function demoInstructions(
   setup: DemoSetup,
   serve: ServeCommand,
@@ -18,7 +18,7 @@ export function demoInstructions(
   const rule = '─'.repeat(72);
   const cli = `${cliLauncher(serve)} --home ${shellQuote(setup.home)} --config ${shellQuote(setup.configPath)}`;
   return [
-    `Mandate demo ready in ${setup.dir}`,
+    `Imprest demo ready in ${setup.dir}`,
     'Everything in it is fictional: the company, the people, the suppliers and the prices.',
     'No money moves. Payments are only authorized and recorded.',
     '',

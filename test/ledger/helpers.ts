@@ -18,8 +18,8 @@ export interface Setup {
 }
 
 export function setup(): Setup {
-  const dir = mkdtempSync(join(tmpdir(), 'mandate-ledger-'));
-  const home = join(dir, '.mandate');
+  const dir = mkdtempSync(join(tmpdir(), 'imprest-ledger-'));
+  const home = join(dir, '.imprest');
   initIssuer(home);
   const issuer = loadSigningIssuer(home);
   const path = join(home, 'ledger.db');

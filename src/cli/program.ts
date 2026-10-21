@@ -65,7 +65,7 @@ function positiveInt(value: string): number {
 }
 
 export function buildProgram(): Command {
-  const program = new Command('mandate')
+  const program = new Command('imprest')
     .description(
       'Give AI agents a mandate: identity, budgets and rules, human approval, a kill switch and ' +
         'signed receipts. Authorizes payments only; never moves real money.',
@@ -74,9 +74,9 @@ export function buildProgram(): Command {
     .option(
       '--home <dir>',
       'state directory (keys, credentials)',
-      process.env.MANDATE_HOME ?? '.mandate',
+      process.env.IMPREST_HOME ?? '.imprest',
     )
-    .option('--config <file>', 'mandate file', process.env.MANDATE_CONFIG ?? 'mandate.yaml');
+    .option('--config <file>', 'mandate file', process.env.IMPREST_CONFIG ?? 'mandate.yaml');
 
   program
     .command('init')
@@ -265,10 +265,10 @@ Press Ctrl+C to stop.
   program
     .command('demo')
     .description('set up a fictional demo, start the panel and print a prompt for Claude')
-    .option('--dir <dir>', 'demo folder (created if missing)', 'mandate-demo')
+    .option('--dir <dir>', 'demo folder (created if missing)', 'imprest-demo')
     .option('--port <n>', 'control panel port', positiveInt, DEFAULT_PANEL_PORT)
     .option('--no-panel', 'do not start the control panel')
-    .option('--reset', 'delete the demo folder first (only one made by "mandate demo")', false)
+    .option('--reset', 'delete the demo folder first (only one made by "imprest demo")', false)
     .action(async (_opts: unknown, cmd: Command) => {
       const o = cmd.opts<{ dir: string; port: number; panel: boolean; reset: boolean }>();
       try {

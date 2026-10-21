@@ -20,7 +20,7 @@ beforeEach(() => {
   s.ledger.close();
 });
 
-/** Save receipt n (1-based) the way `mandate receipt <id> > file` would. */
+/** Save receipt n (1-based) the way `imprest receipt <id> > file` would. */
 function saveReceipt(n: number): string {
   const r = receipts[n - 1];
   if (!r) throw new Error('no receipt');
@@ -29,7 +29,7 @@ function saveReceipt(n: number): string {
   return file;
 }
 
-describe('mandate audit', () => {
+describe('imprest audit', () => {
   it('reports an intact ledger', () => {
     const out = runAudit({ home: s.home });
     expect(out.ok).toBe(true);
@@ -59,7 +59,7 @@ describe('mandate audit', () => {
   });
 });
 
-describe('mandate receipt', () => {
+describe('imprest receipt', () => {
   it('prints the receipt for a receipt id or a payment id', () => {
     const r = receipts[0];
     expect(JSON.parse(runReceipt({ home: s.home, id: r?.entry.id ?? '' }).text)).toEqual(r);
@@ -73,7 +73,7 @@ describe('mandate receipt', () => {
   });
 });
 
-describe('mandate verify', () => {
+describe('imprest verify', () => {
   it('verifies a receipt and its position in the ledger', () => {
     const out = runVerify({ home: s.home, receipt: saveReceipt(2) });
     expect(out.ok).toBe(true);

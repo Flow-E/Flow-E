@@ -20,7 +20,7 @@ export function runInit(o: { home: string; config: string }): string {
     copyFileSync(EXAMPLE_CONFIG, o.config);
     lines.push(`Wrote a starter ${o.config} (fictional example; edit it for your agents).`);
   }
-  lines.push('Next: mandate agent add <id>');
+  lines.push('Next: imprest agent add <id>');
   return lines.join('\n');
 }
 

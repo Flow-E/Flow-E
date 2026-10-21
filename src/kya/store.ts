@@ -5,7 +5,7 @@ import { generateKeyPair, issuerIdFor, publicKeyOf } from '../crypto/ed25519.js'
 import { type CredentialFile, CredentialError, parseCredential } from './credential.js';
 
 /**
- * On-disk state for the issuer, under the mandate home directory (default `.mandate/`):
+ * On-disk state for the issuer, under the Imprest home directory (default `.imprest/`):
  *
  *   issuer.key            Ed25519 private key, PKCS#8 PEM, mode 0600. Never printed or logged.
  *   issuer.pub            Public key, SPKI PEM. Enough to verify credentials and receipts offline.
@@ -60,7 +60,7 @@ export function initIssuer(home: string): Issuer {
 export function loadIssuer(home: string): Issuer {
   const p = storePaths(home);
   if (!existsSync(p.publicKey)) {
-    throw new KeyStoreError(`No issuer key in ${home}. Run "mandate init" first.`);
+    throw new KeyStoreError(`No issuer key in ${home}. Run "imprest init" first.`);
   }
   try {
     const publicKey = createPublicKey(readFileSync(p.publicKey, 'utf8'));
@@ -74,7 +74,7 @@ export function loadIssuer(home: string): Issuer {
 export function loadSigningIssuer(home: string): SigningIssuer {
   const p = storePaths(home);
   if (!existsSync(p.privateKey)) {
-    throw new KeyStoreError(`No issuer key in ${home}. Run "mandate init" first.`);
+    throw new KeyStoreError(`No issuer key in ${home}. Run "imprest init" first.`);
   }
   // Like ssh: refuse a private key that other users can read. (POSIX only; Windows uses ACLs.)
   if (!isWindows && (statSync(p.privateKey).mode & 0o077) !== 0) {
@@ -118,7 +118,7 @@ export function readCredential(home: string, agentId: string): CredentialFile {
   const path = credentialPath(home, agentId);
   if (!existsSync(path)) {
     throw new CredentialError(
-      `Agent "${agentId}" has no credential. Run "mandate agent add ${agentId}".`,
+      `Agent "${agentId}" has no credential. Run "imprest agent add ${agentId}".`,
     );
   }
   return parseCredential(readFileSync(path, 'utf8'));

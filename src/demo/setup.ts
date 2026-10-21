@@ -11,7 +11,7 @@ import { DEMO_CONFIG_YAML, catalogTable, demoPrompt } from './content.js';
  * not create: a marker file proves ownership, and only a marked folder can be reset.
  */
 
-export const DEMO_MARKER = '.mandate-demo';
+export const DEMO_MARKER = '.imprest-demo';
 const DEMO_CREDENTIAL_DAYS = 30;
 
 export class DemoError extends Error {
@@ -35,16 +35,16 @@ export function setupDemo(o: { dir: string; reset: boolean; now: number }): Demo
 
   if (exists && !existsSync(marker) && readdirSync(dir).length > 0) {
     throw new DemoError(
-      `${dir} already exists and was not created by "mandate demo". Choose another --dir.`,
+      `${dir} already exists and was not created by "imprest demo". Choose another --dir.`,
     );
   }
   if (o.reset && existsSync(marker)) rmSync(dir, { recursive: true, force: true });
 
   const created = !existsSync(marker);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(marker, 'Created by "mandate demo". Everything in this folder is fictional.\n');
+  writeFileSync(marker, 'Created by "imprest demo". Everything in this folder is fictional.\n');
 
-  const home = join(dir, '.mandate');
+  const home = join(dir, '.imprest');
   const configPath = join(dir, 'mandate.yaml');
   if (!existsSync(configPath)) writeFileSync(configPath, DEMO_CONFIG_YAML);
   if (!existsSync(join(home, 'issuer.key'))) initIssuer(home);
@@ -110,7 +110,7 @@ export function demoServeCommand(
     platform: NodeJS.Platform;
   },
 ): ServeCommand {
-  const env = { MANDATE_HOME: setup.home, MANDATE_CONFIG: setup.configPath };
+  const env = { IMPREST_HOME: setup.home, IMPREST_CONFIG: setup.configPath };
   const serve = ['serve', '--agent', 'lab-procurement'];
   const viaNpx = /[\\/]_npx[\\/]/.test(o.cliPath);
   if (!viaNpx) return { command: o.nodePath, args: [o.cliPath, ...serve], env };
@@ -147,7 +147,7 @@ export function cliLauncher(cmd: ServeCommand): string {
 export function claudeCodeCommand(cmd: ServeCommand): string {
   const env = Object.entries(cmd.env).map(([k, v]) => `-e ${shellQuote(`${k}=${v}`)}`);
   return [
-    'claude mcp add mandate-demo',
+    'claude mcp add imprest-demo',
     ...env,
     '--',
     shellQuote(cmd.command),
@@ -157,7 +157,7 @@ export function claudeCodeCommand(cmd: ServeCommand): string {
 
 export function claudeDesktopJson(cmd: ServeCommand): string {
   return JSON.stringify(
-    { mcpServers: { 'mandate-demo': { command: cmd.command, args: cmd.args, env: cmd.env } } },
+    { mcpServers: { 'imprest-demo': { command: cmd.command, args: cmd.args, env: cmd.env } } },
     null,
     2,
   );

@@ -31,7 +31,7 @@ let home: string;
 let config: string;
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'mandate-test-'));
-  home = join(dir, '.mandate');
+  home = join(dir, '.imprest');
   config = join(dir, 'mandate.yaml');
 });
 
@@ -47,7 +47,7 @@ const add = (o: Partial<Parameters<typeof runAgentAdd>[0]> = {}) =>
     ...o,
   });
 
-describe('mandate init', () => {
+describe('imprest init', () => {
   it('creates the key pair, a starter config and a .gitignore', () => {
     const out = runInit({ home, config });
     const p = storePaths(home);
@@ -55,7 +55,7 @@ describe('mandate init', () => {
     expect(existsSync(p.publicKey)).toBe(true);
     expect(readFileSync(join(home, '.gitignore'), 'utf8')).toBe('*\n');
     expect(readFileSync(config, 'utf8')).toMatch(/fictional/);
-    expect(out).toMatch(/^Created issuer mandate-issuer:[0-9a-f]{16}/);
+    expect(out).toMatch(/^Created issuer imprest-issuer:[0-9a-f]{16}/);
   });
 
   it('never prints the private key', () => {
@@ -92,7 +92,7 @@ describe('mandate init', () => {
   });
 });
 
-describe('mandate agent add', () => {
+describe('imprest agent add', () => {
   beforeEach(() => runInit({ home, config }));
 
   it('issues a credential with the owner and organisation from mandate.yaml', () => {
@@ -139,9 +139,9 @@ describe('mandate agent add', () => {
     );
   });
 
-  it('needs mandate init first', () => {
-    expect(() => add({ home: join(dir, 'elsewhere') })).toThrow(/Run "mandate init" first/);
-    expect(() => loadIssuer(join(dir, 'elsewhere'))).toThrow(/Run "mandate init" first/);
+  it('needs imprest init first', () => {
+    expect(() => add({ home: join(dir, 'elsewhere') })).toThrow(/Run "imprest init" first/);
+    expect(() => loadIssuer(join(dir, 'elsewhere'))).toThrow(/Run "imprest init" first/);
   });
 });
 
@@ -198,6 +198,6 @@ describe('key store safety', () => {
   });
 
   it('initIssuer works on a fresh directory', () => {
-    expect(initIssuer(join(dir, 'fresh')).id).toMatch(/^mandate-issuer:/);
+    expect(initIssuer(join(dir, 'fresh')).id).toMatch(/^imprest-issuer:/);
   });
 });

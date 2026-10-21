@@ -49,7 +49,7 @@ async function connect(): Promise<void> {
 
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), 'mandate-mcp-'));
-  home = join(dir, '.mandate');
+  home = join(dir, '.imprest');
   config = join(dir, 'mandate.yaml');
   runInit({ home, config });
   writeFileSync(config, readFileSync(config, 'utf8') + OTHER_AGENT);
@@ -360,7 +360,7 @@ describe('startup', () => {
         configPath: config,
         agentId: 'lab-procurement',
       }),
-    ).toThrow(/mandate init/);
+    ).toThrow(/imprest init/);
   });
 });
 
