@@ -283,6 +283,7 @@ MCP server · human control and local panel · demo. Release preparation is next
 ```sh
 npm install
 npm run build && npm test && npm run lint
+npm run test:pack            # pack, install into an empty project, use it like a user
 node dist/cli/index.js demo   # the demo from a checkout
 ```
 

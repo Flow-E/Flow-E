@@ -23,6 +23,7 @@
     "dist",
     "mandate.example.yaml",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "keywords": [
@@ -35,14 +36,18 @@
     "audit"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run lint && npm run typecheck && npm test",
+    "test:pack": "node scripts/pack-smoke.mjs",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",

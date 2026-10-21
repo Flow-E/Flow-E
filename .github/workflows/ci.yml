@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      windows:
+        description: Also run on Windows (uses twice the Actions minutes)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or PR cancels the older run, so minutes aren't spent on stale code.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint, test, build (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      # No dependency needs an install script (better-sqlite3 ships prebuilt binaries).
+      - run: npm ci --ignore-scripts
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      # Runs every test, including the POSIX file-permission tests skipped on Windows, and
+      # enforces the 90% coverage floor on engine, kya, crypto and ledger.
+      - run: npm run coverage
+      - run: npm run build
+      - run: npm pack --dry-run
+      # Installs the packed tarball into an empty project and uses it like a user would.
+      - run: npm run test:pack
+
+  windows:
+    name: Windows (Node 24, on request)
+    if: github.event_name == 'workflow_dispatch' && inputs.windows
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - run: npm run test:pack
