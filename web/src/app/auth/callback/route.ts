@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { startSession } from '@/server/session';
+import { safeNext } from '@/lib/next-path';
+import { NEXT_COOKIE, startSession } from '@/server/session';
 import {
   PKCE_COOKIE,
   SignInError,
@@ -43,10 +44,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return fail(err instanceof SignInError ? err.message : 'Sign-in failed. Try again shortly.');
   }
 
+  const next = new URL(safeNext(request.cookies.get(NEXT_COOKIE)?.value), request.nextUrl);
   const url = request.nextUrl.clone();
-  url.pathname = '/sandbox';
-  url.search = '';
+  url.pathname = next.pathname;
+  url.search = next.search;
   const res = NextResponse.redirect(url, 303);
   res.cookies.delete({ name: PKCE_COOKIE, path: '/auth/callback' });
+  res.cookies.delete({ name: NEXT_COOKIE, path: '/auth/callback' });
   return res;
 }

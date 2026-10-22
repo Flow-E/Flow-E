@@ -13,6 +13,8 @@ import { cookies } from 'next/headers';
  */
 
 export const SESSION_COOKIE = 'flowe_session';
+/** Where an emailed sign-in link continues to (a path checked with safeNext). */
+export const NEXT_COOKIE = 'flowe_next';
 const MAX_AGE_S = 12 * 60 * 60;
 
 export interface Session {

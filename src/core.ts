@@ -37,6 +37,7 @@ export {
   type CredentialFile,
 } from './kya/credential.js';
 export * from './control/plan.js';
+export * from './tools/agent-tools.js';
 export { csvCell, csvFromEntries } from './control/csv.js';
 export {
   CATALOG,

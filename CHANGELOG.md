@@ -12,6 +12,15 @@ changes.
 - `flow-e simulate`: a fake agent for the demo folder (`story`, `buy <n>`, `list`,
   `status <id>`, `mandate`). It talks to Flow-E over MCP stdio like Claude does, and refuses any
   folder not made by `flow-e demo`. `flow-e demo` now points to it.
+- The agent-facing tools are defined once in `src/tools/agent-tools.ts` and exported from
+  `@flow-e/mcp/core` (`AGENT_TOOLS`, `mandateSummary`, `toPaymentRequest`, `paymentAnswer`,
+  `publicPayment`), so the stdio server and the website's remote endpoint answer identically.
+- Website (phase 2, local only, not deployed): organisations with owner, approver and viewer
+  roles and email invitations; real agents with signed credentials and API keys (shown once,
+  stored as SHA-256, rotate, revoke, expiry); a remote MCP endpoint `/api/mcp` (Streamable HTTP,
+  Bearer agent key, per-key rate limit); approval emails with one-time Approve and Decline
+  links that act only after sign-in and a confirm. Each organisation has its own issuer and
+  signed ledger. Migration `web/db/migrations/002_orgs.sql`.
 
 ### Changed
 

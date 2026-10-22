@@ -3,18 +3,84 @@
 The public site and the sandbox for [Flow-E](https://github.com/Flow-E/Flow-E): a Next.js 16 app
 (App Router, TypeScript strict, Tailwind 4).
 
-| Route      | What it is                                                                                |
-| ---------- | ----------------------------------------------------------------------------------------- |
-| `/`        | What Flow-E is, how it works, the thirteen rules, human control, proof, security, roadmap |
-| `/docs`    | The repository README, synced at build time                                               |
-| `/sandbox` | Signed-in only. Your own fictional company: approvals, cooling-off, agents, kill switch   |
-| `/gate`    | The private-preview password page (only while `SITE_PASSWORD` is set)                     |
+| Route                     | What it is                                                                                |
+| ------------------------- | ----------------------------------------------------------------------------------------- |
+| `/`                       | What Flow-E is, how it works, the thirteen rules, human control, proof, security, roadmap |
+| `/docs`                   | The repository README, synced at build time                                               |
+| `/sandbox`                | Signed-in only. Your own fictional company: approvals, cooling-off, agents, kill switch   |
+| `/app`                    | Signed-in only. Your organisations: real agents with API keys, members and roles          |
+| `/api/mcp`                | The remote MCP endpoint for agents (Streamable HTTP, `Authorization: Bearer` agent key)   |
+| `/invite/…`, `/approve/…` | One-time links from invitation and approval emails (sign-in, then confirm)                |
+| `/dev/outbox`             | Development only: the emails Flow-E would have sent                                       |
+| `/gate`                   | The private-preview password page (only while `SITE_PASSWORD` is set)                     |
 
 Sandbox pages: Overview, Fake agent (catalog, demo story, custom request, full rule trace),
 Ledger (integrity check, CSV, issuer public key, receipt verify), Payment detail (trace,
 receipt, download), Mandate (editor validated by the core schema) and Start over.
 
 Everything in the sandbox is fictional. Flow-E authorizes payments; it never moves money.
+
+## Organisations (phase 2, local only so far)
+
+`/app` lists your organisations and creates new ones (name, base currency CHF or EUR, time
+zone). Each organisation has its own issuer key pair, its own mandate (it starts empty and
+valid) and its own signed, hash-chained ledger. Pages under `/app/<org>`: Overview (approvals,
+cooling-off, freeze, kill switch, a getting-started checklist), Agents and each agent's page
+(keys, connection instructions), Mandate, Members, Ledger, Settings.
+
+**Roles.** Written once in `src/server/permissions.ts` and checked by the store on every call,
+with the role read from the database:
+
+| Permission                                   | Owner | Approver | Viewer |
+| -------------------------------------------- | :---: | :------: | :----: |
+| See everything (`org.read`)                  |   ✔   |    ✔     |   ✔    |
+| Approve / decline (`payment.resolve`)        |   ✔   |    ✔     |        |
+| Cancel in cooling-off (`payment.cancel`)     |   ✔   |    ✔     |        |
+| Freeze / unfreeze an agent (`agent.freeze`)  |   ✔   |    ✔     |        |
+| Kill switch (`killswitch.set`)               |   ✔   |    ✔     |        |
+| Change the mandate, pause (`mandate.update`) |   ✔   |          |        |
+| Create agents (`agent.create`)               |   ✔   |          |        |
+| Create, rotate, revoke keys (`agent.keys`)   |   ✔   |          |        |
+| Invite, revoke invitations (`member.invite`) |   ✔   |          |        |
+| Change roles, remove (`member.manage`)       |   ✔   |          |        |
+| Rename (`org.settings`)                      |   ✔   |          |        |
+
+An organisation always keeps at least one owner. Invitations go by email with a one-time link
+(7 days, single use); accepting needs a sign-in with the invited address. The owner also sees
+the link once, to pass it on another way.
+
+**Agents and keys.** An owner creates an agent with a starting mandate; the organisation's
+issuer signs its Know Your Agent credential in the core's format (90 days, renewed
+automatically). An agent key is `flowe_ak_` plus 32 random bytes (base64url), shown once.
+Only its SHA-256 and a visible prefix are stored. Keys can expire, be rotated (old one revoked,
+new one shown once) and be revoked; at most five are active per agent. Keys work only on
+`/api/mcp`.
+
+**Remote MCP endpoint.** `POST /api/mcp`, Streamable HTTP, stateless (`src/server/mcp-endpoint.ts`).
+The key decides the organisation and the agent. The four tools are the core's shared
+definitions (`src/tools/agent-tools.ts`), so they match the stdio server exactly. Each payment
+is evaluated and recorded in one transaction with the organisation row locked, so a freeze or
+kill switch that lands first always wins. A missing, wrong, revoked or expired key gets `401`
+with a JSON-RPC error and `WWW-Authenticate: Bearer`. Limits: 60 requests per minute per key
+(in memory, per server instance: with several instances the real limit is a multiple), 64 KB
+per request. No cookies, no CORS. It is the only path the `SITE_PASSWORD` gate lets through.
+Connect Claude Code with the command on the agent's page:
+
+```bash
+claude mcp add --transport http flow-e https://<site>/api/mcp --header "Authorization: Bearer flowe_ak_…"
+```
+
+**Approval emails.** A payment that needs review emails every owner and approver: amount,
+supplier, agent, reason, and Approve and Decline links. Each link is a one-time token (hash
+stored) bound to that person, that payment and that action, valid 24 hours. Opening a link
+changes nothing: it asks for a sign-in as that person, shows the payment and acts only on the
+confirm button (a POST), which re-checks the link, the person's current role and the payment's
+status. Once a payment is decided, all its links are spent.
+
+**Email delivery** is an adapter (`src/server/email.ts`). In development emails go to the
+`email_outbox` table and `/dev/outbox` shows them (only with `NODE_ENV` not production and
+`FLOWE_DEV_LOGIN=1`); production refuses the outbox. The SMTP adapter reads `EMAIL_FROM` and
+`SMTP_URL` but is not wired to a transport yet. Plain text plus simple HTML, no tracking.
 
 ## How it uses the core
 
@@ -40,6 +106,11 @@ README sections into `src/content/readme.generated.ts` and builds the core.
   (`SELECT … FOR UPDATE`) so two requests cannot fork the chain.
 
 Start over archives the old sandbox (its ledger stays) and creates a new one with new keys.
+
+Organisations live in `db/migrations/002_orgs.sql` (`src/server/org-store.ts`): `orgs`,
+`org_members`, `org_invitations`, `org_agents`, `agent_keys`, `org_ledger_entries` (same
+append-only triggers as the sandbox ledger), `approval_tokens` and `email_outbox`. The sandbox
+tables are untouched. Every table has RLS enabled and no policies.
 
 Locally the store uses PGlite (Postgres in the process, in `web/.data/pglite`, migrated on
 start). With `DATABASE_URL` set it uses Postgres through postgres.js. Production refuses PGlite.
@@ -75,7 +146,9 @@ Checks: `npm run lint`, `npm run typecheck`, `npm test` (in-memory PGlite, no se
 
 | Name                                   | Where           | Secret | Purpose                                                                                                   |
 | -------------------------------------- | --------------- | ------ | --------------------------------------------------------------------------------------------------------- |
-| `FLOWE_SANDBOX_KEY`                    | everywhere      | yes    | 32 random bytes, base64. Encrypts each sandbox's issuer private key                                       |
+| `FLOWE_KEY_ENCRYPTION_KEY`             | everywhere      | yes    | 32 random bytes, base64. Encrypts every issuer private key (sandboxes and organisations)                  |
+| `FLOWE_SANDBOX_KEY`                    | older name      | yes    | Same key under its old name; still read when `FLOWE_KEY_ENCRYPTION_KEY` is not set. Set only one          |
+| `EMAIL_FROM`, `SMTP_URL`               | later           | yes    | Real email delivery. Not wired yet: setting either makes sending fail on purpose until it is              |
 | `FLOWE_SESSION_SECRET`                 | everywhere      | yes    | 32+ random characters. Signs the session cookie                                                           |
 | `SITE_PASSWORD`                        | optional        | yes    | Private-preview gate for every page. Remove to make the site public                                       |
 | `DATABASE_URL`                         | production      | yes    | Postgres connection string (Supabase transaction pooler)                                                  |
@@ -91,8 +164,8 @@ Generate a sandbox key:
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-Changing `FLOWE_SANDBOX_KEY` later makes existing sandboxes unreadable; their owners would
-have to start over.
+Changing the key-encryption key later makes existing sandboxes and organisations unreadable.
+To move from `FLOWE_SANDBOX_KEY` to the new name, give `FLOWE_KEY_ENCRYPTION_KEY` the same value.
 
 ## Security
 
@@ -106,6 +179,16 @@ have to start over.
   `/auth/callback`). The verifier lives in an httpOnly cookie scoped to `/auth/callback`, so a
   forwarded or intercepted link is useless in another browser. Supabase tokens are never stored;
   only the user id and email go into Flow-E's session.
+- Organisations: every store method takes the signed-in user and checks their role from
+  `org_members` against `src/server/permissions.ts`. A non-member gets the same answer whether
+  or not the organisation exists. Ids from forms and URLs are only ever looked up inside the
+  user's organisation.
+- Secrets handed out (agent keys, invitation and approval links) are 32 random bytes; only
+  their SHA-256 is stored, and the ledger records key ids and prefixes, never keys. Errors are
+  logged by name only. One-time links sit in URL paths, so they appear in access logs: they are
+  single-use, short-lived and useless without signing in as their recipient.
+- After sign-in, `?next=` only accepts our own `/sandbox`, `/app`, `/invite` and `/approve`
+  paths.
 - The whole site is `noindex` during the preview.
 
 ## Deploy (not done yet)
@@ -115,7 +198,7 @@ have to start over.
 Project `khxqgpbgijnhckwlkorg` (Zurich), URL `https://khxqgpbgijnhckwlkorg.supabase.co`,
 publishable key `sb_publishable__LHTIX5Dmr0Fg1ctdUztJA_Ak2sFoKm` (public).
 
-1. SQL editor: run `db/migrations/001_init.sql` once. It is idempotent.
+1. SQL editor: run `db/migrations/001_init.sql`, then `002_orgs.sql`. Both are idempotent.
 2. Project Settings → Database → Connection string → **Transaction pooler** (port 6543). That
    is `DATABASE_URL`, with the database password filled in. The client uses
    `prepare: false`, which the pooler needs.
@@ -134,9 +217,12 @@ publishable key `sb_publishable__LHTIX5Dmr0Fg1ctdUztJA_Ak2sFoKm` (public).
 2. **Install Command:** `npm ci --prefix .. --ignore-scripts && npm ci --ignore-scripts`.
    Build command and output stay at the Next.js defaults (`npm run build` builds the core
    first).
-3. Environment variables (Production and Preview): `FLOWE_SANDBOX_KEY`,
-   `FLOWE_SESSION_SECRET`, `SITE_PASSWORD`, `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`,
-   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Never set `FLOWE_DEV_LOGIN` there.
+3. Environment variables (Production and Preview): `FLOWE_SANDBOX_KEY` (or
+   `FLOWE_KEY_ENCRYPTION_KEY` with the same value), `FLOWE_SESSION_SECRET`, `SITE_PASSWORD`,
+   `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and
+   `FLOWE_SITE_URL` (links in emails and on agent pages must not follow the request's Host
+   header). Never set `FLOWE_DEV_LOGIN` there. Organisations need real email first
+   (`EMAIL_FROM`, `SMTP_URL` and a wired transport): production refuses the dev outbox.
 4. Region: Frankfurt (`fra1`) or Zurich-near, to sit next to the database.
 
 ### What is and is not verified
@@ -150,3 +236,7 @@ publishable key `sb_publishable__LHTIX5Dmr0Fg1ctdUztJA_Ak2sFoKm` (public).
   verifier are both refused. Not yet run against the real Supabase project.
 - Not run: the Postgres adapter against a real Supabase database. It shares every query and
   test with PGlite, but has not met the pooler yet.
+- Organisations (phase 2): verified locally only, with PGlite, the dev outbox and the dev
+  login: tests for every action and role, isolation, invitations, keys, approval links and the
+  MCP endpoint through the SDK client; the MCP Inspector CLI over HTTP; a browser walkthrough.
+  Not run against Supabase, a real mail transport, or more than one server instance.

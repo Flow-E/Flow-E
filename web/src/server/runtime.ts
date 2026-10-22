@@ -1,19 +1,27 @@
 import 'server-only';
 import path from 'node:path';
 import { migrate, openPglite, openPostgres, type Db } from './db';
-import { parseEncryptionKey } from './keys';
+import { mailerFromEnv } from './email';
+import { encryptionKeyFromEnv } from './keys';
+import { OrgStore } from './org-store';
 import { SandboxStore } from './store';
 
 /**
- * One store per server process. Storage is chosen by environment:
+ * One database and one set of stores per server process. Storage is chosen by environment:
  * - DATABASE_URL set: Postgres (Supabase). Apply db/migrations/*.sql there yourself.
  * - otherwise: PGlite in FLOWE_PGLITE_DIR (default web/.data/pglite), migrated on start.
  */
 
-const globalForStore = globalThis as unknown as { floweStore?: Promise<SandboxStore> };
+interface Stores {
+  db: Db;
+  sandbox: SandboxStore;
+  orgs: OrgStore;
+}
 
-async function open(): Promise<SandboxStore> {
-  const key = parseEncryptionKey(process.env.FLOWE_SANDBOX_KEY);
+const globalForStore = globalThis as unknown as { floweStores?: Promise<Stores> };
+
+async function open(): Promise<Stores> {
+  const key = encryptionKeyFromEnv();
   let db: Db;
   if (process.env.DATABASE_URL) {
     db = await openPostgres(process.env.DATABASE_URL);
@@ -26,14 +34,30 @@ async function open(): Promise<SandboxStore> {
     );
     await migrate(db);
   }
-  return new SandboxStore(db, key);
+  return {
+    db,
+    sandbox: new SandboxStore(db, key),
+    orgs: new OrgStore(db, key, mailerFromEnv(db)),
+  };
 }
 
 /** Survives hot reloads in development, so PGlite opens its data directory once. */
-export function getStore(): Promise<SandboxStore> {
-  globalForStore.floweStore ??= open().catch((err: unknown) => {
-    globalForStore.floweStore = undefined;
+function stores(): Promise<Stores> {
+  globalForStore.floweStores ??= open().catch((err: unknown) => {
+    globalForStore.floweStores = undefined;
     throw err;
   });
-  return globalForStore.floweStore;
+  return globalForStore.floweStores;
+}
+
+export async function getStore(): Promise<SandboxStore> {
+  return (await stores()).sandbox;
+}
+
+export async function getOrgStore(): Promise<OrgStore> {
+  return (await stores()).orgs;
+}
+
+export async function getDb(): Promise<Db> {
+  return (await stores()).db;
 }

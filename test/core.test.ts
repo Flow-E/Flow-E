@@ -56,6 +56,12 @@ describe('@flow-e/mcp/core', () => {
       'issueCredential',
       'DEMO_CONFIG_YAML',
       'DEMO_STORY_STEPS',
+      'AGENT_TOOLS',
+      'AGENT_INSTRUCTIONS',
+      'mandateSummary',
+      'toPaymentRequest',
+      'paymentAnswer',
+      'publicPayment',
     ]) {
       expect(core).toHaveProperty(name);
     }

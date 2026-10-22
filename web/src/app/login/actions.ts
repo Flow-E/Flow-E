@@ -3,7 +3,8 @@
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { authMode, devUserId, endSession, startSession } from '@/server/session';
+import { safeNext } from '@/lib/next-path';
+import { NEXT_COOKIE, authMode, devUserId, endSession, startSession } from '@/server/session';
 import {
   PKCE_COOKIE,
   PKCE_MAX_AGE_S,
@@ -55,6 +56,14 @@ export async function sendLink(_prev: LoginState, form: FormData): Promise<Login
     path: '/auth/callback',
     maxAge: PKCE_MAX_AGE_S,
   });
+  const next = safeNext(form.get('next'));
+  (await cookies()).set(NEXT_COOKIE, next, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/auth/callback',
+    maxAge: PKCE_MAX_AGE_S,
+  });
   return { sentTo: parsed.data };
 }
 
@@ -71,7 +80,7 @@ export async function devLogin(_prev: LoginState, form: FormData): Promise<Login
   if (!parsed.success)
     return { error: parsed.error.issues[0]?.message ?? 'Enter an email address.' };
   await startSession({ userId: devUserId(parsed.data), email: parsed.data });
-  redirect('/sandbox');
+  redirect(safeNext(form.get('next')));
 }
 
 export async function signOut(): Promise<void> {

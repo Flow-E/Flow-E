@@ -5,7 +5,13 @@ import { buttonClass } from '@/components/ui';
 import { devLogin, sendLink, type LoginState } from './actions';
 
 /** Email sign-in link (Supabase Auth). */
-export function EmailLinkForm({ initialError }: { initialError?: string | undefined }) {
+export function EmailLinkForm({
+  initialError,
+  next,
+}: {
+  initialError?: string | undefined;
+  next: string;
+}) {
   const [state, action, pending] = useActionState<LoginState, FormData>(
     sendLink,
     initialError ? { error: initialError } : {},
@@ -30,6 +36,7 @@ export function EmailLinkForm({ initialError }: { initialError?: string | undefi
   }
   return (
     <form action={action} className="mt-6 space-y-4">
+      <input type="hidden" name="next" value={next} />
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-ink">
           Email
@@ -62,10 +69,11 @@ export function EmailLinkForm({ initialError }: { initialError?: string | undefi
   );
 }
 
-export function DevLoginForm() {
+export function DevLoginForm({ next }: { next: string }) {
   const [state, action, pending] = useActionState<LoginState, FormData>(devLogin, {});
   return (
     <form action={action} className="mt-6 space-y-4">
+      <input type="hidden" name="next" value={next} />
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-ink">
           Email
@@ -92,7 +100,7 @@ export function DevLoginForm() {
         ) : null}
       </div>
       <button type="submit" disabled={pending} className={`${buttonClass('primary')} w-full`}>
-        {pending ? 'Signing in…' : 'Open my sandbox'}
+        {pending ? 'Signing in…' : next.startsWith('/sandbox') ? 'Open my sandbox' : 'Sign in'}
       </button>
     </form>
   );
