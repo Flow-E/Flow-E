@@ -4,7 +4,8 @@ import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['dist/', 'coverage/', 'node_modules/'] },
+  // web/ has its own ESLint config (Next.js); lint it from there.
+  { ignores: ['dist/', 'coverage/', 'node_modules/', 'web/'] },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   {

@@ -2,3 +2,9 @@ dist
 coverage
 node_modules
 package-lock.json
+web/.next
+web/node_modules
+web/.data
+web/screenshots-review
+web/next-env.d.ts
+web/src/content/readme.generated.ts

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { CATALOG, DEMO_AGENT, type CatalogItem } from '../demo/content.js';
+import { CATALOG, DEMO_AGENT, DEMO_STORY_STEPS, type CatalogItem } from '../demo/content.js';
 import { DEMO_MARKER, DemoError } from '../demo/setup.js';
 import type { CommandResult } from './ledger-commands.js';
 
@@ -107,10 +107,9 @@ export async function runSimulate(o: SimulateOptions): Promise<CommandResult> {
         "Fake agent buying this week's lab supplies (fictional data; no money moves).",
         '',
       ];
-      const at = (n: number): CatalogItem => CATALOG[n - 1] as CatalogItem;
-      for (const n of [1, 2, 3, 4]) lines.push(await buy(at(n)));
-      lines.push(await buy(at(4), '4500.00')); // tries to split the declined column set
-      for (const n of [5, 6]) lines.push(await buy(at(n)));
+      for (const step of DEMO_STORY_STEPS) {
+        lines.push(await buy(CATALOG[step.item - 1] as CatalogItem, step.amount));
+      }
       lines.push('', 'Open the control panel: the centrifuge is waiting for your approval.');
       return { ok: true, text: lines.join('\n') };
     }

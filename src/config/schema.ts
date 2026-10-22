@@ -87,6 +87,11 @@ export function parseConfig(yamlText: string): MandateConfig {
   } catch (err) {
     throw new ConfigError(`mandate.yaml is not valid YAML: ${(err as Error).message}`);
   }
+  return parseConfigObject(raw);
+}
+
+/** Validate an already-parsed mandate (e.g. JSON from a database) with the same rules. */
+export function parseConfigObject(raw: unknown): MandateConfig {
   const result = configSchema.safeParse(raw);
   if (!result.success) {
     throw new ConfigError(`mandate.yaml is invalid:\n${z.prettifyError(result.error)}`);

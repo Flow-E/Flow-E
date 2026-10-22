@@ -1,0 +1,217 @@
+@import 'tailwindcss';
+
+/*
+ * Flow-E: "ledger and ink". Warm paper, deep ink, one ledger-green accent for approval and
+ * primary actions, amber for review, oxblood for decline. Light by default (finance and ops
+ * teams in daylight offices); dark follows the system.
+ */
+:root {
+  --paper: #f7f5f0;
+  --surface: #fffdf9;
+  --sunken: #efece5;
+  --ink: #1b1f24;
+  --ink-2: #4a525c;
+  --ink-3: #6b7280;
+  --rule: #e2ddd2;
+  --rule-strong: #cfc8ba;
+  --accent: #1f5e4a;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3efe9;
+  --approve: #1f6b4c;
+  --approve-soft: #e2f1e8;
+  --review: #8a5a00;
+  --review-soft: #fbf0d9;
+  --decline: #9b2c2c;
+  --decline-soft: #f8e4e2;
+  --muted-soft: #ecebe7;
+  --focus: #2f6fd1;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #111315;
+    --surface: #181b1e;
+    --sunken: #0c0e10;
+    --ink: #ebe8e2;
+    --ink-2: #b5b1a8;
+    --ink-3: #8f8b83;
+    --rule: #2a2e33;
+    --rule-strong: #3a3f45;
+    --accent: #6fc2a0;
+    --accent-ink: #0d1f18;
+    --accent-soft: #17302a;
+    --approve: #7fd0ab;
+    --approve-soft: #15291f;
+    --review: #e5b45a;
+    --review-soft: #2e2412;
+    --decline: #ef8f86;
+    --decline-soft: #33191a;
+    --muted-soft: #23272b;
+    --focus: #7aa7ff;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-approve: var(--approve);
+  --color-approve-soft: var(--approve-soft);
+  --color-review: var(--review);
+  --color-review-soft: var(--review-soft);
+  --color-decline: var(--decline);
+  --color-decline-soft: var(--decline-soft);
+  --color-muted-soft: var(--muted-soft);
+  --color-focus: var(--focus);
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --font-serif: var(--font-newsreader), Georgia, serif;
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-text-size-adjust: 100%;
+  scrollbar-color: var(--rule-strong) transparent;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: 'ss02';
+  line-height: 1.55;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+a {
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+
+input,
+textarea,
+select {
+  caret-color: var(--accent);
+}
+
+/* Amounts, hashes and ids line up. */
+.tabular,
+table,
+code,
+pre {
+  font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+/* Rendered README (docs). */
+.prose-docs {
+  max-width: 70ch;
+  color: var(--ink-2);
+}
+.prose-docs h3 {
+  margin: 2rem 0 0.5rem;
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+.prose-docs p,
+.prose-docs ul,
+.prose-docs ol,
+.prose-docs pre,
+.prose-docs table,
+.prose-docs blockquote {
+  margin: 0 0 1rem;
+}
+.prose-docs ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.prose-docs ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+.prose-docs li {
+  margin: 0.25rem 0;
+}
+.prose-docs strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.prose-docs a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.prose-docs code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--sunken);
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+  color: var(--ink);
+}
+.prose-docs pre {
+  background: var(--sunken);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.prose-docs pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+.prose-docs table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  display: block;
+  overflow-x: auto;
+}
+.prose-docs th,
+.prose-docs td {
+  text-align: left;
+  border-bottom: 1px solid var(--rule);
+  padding: 0.45rem 0.6rem 0.45rem 0;
+  vertical-align: top;
+}
+.prose-docs th {
+  color: var(--ink);
+  font-weight: 600;
+}
+.prose-docs blockquote {
+  border-left: 1px solid var(--rule-strong);
+  padding: 0.25rem 0 0.25rem 1rem;
+  color: var(--ink-2);
+}

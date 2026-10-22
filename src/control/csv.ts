@@ -90,7 +90,12 @@ function rowFor(e: Entry): Cell[] {
 
 /** CSV text with a header row. Amounts are decimals in their currency. */
 export function exportCsv(ledger: Ledger): string {
+  return csvFromEntries(ledger.entries());
+}
+
+/** The same CSV from entries already loaded from any store (in sequence order). */
+export function csvFromEntries(entries: readonly Entry[]): string {
   const lines = [COLUMNS.map(csvCell).join(',')];
-  for (const entry of ledger.entries()) lines.push(rowFor(entry).map(csvCell).join(','));
+  for (const entry of entries) lines.push(rowFor(entry).map(csvCell).join(','));
   return lines.join('\r\n') + '\r\n';
 }

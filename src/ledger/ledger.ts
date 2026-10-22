@@ -1,24 +1,46 @@
-import { randomBytes, type KeyObject } from 'node:crypto';
+import type { KeyObject } from 'node:crypto';
 import Database from 'better-sqlite3';
-import { canonicalJson } from '../crypto/canonical.js';
-import { issuerIdFor } from '../crypto/ed25519.js';
 import type { EvaluationResult, LedgerEntryView, PaymentRequest } from '../engine/types.js';
 import {
-  GENESIS_HASH,
-  entryHash,
-  signHash,
-  toReceipt,
-  verifyHashSignature,
-  type Entry,
-  type EntryBody,
-  type JsonValue,
-  type Receipt,
-} from './receipt.js';
+  KILL_SWITCH,
+  AGENT_FREEZE,
+  PAYMENT_CANCELLED,
+  PAYMENT_DECISION,
+  PAYMENT_RESOLVED,
+  auditEntries,
+  buildEntry,
+  decisionData,
+  foldControls,
+  foldPayments,
+  fromStored,
+  toEngineViews,
+  type AuditResult,
+  type Controls,
+  type EntryInput,
+  type PaymentRecord,
+  type Signer,
+  type StoredEntry,
+} from './fold.js';
+import { toReceipt, type Entry, type Receipt } from './receipt.js';
+
+export {
+  AGENT_FREEZE,
+  ALL_AGENTS,
+  KILL_SWITCH,
+  PAYMENT_CANCELLED,
+  PAYMENT_DECISION,
+  PAYMENT_RESOLVED,
+  newId,
+  type AuditResult,
+  type Controls,
+  type PaymentRecord,
+  type Signer,
+} from './fold.js';
 
 /**
  * Append-only ledger in SQLite. Triggers refuse UPDATE and DELETE; anything done around them
  * (editing the file directly, dropping the triggers) breaks the hash chain or a signature, and
- * `audit()` names the first broken entry.
+ * `audit()` names the first broken entry. The rules themselves live in fold.ts.
  */
 
 const SCHEMA_VERSION = '1';
@@ -50,49 +72,8 @@ CREATE TRIGGER IF NOT EXISTS entries_no_delete BEFORE DELETE ON entries
 BEGIN SELECT RAISE(ABORT, 'the ledger is append-only'); END;
 `;
 
-/** Entry types. Status changes are new entries; nothing is ever updated in place. */
-export const PAYMENT_DECISION = 'payment.decision';
-/** A human approved or declined a payment that was in review. */
-export const PAYMENT_RESOLVED = 'payment.resolved';
-/** A human cancelled an approved payment inside its cooling-off window. */
-export const PAYMENT_CANCELLED = 'payment.cancelled';
-export const AGENT_FREEZE = 'control.agent_freeze';
-export const KILL_SWITCH = 'control.kill_switch';
-/** agent_id used for entries that concern every agent. */
-export const ALL_AGENTS = '*';
-
-export interface Controls {
-  killSwitch: { on: boolean; by: string; at: string } | null;
-  frozen: Record<string, { frozen: boolean; by: string; at: string }>;
-}
-
 export class LedgerError extends Error {
   override name = 'LedgerError';
-}
-
-export interface Signer {
-  issuer: string;
-  privateKey: KeyObject;
-}
-
-interface Row {
-  seq: number;
-  id: string;
-  type: string;
-  agent_id: string;
-  created_at: string;
-  data: string;
-  prev_hash: string;
-  hash: string;
-  signature: string;
-}
-
-export type AuditResult =
-  | { ok: true; entries: number; head: { seq: number; hash: string } | null }
-  | { ok: false; entries: number; firstBroken: { seq: number; id: string | null; reason: string } };
-
-export function newId(prefix: string): string {
-  return `${prefix}_${randomBytes(10).toString('hex')}`;
 }
 
 export class Ledger {
@@ -156,17 +137,9 @@ export class Ledger {
   }
 
   /** Append one entry, atomically against concurrent writers. Returns its receipt. */
-  append(input: {
-    type: string;
-    agentId: string;
-    now: number;
-    data: { [key: string]: JsonValue };
-    id?: string;
-  }): Receipt {
+  append(input: EntryInput): Receipt {
     const signer = this.signer;
     if (!signer) throw new LedgerError('The ledger was opened read-only.');
-    // Canonicalise up front: throws on undefined, NaN and other values JSON cannot hold exactly.
-    const dataText = canonicalJson(input.data);
     const last = this.db.prepare<[], { seq: number; hash: string }>(
       'SELECT seq, hash FROM entries ORDER BY seq DESC LIMIT 1',
     );
@@ -175,23 +148,8 @@ export class Ledger {
        VALUES (@seq, @id, @type, @agent_id, @created_at, @data, @prev_hash, @hash, @signature)`,
     );
     const write = this.db.transaction((): Entry => {
-      const prev = last.get();
-      const body: EntryBody = {
-        seq: (prev?.seq ?? 0) + 1,
-        id: input.id ?? newId('rcpt'),
-        type: input.type,
-        agent_id: input.agentId,
-        created_at: new Date(input.now).toISOString(),
-        data: input.data,
-        prev_hash: prev?.hash ?? GENESIS_HASH,
-      };
-      const hash = entryHash(body);
-      const entry: Entry = {
-        ...body,
-        hash,
-        signature: signHash(signer.privateKey, signer.issuer, hash),
-      };
-      insert.run({ ...entry, data: dataText });
+      const { entry, stored } = buildEntry(last.get() ?? null, input, signer);
+      insert.run(stored);
       return entry;
     });
     return toReceipt(this.issuer, write.immediate());
@@ -206,63 +164,35 @@ export class Ledger {
     baseCurrency: string;
     now: number;
   }): Receipt {
-    const { request: r, result } = input;
-    const request: { [key: string]: JsonValue } = {
-      merchant: r.merchant,
-      amount: r.amount,
-      currency: r.currency,
-      category: r.category,
-      country: r.country,
-    };
-    if (r.memo !== undefined) request.memo = r.memo;
     return this.append({
       type: PAYMENT_DECISION,
       agentId: input.agentId,
       now: input.now,
-      data: {
-        payment_id: input.paymentId,
-        request,
-        decision: result.decision,
-        rule: result.rule,
-        reason: result.reason,
-        amount_base: result.amountBase,
-        base_currency: input.baseCurrency,
-        cancellable_until:
-          result.cancellableUntil === undefined
-            ? null
-            : new Date(result.cancellableUntil).toISOString(),
-        trace: result.trace.map((t) => {
-          const step: { [key: string]: JsonValue } = {
-            rule: t.rule,
-            outcome: t.outcome,
-            detail: t.detail,
-          };
-          if (t.data) step.data = t.data;
-          return step;
-        }),
-      },
+      data: decisionData(input),
     });
   }
 
   entries(): Entry[] {
-    return this.db.prepare<[], Row>('SELECT * FROM entries ORDER BY seq').all().map(fromRow);
+    return this.rows().map(fromStored);
   }
 
   /** Find an entry by receipt id or by the payment id it records. */
   find(id: string): Entry | undefined {
     const row =
-      this.db.prepare<[string], Row>('SELECT * FROM entries WHERE id = ?').get(id) ??
+      this.db.prepare<[string], StoredEntry>('SELECT * FROM entries WHERE id = ?').get(id) ??
       this.db
-        .prepare<[string, string], Row>(
+        .prepare<[string, string], StoredEntry>(
           "SELECT * FROM entries WHERE type = ? AND json_extract(data, '$.payment_id') = ? ORDER BY seq LIMIT 1",
         )
         .get(PAYMENT_DECISION, id);
-    return row ? fromRow(row) : undefined;
+    return row ? fromStored(row) : undefined;
   }
 
   bySeq(seq: number): Entry | undefined {
-    const row = this.db.prepare<[number], Row>('SELECT * FROM entries WHERE seq = ?').get(seq);
-    return row ? fromRow(row) : undefined;
+    const row = this.db
+      .prepare<[number], StoredEntry>('SELECT * FROM entries WHERE seq = ?')
+      .get(seq);
+    return row ? fromStored(row) : undefined;
   }
 
   receipt(id: string): Receipt | undefined {
@@ -279,10 +209,12 @@ export class Ledger {
     const rows =
       agentId === undefined
         ? this.db
-            .prepare<string[], Row>('SELECT * FROM entries WHERE type IN (?, ?, ?) ORDER BY seq')
+            .prepare<string[], StoredEntry>(
+              'SELECT * FROM entries WHERE type IN (?, ?, ?) ORDER BY seq',
+            )
             .all(...types)
         : this.db
-            .prepare<string[], Row>(
+            .prepare<string[], StoredEntry>(
               'SELECT * FROM entries WHERE agent_id = ? AND type IN (?, ?, ?) ORDER BY seq',
             )
             .all(agentId, ...types);
@@ -296,19 +228,13 @@ export class Ledger {
 
   /** Kill switch and per-agent freezes, as last set by a human. */
   controls(): Controls {
-    const controls: Controls = { killSwitch: null, frozen: {} };
-    const rows = this.db
-      .prepare<[string, string], Row>('SELECT * FROM entries WHERE type IN (?, ?) ORDER BY seq')
-      .all(KILL_SWITCH, AGENT_FREEZE);
-    for (const row of rows) {
-      const d = JSON.parse(row.data) as { on?: boolean; frozen?: boolean; by: string };
-      if (row.type === KILL_SWITCH) {
-        controls.killSwitch = { on: d.on === true, by: d.by, at: row.created_at };
-      } else {
-        controls.frozen[row.agent_id] = { frozen: d.frozen === true, by: d.by, at: row.created_at };
-      }
-    }
-    return controls;
+    return foldControls(
+      this.db
+        .prepare<[string, string], StoredEntry>(
+          'SELECT * FROM entries WHERE type IN (?, ?) ORDER BY seq',
+        )
+        .all(KILL_SWITCH, AGENT_FREEZE),
+    );
   }
 
   /** Run reads and appends as one write transaction, serialised against other processes. */
@@ -319,13 +245,7 @@ export class Ledger {
 
   /** This agent's payments, shaped for the policy engine. */
   paymentViews(agentId: string): LedgerEntryView[] {
-    return this.payments(agentId).map((p) => ({
-      id: p.paymentId,
-      merchant: p.request.merchant,
-      amountBase: p.amountBase ?? 0,
-      status: p.status,
-      createdAt: Date.parse(p.createdAt),
-    }));
+    return toEngineViews(this.payments(agentId));
   }
 
   /**
@@ -353,153 +273,11 @@ export class Ledger {
    * first broken entry, because everything after it can no longer be trusted.
    */
   audit(publicKey: KeyObject): AuditResult {
-    const keyId = issuerIdFor(publicKey);
-    if (keyId !== this.issuer) {
-      return {
-        ok: false,
-        entries: 0,
-        firstBroken: {
-          seq: 0,
-          id: null,
-          reason: `the ledger is bound to issuer ${this.issuer}, but the public key is ${keyId}`,
-        },
-      };
-    }
-    let expectedSeq = 1;
-    let prevHash = GENESIS_HASH;
-    const rows = this.db.prepare<[], Row>('SELECT * FROM entries ORDER BY seq').iterate();
-    for (const row of rows) {
-      const broken = (reason: string): AuditResult => ({
-        ok: false,
-        entries: expectedSeq - 1,
-        firstBroken: { seq: row.seq, id: typeof row.id === 'string' ? row.id : null, reason },
-      });
-      if (row.seq > expectedSeq) {
-        // The first broken position is the gap itself, not the row after it.
-        return {
-          ok: false,
-          entries: expectedSeq - 1,
-          firstBroken: {
-            seq: expectedSeq,
-            id: null,
-            reason: `entry #${expectedSeq} is missing (next entry found is #${row.seq})`,
-          },
-        };
-      }
-      if (row.seq !== expectedSeq) return broken(`unexpected sequence number ${row.seq}`);
-      if (row.prev_hash !== prevHash) {
-        return broken(`does not link to entry #${expectedSeq - 1} (prev_hash mismatch)`);
-      }
-      let entry: Entry;
-      try {
-        entry = fromRow(row);
-        if (canonicalJson(entry.data) !== row.data) throw new Error('not canonical');
-      } catch {
-        return broken('data is not valid canonical JSON (edited by hand?)');
-      }
-      if (entryHash(entry) !== row.hash) {
-        return broken('contents do not match the stored hash (edited after writing)');
-      }
-      if (!verifyHashSignature(publicKey, this.issuer, row.hash, row.signature)) {
-        return broken('issuer signature is not valid (hash rewritten without the issuer key)');
-      }
-      prevHash = row.hash;
-      expectedSeq += 1;
-    }
-    const count = expectedSeq - 1;
-    return { ok: true, entries: count, head: count === 0 ? null : { seq: count, hash: prevHash } };
+    // Loaded up front: an early return must not leave a SQLite cursor open.
+    return auditEntries(this.rows(), this.issuer, publicKey);
   }
-}
 
-/** A payment as the agent and the owner see it. */
-export interface PaymentRecord {
-  paymentId: string;
-  receiptId: string;
-  agentId: string;
-  status: 'approved' | 'declined' | 'review' | 'cancelled';
-  /** The engine's original decision. */
-  engineDecision: 'approved' | 'declined' | 'review';
-  rule: string | null;
-  reason: string;
-  request: {
-    merchant: string;
-    amount: number;
-    currency: string;
-    category: string;
-    country: string;
-    memo?: string;
-  };
-  amountBase: number | null;
-  baseCurrency: string;
-  createdAt: string;
-  cancellableUntil: string | null;
-  /** "engine", or the person who last changed the status. */
-  decidedBy: string;
-  /** When a human last changed the status; null if never. */
-  updatedAt: string | null;
-  note: string | null;
-}
-
-interface DecisionData {
-  payment_id: string;
-  request: PaymentRecord['request'];
-  decision: PaymentRecord['engineDecision'];
-  rule: string | null;
-  reason: string;
-  amount_base: number | null;
-  base_currency: string;
-  cancellable_until: string | null;
-}
-
-interface HumanActionData {
-  payment_id: string;
-  status?: 'approved' | 'declined';
-  by: string;
-  note: string | null;
-  cancellable_until?: string | null;
-}
-
-function foldPayments(rows: Row[]): PaymentRecord[] {
-  const byId = new Map<string, PaymentRecord>();
-  for (const row of rows) {
-    if (row.type === PAYMENT_DECISION) {
-      const d = JSON.parse(row.data) as DecisionData;
-      byId.set(d.payment_id, {
-        paymentId: d.payment_id,
-        receiptId: row.id,
-        agentId: row.agent_id,
-        status: d.decision,
-        engineDecision: d.decision,
-        rule: d.rule,
-        reason: d.reason,
-        request: d.request,
-        amountBase: d.amount_base,
-        baseCurrency: d.base_currency,
-        createdAt: row.created_at,
-        cancellableUntil: d.cancellable_until,
-        decidedBy: 'engine',
-        updatedAt: null,
-        note: null,
-      });
-      continue;
-    }
-    const d = JSON.parse(row.data) as HumanActionData;
-    const p = byId.get(d.payment_id);
-    if (!p) continue;
-    p.decidedBy = d.by;
-    p.updatedAt = row.created_at;
-    p.note = d.note;
-    if (row.type === PAYMENT_CANCELLED) {
-      p.status = 'cancelled';
-      p.cancellableUntil = null;
-    } else if (d.status) {
-      p.status = d.status;
-      p.cancellableUntil = d.cancellable_until ?? null;
-    }
+  private rows(): StoredEntry[] {
+    return this.db.prepare<[], StoredEntry>('SELECT * FROM entries ORDER BY seq').all();
   }
-  return [...byId.values()];
-}
-
-function fromRow(row: Row): Entry {
-  return { ...row, data: JSON.parse(row.data) as Entry['data'] };
 }

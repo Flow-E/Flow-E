@@ -1,0 +1,46 @@
+name: Web
+
+# The website in web/. Runs only when the site or the core it imports changes, on one runner.
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', 'src/**', 'package.json', 'package-lock.json', '.github/workflows/web.yml']
+  pull_request:
+    paths: ['web/**', 'src/**', 'package.json', 'package-lock.json', '.github/workflows/web.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Lint, test, build (Node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      # The site imports the core from ../dist, so the core's dependencies are needed too.
+      - run: npm ci --ignore-scripts
+      - run: npm ci --ignore-scripts
+        working-directory: web
+      # `npm run build` syncs the docs from README.md and builds the core first (prebuild);
+      # the steps after it call the tools directly so that work isn't repeated.
+      - run: npm run build
+        working-directory: web
+      - run: npx eslint .
+        working-directory: web
+      - run: npx tsc --noEmit
+        working-directory: web
+      - run: npx vitest run
+        working-directory: web

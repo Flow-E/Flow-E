@@ -129,6 +129,20 @@ ${catalogTable()}
 For each item, pick the best offer, request the payment and tell me the decision, the reason and the payment_id. If a payment needs my approval, tell me and wait. Finish with a short summary table.`;
 }
 
+/**
+ * The fake agent's demo story: catalog item numbers (1-based) in order. Step 5 tries to split
+ * the declined column set into a smaller payment.
+ */
+export const DEMO_STORY_STEPS: readonly { item: number; amount?: string }[] = [
+  { item: 1 },
+  { item: 2 },
+  { item: 3 },
+  { item: 4 },
+  { item: 4, amount: '4500.00' },
+  { item: 5 },
+  { item: 6 },
+];
+
 /** Explains what the demo is expected to show, for the person running it. */
 export const DEMO_STORY = [
   'Cheapest buffer (Example Chem Trading LLC): declined, the supplier is on the demo blocklist.',
