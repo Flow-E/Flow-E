@@ -16,6 +16,6 @@ export async function serveStdio(o: MandateServerOptions): Promise<void> {
   };
   await mandate.server.connect(transport);
   process.stderr.write(
-    `imprest: serving agent "${o.agentId}" (issuer ${mandate.issuerId}) on stdio\n`,
+    `flow-e: serving agent "${o.agentId}" (issuer ${mandate.issuerId}) on stdio\n`,
   );
 }

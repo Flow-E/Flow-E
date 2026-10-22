@@ -44,7 +44,7 @@ export interface MandateServer {
 
 const INSTRUCTIONS = `This server holds your spending mandate: the budget and rules your organisation set for you.
 Call check_mandate before planning purchases. Call request_payment before every purchase and only buy when the decision is "approved".
-Imprest authorizes payments; it does not move money. A decision is final unless a human changes it: never split a declined payment, or re-submit it with a changed supplier name, category, country or currency, to get around a rule. Buying the item from a different supplier that is genuinely allowed is fine. Never place an order that is "review" until get_payment shows "approved".`;
+Flow-E authorizes payments; it does not move money. A decision is final unless a human changes it: never split a declined payment, or re-submit it with a changed supplier name, category, country or currency, to get around a rule. Buying the item from a different supplier that is genuinely allowed is fine. Never place an order that is "review" until get_payment shows "approved".`;
 
 const DAY_NAMES = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -103,7 +103,7 @@ export function createMandateServer(o: MandateServerOptions): MandateServer {
   }
 
   const server = new McpServer(
-    { name: 'imprest', version: '0.1.0' },
+    { name: 'flow-e', version: '0.1.0' },
     { instructions: INSTRUCTIONS },
   );
 
@@ -362,7 +362,7 @@ export function createMandateServer(o: MandateServerOptions): MandateServer {
 const NEXT_STEP = {
   approved:
     'Authorized. Complete the purchase through the normal checkout and quote the payment_id. ' +
-    'Imprest has not moved any money.',
+    'Flow-E has not moved any money.',
   declined:
     'Not authorized. Do not buy this, and do not retry it in a disguised form (split, renamed, ' +
     're-categorised or in another currency). You may buy the item from a different supplier ' +

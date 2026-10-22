@@ -21,7 +21,7 @@ let reviewId: string;
 
 beforeEach(async () => {
   const dir = mkdtempSync(join(tmpdir(), 'mandate-panel-'));
-  home = join(dir, '.imprest');
+  home = join(dir, '.flow-e');
   config = join(dir, 'mandate.yaml');
   runInit({ home, config });
   const issuer = loadSigningIssuer(home);
@@ -232,7 +232,7 @@ describe('CSV export', () => {
     const res = await fetch(`${base}/api/export.csv`, { headers: auth() });
     expect(res.headers.get('content-type')).toBe('text/csv; charset=utf-8');
     expect(res.headers.get('content-disposition')).toBe(
-      'attachment; filename="imprest-ledger-2026-10-21.csv"',
+      'attachment; filename="flow-e-ledger-2026-10-21.csv"',
     );
     expect((await res.text()).trimEnd().split('\r\n')).toHaveLength(3);
   });

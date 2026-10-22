@@ -39,7 +39,7 @@ const transport = new StdioClientTransport({
   args: [
     cli,
     '--home',
-    join(project, 'demo', '.imprest'),
+    join(project, 'demo', '.flow-e'),
     '--config',
     join(project, 'demo', 'mandate.yaml'),
     'serve',
@@ -63,5 +63,5 @@ await client.close();
 const decision = JSON.parse(result.content[0].text).decision;
 if (decision !== 'approved') throw new Error(`expected approved, got ${decision}`);
 console.log('request_payment over stdio:', decision);
-console.log(node('--home', 'demo/.imprest', 'audit').trim());
+console.log(node('--home', 'demo/.flow-e', 'audit').trim());
 console.log(`pack smoke test passed (${tarball})`);

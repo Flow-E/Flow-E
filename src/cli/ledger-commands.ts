@@ -89,7 +89,7 @@ export function runVerify(o: {
     } finally {
       ledger.close();
     }
-    lines.push('  (run "imprest audit" to check the whole chain)');
+    lines.push('  (run "flow-e audit" to check the whole chain)');
   }
   lines.push(ok ? 'VALID' : 'INVALID');
   return { ok, text: lines.join('\n') };

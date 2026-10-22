@@ -1,4 +1,4 @@
-# Imprest (`@imprest-hq/mcp`)
+# Flow-E (`@flow-e/mcp`)
 
 Open-source MCP server that lets companies give AI agents a mandate: identity, budgets and rules, human approval, a kill switch, and signed receipts. v1 authorizes payments only; it never moves real money.
 
@@ -22,9 +22,9 @@ CI (.github/workflows/ci.yml) runs on Ubuntu with Node 22 and 24; Windows only o
 
 ## Naming
 
-- Brand **Imprest**: package `@imprest-hq/mcp`, CLI `imprest`, state folder `.imprest/`, env `IMPREST_HOME`/`IMPREST_CONFIG`, signed-data ids `imprest-issuer:`, `imprest-credential/v1`, `imprest-receipt/v1`.
+- Brand **Flow-E**: package `@flow-e/mcp`, CLI `flow-e`, state folder `.flow-e/`, env `FLOWE_HOME`/`FLOWE_CONFIG`, signed-data ids `flow-e-issuer:`, `flow-e-credential/v1`, `flow-e-receipt/v1`.
 - "Mandate" stays as the concept word: `mandate.yaml`, the `check_mandate` tool, the `Mandate` type.
-- Never write `npx mandate-mcp` or `npx mandate`: those npm names belong to other people. Don't put `npx @imprest-hq/mcp` in instructions until the npm org is registered and the package is published. Printed commands take the package name from package.json.
+- Never write `npx mandate-mcp` or `npx mandate`: those npm names belong to other people. Don't put `npx @flow-e/mcp` in instructions until the package is published (the npm org `flow-e` exists, owner `lowrexius`). Repository: https://github.com/Flow-E/Flow-E (public). Printed commands take the package name from package.json.
 
 ## Conventions
 

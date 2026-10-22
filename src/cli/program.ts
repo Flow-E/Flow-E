@@ -66,7 +66,7 @@ function positiveInt(value: string): number {
 }
 
 export function buildProgram(): Command {
-  const program = new Command('imprest')
+  const program = new Command('flow-e')
     .description(
       'Give AI agents a mandate: identity, budgets and rules, human approval, a kill switch and ' +
         'signed receipts. Authorizes payments only; never moves real money.',
@@ -75,9 +75,9 @@ export function buildProgram(): Command {
     .option(
       '--home <dir>',
       'state directory (keys, credentials)',
-      process.env.IMPREST_HOME ?? '.imprest',
+      process.env.FLOWE_HOME ?? '.flow-e',
     )
-    .option('--config <file>', 'mandate file', process.env.IMPREST_CONFIG ?? 'mandate.yaml');
+    .option('--config <file>', 'mandate file', process.env.FLOWE_CONFIG ?? 'mandate.yaml');
 
   program
     .command('init')
@@ -266,10 +266,10 @@ Press Ctrl+C to stop.
   program
     .command('demo')
     .description('set up a fictional demo, start the panel and print a prompt for Claude')
-    .option('--dir <dir>', 'demo folder (created if missing)', 'imprest-demo')
+    .option('--dir <dir>', 'demo folder (created if missing)', 'flow-e-demo')
     .option('--port <n>', 'control panel port', positiveInt, DEFAULT_PANEL_PORT)
     .option('--no-panel', 'do not start the control panel')
-    .option('--reset', 'delete the demo folder first (only one made by "imprest demo")', false)
+    .option('--reset', 'delete the demo folder first (only one made by "flow-e demo")', false)
     .action(async (_opts: unknown, cmd: Command) => {
       const o = cmd.opts<{ dir: string; port: number; panel: boolean; reset: boolean }>();
       try {
@@ -308,7 +308,7 @@ Press Ctrl+C to stop.
     .description(
       'a fake agent for the demo folder: story (default), buy <1-6>, list, status <id>, mandate',
     )
-    .option('--dir <dir>', 'demo folder made by "imprest demo"', 'imprest-demo')
+    .option('--dir <dir>', 'demo folder made by "flow-e demo"', 'flow-e-demo')
     .action(
       async (action: string | undefined, arg: string | undefined, _opts: unknown, cmd: Command) => {
         const o = cmd.opts<{ dir: string }>();

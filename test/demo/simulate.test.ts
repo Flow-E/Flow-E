@@ -23,7 +23,7 @@ beforeAll(() => {
   execFileSync(process.execPath, [tsc, '-p', join(root, 'tsconfig.build.json')], {
     stdio: 'inherit',
   });
-  demo = join(mkdtempSync(join(tmpdir(), 'imprest-sim-')), 'demo');
+  demo = join(mkdtempSync(join(tmpdir(), 'flow-e-sim-')), 'demo');
   setupDemo({ dir: demo, reset: false, now: Date.now() });
 }, 120_000);
 
@@ -31,16 +31,16 @@ const simulate = (action: string, arg?: string, dir = demo) =>
   runSimulate({ dir, action, arg, cliPath, nodePath });
 
 describe('safety', () => {
-  it('refuses a folder that "imprest demo" did not make', async () => {
-    const plain = mkdtempSync(join(tmpdir(), 'imprest-not-demo-'));
+  it('refuses a folder that "flow-e demo" did not make', async () => {
+    const plain = mkdtempSync(join(tmpdir(), 'flow-e-not-demo-'));
     await expect(simulate('story', undefined, plain)).rejects.toThrow(
-      /is not a demo folder made by "imprest demo"/,
+      /is not a demo folder made by "flow-e demo"/,
     );
   });
 
   it('refuses a folder that does not exist', async () => {
     await expect(
-      simulate('list', undefined, join(tmpdir(), 'no-such-imprest-demo')),
+      simulate('list', undefined, join(tmpdir(), 'no-such-flow-e-demo')),
     ).rejects.toThrow(/is not a demo folder/);
   });
 
@@ -49,7 +49,7 @@ describe('safety', () => {
   });
 
   it('exits with an error from the CLI too', () => {
-    const plain = mkdtempSync(join(tmpdir(), 'imprest-not-demo-'));
+    const plain = mkdtempSync(join(tmpdir(), 'flow-e-not-demo-'));
     let failure: { status: number | null; stderr: string } | undefined;
     try {
       execFileSync(nodePath, [cliPath, 'simulate', '--dir', plain], { stdio: 'pipe' });
@@ -58,7 +58,7 @@ describe('safety', () => {
       failure = { status: e.status, stderr: e.stderr.toString() };
     }
     expect(failure?.status).toBe(1);
-    expect(failure?.stderr).toMatch(/is not a demo folder made by "imprest demo"/);
+    expect(failure?.stderr).toMatch(/is not a demo folder made by "flow-e demo"/);
   });
 });
 
@@ -94,9 +94,9 @@ describe('the fake agent', () => {
     expect(story).toMatch(/"Example Glass GmbH" is not on this agent's approved supplier list/);
     expect(story).toMatch(/centrifuge is waiting for your approval/);
 
-    const ledger = Ledger.openReadOnly(join(demo, '.imprest', 'ledger.db'));
+    const ledger = Ledger.openReadOnly(join(demo, '.flow-e', 'ledger.db'));
     try {
-      expect(ledger.audit(loadIssuer(join(demo, '.imprest')).publicKey)).toMatchObject({
+      expect(ledger.audit(loadIssuer(join(demo, '.flow-e')).publicKey)).toMatchObject({
         ok: true,
         entries: 7,
       });

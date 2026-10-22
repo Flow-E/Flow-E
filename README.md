@@ -1,15 +1,11 @@
-# Imprest
+# Flow-E
 
 Give an AI agent a **mandate**: a verified identity, a budget and rules, human approval above a
-threshold, a kill switch, and a signed receipt for every decision. **Imprest** is an open-source
+threshold, a kill switch, and a signed receipt for every decision. **Flow-E** is an open-source
 [MCP](https://modelcontextprotocol.io) server that **authorizes** the payments an agent asks for.
 It never holds or moves money.
 
-> **Why "Imprest"?** In accounting, an _imprest_ is a fixed float of money entrusted to someone
-> for a purpose, spent within rules, accounted for item by item, and topped back up. That is what
-> an agent's budget should be.
-
-> **Status: v0.1, early, not yet on npm.** It will be published as `@imprest-hq/mcp`. Until then,
+> **Status: v0.1, early, not yet on npm.** It will be published as `@flow-e/mcp`. Until then,
 > install from a checkout as shown below. Everything here works locally. It has not had an
 > external security review, and it is not a compliance product. See
 > [Security model](#security-model).
@@ -20,7 +16,7 @@ AI agents are starting to buy things: lab supplies, compute, data, travel. Most 
 let them, because there is no trustworthy way to give an agent a budget and rules, see every
 decision, and stop it instantly.
 
-Imprest is that missing layer, and you can add it to an agent in five minutes:
+Flow-E is that missing layer, and you can add it to an agent in five minutes:
 
 - **Know Your Agent.** Each agent carries a signed credential that names a responsible person.
 - **A mandate per agent.** Daily budget, per-payment limit, allowed suppliers, categories,
@@ -38,12 +34,12 @@ features come later (see the [roadmap](#roadmap)).
 You need Node.js 22.12 or later, git, and Claude Code or Claude Desktop.
 
 ```sh
-git clone <this repository> imprest && cd imprest
-npm install && npm run build && npm link   # puts the `imprest` command on your PATH
-cd .. && imprest demo
+git clone https://github.com/Flow-E/Flow-E.git flow-e && cd flow-e
+npm install && npm run build && npm link   # puts the `flow-e` command on your PATH
+cd .. && flow-e demo
 ```
 
-This sets up a folder called `imprest-demo` holding a **fictional** company, two agents, a supplier
+This sets up a folder called `flow-e-demo` holding a **fictional** company, two agents, a supplier
 catalog and fresh keys. It also starts the control panel and prints three things:
 
 1. **A command that connects Claude** to the demo agent: `claude mcp add …` for Claude Code, or a
@@ -66,23 +62,23 @@ You should then see Claude:
 so the control panel fills up straight away:
 
 ```sh
-imprest simulate --dir imprest-demo            # the whole story above
-imprest simulate --dir imprest-demo buy 6      # one item from the catalog (see: simulate list)
-imprest simulate --dir imprest-demo mandate    # budget left today
+flow-e simulate --dir flow-e-demo            # the whole story above
+flow-e simulate --dir flow-e-demo buy 6      # one item from the catalog (see: simulate list)
+flow-e simulate --dir flow-e-demo mandate    # budget left today
 ```
 
-It only runs in a folder made by `imprest demo`, so fake requests never reach a real ledger.
+It only runs in a folder made by `flow-e demo`, so fake requests never reach a real ledger.
 
-Run `imprest demo --reset` to start over. Every company, person, supplier and price in the
+Run `flow-e demo --reset` to start over. Every company, person, supplier and price in the
 demo is invented; supplier names all start with "Example".
 
 ## Use it with your own agents
 
 ```sh
-imprest init                       # issuer keys in .imprest/ and a starter mandate.yaml
+flow-e init                       # issuer keys in .flow-e/ and a starter mandate.yaml
 # edit mandate.yaml: your agents, budgets, suppliers, categories
-imprest check                      # validate it
-imprest agent add lab-procurement  # a signed credential for one agent
+flow-e check                      # validate it
+flow-e agent add lab-procurement  # a signed credential for one agent
 ```
 
 Then connect each agent with its own MCP server. Use **absolute paths** throughout, because the
@@ -91,10 +87,10 @@ client starts the server from its own working directory and may not share your `
 **Claude Code:**
 
 ```sh
-claude mcp add imprest \
-  -e IMPREST_HOME=/absolute/path/to/project/.imprest \
-  -e IMPREST_CONFIG=/absolute/path/to/project/mandate.yaml \
-  -- node /absolute/path/to/imprest/dist/cli/index.js serve --agent lab-procurement
+claude mcp add flow-e \
+  -e FLOWE_HOME=/absolute/path/to/project/.flow-e \
+  -e FLOWE_CONFIG=/absolute/path/to/project/mandate.yaml \
+  -- node /absolute/path/to/flow-e/dist/cli/index.js serve --agent lab-procurement
 ```
 
 **Claude Desktop** (`claude_desktop_config.json`):
@@ -102,25 +98,20 @@ claude mcp add imprest \
 ```json
 {
   "mcpServers": {
-    "imprest": {
+    "flow-e": {
       "command": "node",
-      "args": [
-        "/absolute/path/to/imprest/dist/cli/index.js",
-        "serve",
-        "--agent",
-        "lab-procurement"
-      ],
+      "args": ["/absolute/path/to/flow-e/dist/cli/index.js", "serve", "--agent", "lab-procurement"],
       "env": {
-        "IMPREST_HOME": "/absolute/path/to/project/.imprest",
-        "IMPREST_CONFIG": "/absolute/path/to/project/mandate.yaml"
+        "FLOWE_HOME": "/absolute/path/to/project/.flow-e",
+        "FLOWE_CONFIG": "/absolute/path/to/project/mandate.yaml"
       }
     }
   }
 }
 ```
 
-`imprest demo` prints both snippets with the real paths filled in. After the first npm release,
-`npx -y @imprest-hq/mcp serve …` will replace the `node …/dist/cli/index.js serve …` part. Any MCP client that supports
+`flow-e demo` prints both snippets with the real paths filled in. After the first npm release,
+`npx -y @flow-e/mcp serve …` will replace the `node …/dist/cli/index.js serve …` part. Any MCP client that supports
 stdio servers works the same way.
 
 ### What the agent can do
@@ -169,13 +160,13 @@ Good to know:
 ## Human control
 
 ```sh
-imprest approve <payment-id> --note "Checked the quote"   # or: decline
-imprest freeze lab-procurement                          # one agent; unfreeze undoes it
-imprest freeze --all                                    # kill switch: decline everything
-imprest unfreeze --all                                  # release it (frozen agents stay frozen)
-imprest cooloff-cancel <payment-id>                     # within the 10-minute window
-imprest export --out ledger.csv                         # the whole ledger as CSV
-imprest panel                                           # the control panel in your browser
+flow-e approve <payment-id> --note "Checked the quote"   # or: decline
+flow-e freeze lab-procurement                          # one agent; unfreeze undoes it
+flow-e freeze --all                                    # kill switch: decline everything
+flow-e unfreeze --all                                  # release it (frozen agents stay frozen)
+flow-e cooloff-cancel <payment-id>                     # within the 10-minute window
+flow-e export --out ledger.csv                         # the whole ledger as CSV
+flow-e panel                                           # the control panel in your browser
 ```
 
 Each action is a signed ledger entry that records who acted (`--by`, which defaults to your OS user
@@ -197,7 +188,7 @@ and cannot hide what it did. You can stop it at once, and anyone can check the r
 - **The model** sees only tool results. No tool returns keys, credentials or signatures, and an
   agent can read only its own payments. All input is validated with zod before the engine sees it.
 - **The MCP server process** holds the issuer private key, so that it can sign receipts. Anyone who
-  can read `.imprest/issuer.key` can issue credentials and sign ledger entries: guard it like a
+  can read `.flow-e/issuer.key` can issue credentials and sign ledger entries: guard it like a
   production secret.
 - **The human owner** acts through the CLI or the panel, both on the same machine.
 
@@ -236,19 +227,19 @@ the payment is not authorized.
 - No accounts: `--by` is a label, not an authenticated identity.
 
 > **Not legal advice.** The country list in the examples is a demo and is **not** sanctions
-> screening. Imprest makes no claim of regulatory compliance. Configure your own screening.
+> screening. Flow-E makes no claim of regulatory compliance. Configure your own screening.
 
 ## Ledger, receipts and audit
 
 ```sh
-imprest audit                                     # check the whole chain
-imprest receipt <receipt-or-payment-id> > receipt.json
-imprest verify receipt.json                       # signature, hash and position in the ledger
-imprest verify receipt.json --pubkey issuer.pub --offline   # an auditor with only the public key
+flow-e audit                                     # check the whole chain
+flow-e receipt <receipt-or-payment-id> > receipt.json
+flow-e verify receipt.json                       # signature, hash and position in the ledger
+flow-e verify receipt.json --pubkey issuer.pub --offline   # an auditor with only the public key
 ```
 
-All commands accept `--home <dir>` and `--config <file>`, or the `IMPREST_HOME` and
-`IMPREST_CONFIG` environment variables.
+All commands accept `--home <dir>` and `--config <file>`, or the `FLOWE_HOME` and
+`FLOWE_CONFIG` environment variables.
 
 ## Configuration
 

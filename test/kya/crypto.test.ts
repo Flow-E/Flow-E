@@ -54,8 +54,8 @@ describe('ed25519', () => {
     expect(verifyPayload(pub, 'test-domain', 'hellO', sig)).toBe(false);
   });
   it('separates domains: a signature for one purpose fails for another', () => {
-    const sig = signPayload(priv, 'imprest-receipt-v1', 'payload');
-    expect(verifyPayload(pub, 'imprest-credential-v1', 'payload', sig)).toBe(false);
+    const sig = signPayload(priv, 'flow-e-receipt-v1', 'payload');
+    expect(verifyPayload(pub, 'flow-e-credential-v1', 'payload', sig)).toBe(false);
   });
   it('rejects another key', () => {
     const other = createPublicKey(generateKeyPair().publicKeyPem);
@@ -68,7 +68,7 @@ describe('ed25519', () => {
     },
   );
   it('derives a stable issuer id from the public key', () => {
-    expect(issuerIdFor(pub)).toMatch(/^imprest-issuer:[0-9a-f]{16}$/);
+    expect(issuerIdFor(pub)).toMatch(/^flow-e-issuer:[0-9a-f]{16}$/);
     expect(issuerIdFor(createPublicKey(publicKeyPem))).toBe(issuerIdFor(pub));
     expect(issuerIdFor(createPublicKey(generateKeyPair().publicKeyPem))).not.toBe(issuerIdFor(pub));
   });

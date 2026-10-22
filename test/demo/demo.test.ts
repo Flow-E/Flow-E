@@ -26,8 +26,8 @@ let root: string;
 let dir: string;
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'imprest-demo-'));
-  dir = join(root, 'imprest-demo');
+  root = mkdtempSync(join(tmpdir(), 'flow-e-demo-'));
+  dir = join(root, 'flow-e-demo');
 });
 
 describe('demo content is fictional and labelled', () => {
@@ -61,7 +61,7 @@ describe('setupDemo', () => {
       'mandate.yaml',
       'catalog.md',
       'prompt.md',
-      '.imprest/issuer.key',
+      '.flow-e/issuer.key',
     ]) {
       expect(existsSync(join(dir, f))).toBe(true);
     }
@@ -96,20 +96,18 @@ describe('setupDemo', () => {
 
   it('starts over with --reset: new keys, empty ledger', () => {
     const first = setupDemo({ dir, reset: false, now: NOW });
-    writeFileSync(join(dir, '.imprest', 'ledger.db'), '');
+    writeFileSync(join(dir, '.flow-e', 'ledger.db'), '');
     const again = setupDemo({ dir, reset: true, now: NOW });
     expect(again.created).toBe(true);
     expect(again.issuerId).not.toBe(first.issuerId);
-    expect(existsSync(join(dir, '.imprest', 'ledger.db'))).toBe(false);
+    expect(existsSync(join(dir, '.flow-e', 'ledger.db'))).toBe(false);
   });
 
   it('refuses a folder it did not create, even with --reset, and deletes nothing', () => {
     mkdirSync(dir);
     writeFileSync(join(dir, 'thesis.docx'), 'precious');
     for (const reset of [false, true]) {
-      expect(() => setupDemo({ dir, reset, now: NOW })).toThrow(
-        /was not created by "imprest demo"/,
-      );
+      expect(() => setupDemo({ dir, reset, now: NOW })).toThrow(/was not created by "flow-e demo"/);
     }
     expect(readFileSync(join(dir, 'thesis.docx'), 'utf8')).toBe('precious');
   });
@@ -135,13 +133,13 @@ describe('connection instructions', () => {
       command: '/usr/bin/node',
       args: ['/repo/dist/cli/index.js', 'serve', '--agent', 'lab-procurement'],
     });
-    expect(cmd.env.IMPREST_HOME).toBe(join(dir, '.imprest'));
+    expect(cmd.env.FLOWE_HOME).toBe(join(dir, '.flow-e'));
   });
 
   it('points an npx run at the published version, with cmd /c on Windows', () => {
     const npx = {
       ...local,
-      cliPath: '/home/u/.npm/_npx/abc/node_modules/@imprest-hq/mcp/dist/cli/index.js',
+      cliPath: '/home/u/.npm/_npx/abc/node_modules/@flow-e/mcp/dist/cli/index.js',
     };
     expect(demoServeCommand(s(), { ...npx, platform: 'darwin' })).toMatchObject({
       command: 'npx',
@@ -157,12 +155,12 @@ describe('connection instructions', () => {
     const cmd = {
       command: 'C:\\Program Files\\nodejs\\node.exe',
       args: ['C:\\x\\cli.js', 'serve'],
-      env: { IMPREST_HOME: 'C:\\My Demo\\.imprest' },
+      env: { FLOWE_HOME: 'C:\\My Demo\\.flow-e' },
     };
     expect(claudeCodeCommand(cmd)).toBe(
-      'claude mcp add imprest-demo -e "IMPREST_HOME=C:\\My Demo\\.imprest" -- "C:\\Program Files\\nodejs\\node.exe" "C:\\x\\cli.js" serve',
+      'claude mcp add flow-e-demo -e "FLOWE_HOME=C:\\My Demo\\.flow-e" -- "C:\\Program Files\\nodejs\\node.exe" "C:\\x\\cli.js" serve',
     );
-    expect(JSON.parse(claudeDesktopJson(cmd))).toEqual({ mcpServers: { 'imprest-demo': cmd } });
+    expect(JSON.parse(claudeDesktopJson(cmd))).toEqual({ mcpServers: { 'flow-e-demo': cmd } });
   });
 
   it('builds a launcher hint that matches how the CLI was started', () => {
@@ -196,7 +194,7 @@ describe('connection instructions', () => {
       demoServeCommand(setup, { ...local, platform: 'linux' }),
       'http://127.0.0.1:4848/#token=abc',
     );
-    expect(text).toContain('claude mcp add imprest-demo');
+    expect(text).toContain('claude mcp add flow-e-demo');
     expect(text).toContain('"mcpServers"');
     expect(text).toContain('http://127.0.0.1:4848/#token=abc');
     expect(text).toContain(demoPrompt());

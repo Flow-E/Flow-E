@@ -25,7 +25,7 @@ let approved: string;
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'mandate-cli-'));
-  home = join(dir, '.imprest');
+  home = join(dir, '.flow-e');
   config = join(dir, 'mandate.yaml');
   runInit({ home, config });
   const issuer = loadSigningIssuer(home);
@@ -41,12 +41,12 @@ beforeEach(() => {
 
 const who = { by: 'M. Keller (cli)', now: NOW };
 
-describe('imprest approve / decline', () => {
+describe('flow-e approve / decline', () => {
   it('approves and mentions the cooling-off window', () => {
     const out = runResolve({ home, ...who, id: review, status: 'approved', note: 'ok' });
     expect(out.text).toBe(
       `Approved ${review}: CHF 6000.00 to Alpine Reagents AG (agent lab-procurement).\n` +
-        `First payment to this supplier: cancellable until 2026-10-21T10:10:00.000Z (imprest cooloff-cancel ${review}).`,
+        `First payment to this supplier: cancellable until 2026-10-21T10:10:00.000Z (flow-e cooloff-cancel ${review}).`,
     );
   });
   it('declines', () => {
@@ -59,7 +59,7 @@ describe('imprest approve / decline', () => {
   });
 });
 
-describe('imprest cooloff-cancel', () => {
+describe('flow-e cooloff-cancel', () => {
   it('cancels inside the window', () => {
     expect(runCooloffCancel({ home, ...who, id: approved }).text).toBe(
       `Cancelled ${approved}: CHF 1200.00 to Basel Labware AG (agent lab-procurement).`,
@@ -67,7 +67,7 @@ describe('imprest cooloff-cancel', () => {
   });
 });
 
-describe('imprest freeze / unfreeze', () => {
+describe('flow-e freeze / unfreeze', () => {
   const freeze = (o: { agent?: string; all?: boolean; frozen?: boolean }) =>
     runFreeze({
       home,
@@ -114,7 +114,7 @@ describe('imprest freeze / unfreeze', () => {
   });
 });
 
-describe('imprest export', () => {
+describe('flow-e export', () => {
   it('prints CSV, or writes it to a file', () => {
     expect(runExport({ home }).text.split('\r\n')).toHaveLength(3);
     const out = join(dir, 'ledger.csv');

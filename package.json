@@ -1,14 +1,22 @@
 {
-  "name": "@imprest-hq/mcp",
+  "name": "@flow-e/mcp",
   "version": "0.1.0",
-  "description": "Imprest: give AI agents a spending mandate. Identity, budgets and rules, human approval, a kill switch and signed receipts, as an MCP server. Authorizes payments; never moves money.",
+  "description": "Flow-E: give AI agents a spending mandate. Identity, budgets and rules, human approval, a kill switch and signed receipts, as an MCP server. Authorizes payments; never moves money.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Flow-E/Flow-E.git"
+  },
+  "homepage": "https://github.com/Flow-E/Flow-E#readme",
+  "bugs": {
+    "url": "https://github.com/Flow-E/Flow-E/issues"
+  },
   "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22.12"
   },
   "bin": {
-    "imprest": "dist/cli/index.js"
+    "flow-e": "dist/cli/index.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -29,7 +37,7 @@
     "access": "public"
   },
   "keywords": [
-    "imprest",
+    "flow-e",
     "mcp",
     "model-context-protocol",
     "ai-agents",

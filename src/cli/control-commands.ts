@@ -56,7 +56,7 @@ export function runResolve(
     const p = resolvePayment(ledger, o.id, o.status, o);
     const verb = o.status === 'approved' ? 'Approved' : 'Declined';
     const cooling = p.cancellableUntil
-      ? `\nFirst payment to this supplier: cancellable until ${p.cancellableUntil} (imprest cooloff-cancel ${p.paymentId}).`
+      ? `\nFirst payment to this supplier: cancellable until ${p.cancellableUntil} (flow-e cooloff-cancel ${p.paymentId}).`
       : '';
     return { ok: true, text: `${verb} ${p.paymentId}: ${describe(p)}.${cooling}` };
   });

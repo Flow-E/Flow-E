@@ -61,7 +61,7 @@ function decide(credential: Credential | null, now = NOW) {
 describe('issueCredential', () => {
   it('fills every claim and signs it', () => {
     const c = issue();
-    expect(c.format).toBe('imprest-credential/v1');
+    expect(c.format).toBe('flow-e-credential/v1');
     expect(c.claims).toEqual({
       issuer: ISSUER_ID,
       agent_id: 'lab-procurement',
