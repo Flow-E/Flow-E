@@ -62,6 +62,17 @@ You should then see Claude:
   into smaller payments is caught too;
 - get **declined** for glassware from a supplier that is not on the approved list.
 
+**No Claude handy?** A built-in fake agent sends the same requests through the same MCP tools,
+so the control panel fills up straight away:
+
+```sh
+imprest simulate --dir imprest-demo            # the whole story above
+imprest simulate --dir imprest-demo buy 6      # one item from the catalog (see: simulate list)
+imprest simulate --dir imprest-demo mandate    # budget left today
+```
+
+It only runs in a folder made by `imprest demo`, so fake requests never reach a real ledger.
+
 Run `imprest demo --reset` to start over. Every company, person, supplier and price in the
 demo is invented; supplier names all start with "Example".
 

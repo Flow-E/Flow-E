@@ -14,6 +14,7 @@ import { DEFAULT_PANEL_PORT, PanelError, startPanel } from '../panel/server.js';
 import { ActionError } from '../control/actions.js';
 import { DemoError, demoServeCommand, setupDemo } from '../demo/setup.js';
 import { demoInstructions } from './demo-command.js';
+import { runSimulate } from './simulate-command.js';
 import {
   defaultActor,
   runCooloffCancel,
@@ -301,6 +302,31 @@ Press Ctrl+C to stop.
         report(err);
       }
     });
+
+  program
+    .command('simulate [action] [arg]')
+    .description(
+      'a fake agent for the demo folder: story (default), buy <1-6>, list, status <id>, mandate',
+    )
+    .option('--dir <dir>', 'demo folder made by "imprest demo"', 'imprest-demo')
+    .action(
+      async (action: string | undefined, arg: string | undefined, _opts: unknown, cmd: Command) => {
+        const o = cmd.opts<{ dir: string }>();
+        try {
+          const result = await runSimulate({
+            dir: o.dir,
+            action: action ?? 'story',
+            arg,
+            cliPath: realpathSync(process.argv[1] ?? fileURLToPath(import.meta.url)),
+            nodePath: process.execPath,
+          });
+          (result.ok ? process.stdout : process.stderr).write(result.text + '\n');
+          if (!result.ok) process.exitCode = 1;
+        } catch (err) {
+          report(err);
+        }
+      },
+    );
 
   return program;
 }

@@ -7,6 +7,12 @@ changes.
 
 ## [Unreleased]
 
+### Added
+
+- `imprest simulate`: a fake agent for the demo folder (`story`, `buy <n>`, `list`,
+  `status <id>`, `mandate`). It talks to Imprest over MCP stdio like Claude does, and refuses any
+  folder not made by `imprest demo`. `imprest demo` now points to it.
+
 ### Changed
 
 - Renamed from the working name "Mandate" to **Imprest** before the first release. It will be
