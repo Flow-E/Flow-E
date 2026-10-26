@@ -54,11 +54,13 @@ import {
   type EvaluationResult,
   type MandateConfig,
   type PaymentRecord,
+  type PaymentRequest,
   type Receipt,
   type StoredEntry,
 } from '@flow-e/mcp/core';
 import type { Db, Sql } from './db';
 import { decryptSecret, encryptSecret } from './keys';
+import { SAMPLE_APPROVER, SAMPLE_DAYS, SAMPLE_HISTORY, samplePlan } from './sample-history';
 
 /**
  * The website's sandbox store. Every method takes the signed-in owner's id and works on that
@@ -70,6 +72,7 @@ import { decryptSecret, encryptSecret } from './keys';
 export const CONFIG_UPDATED = 'config.updated';
 const CREDENTIAL_DAYS = 90;
 const DAY = 86_400_000;
+const MINUTE = 60_000;
 
 interface SandboxRow {
   id: string;
@@ -98,6 +101,8 @@ export interface AgentView {
 }
 
 export interface SandboxView {
+  /** The store's clock when the view was read; budgets and the dashboard use it. */
+  now: number;
   issuer: string;
   publicKeyPem: string;
   organisation: string | null;
@@ -210,6 +215,7 @@ export class SandboxStore {
     });
     const newestFirst = [...all].reverse();
     return {
+      now,
       issuer: row.issuer,
       publicKeyPem: row.issuer_public_key,
       organisation: config.organisation ?? null,
@@ -318,8 +324,6 @@ export class SandboxStore {
       }
       const credentials = await this.freshCredentials(tx, loaded);
       const entries = await this.entries(tx, row.id);
-      const controls = foldControls(entries);
-      const now = this.clock();
       const request = {
         merchant: req.merchant,
         amount,
@@ -328,46 +332,96 @@ export class SandboxStore {
         country: req.country.toUpperCase(),
         ...(req.memo ? { memo: req.memo } : {}),
       };
-      const result = evaluate(
-        {
-          id: agent.id,
-          status: effectiveStatus(agent.status, controls, agent.id),
-          credential: credentials[agent.id] ?? null,
-        },
-        agent.mandate,
-        request,
-        {
-          now,
-          killSwitch: controls.killSwitch?.on === true,
-          ledger: toEngineViews(foldPayments(entries, agent.id)),
-          policy: config.policy,
-          kya: {
-            issuer: row.issuer,
-            requiredScope: PAYMENT_SCOPE,
-            verifySignature: signatureCheck(loaded.publicKey),
-          },
-        },
-      );
-      const paymentId = newId('pay');
-      const receipt = await this.append(tx, loaded, entries, {
-        type: PAYMENT_DECISION,
+      const decided = await this.decide(tx, loaded, entries, {
         agentId: agent.id,
-        now,
-        data: decisionData({
-          paymentId,
-          request,
-          result,
-          baseCurrency: config.policy.baseCurrency,
-        }),
+        request,
+        credential: credentials[agent.id] ?? null,
+        now: this.clock(),
       });
-      return {
-        paymentId,
-        receiptId: receipt.entry.id,
-        label: label ?? req.merchant,
-        result,
-        currency,
-        amount,
-      };
+      return { ...decided, label: label ?? req.merchant, currency, amount };
+    });
+  }
+
+  /**
+   * Fill an EMPTY sandbox with 30 days of fictional purchasing, for demos of the dashboard. Every
+   * request goes through the real engine and every entry into the same signed chain; only the
+   * clock is set back, step by step in time order, which is why the ledger must be empty. The
+   * first entry says so. Organisations have no such method: their timestamps are always real.
+   */
+  async fillSampleHistory(ownerId: string, actor: ActorInput): Promise<number> {
+    return this.db.transaction(async (tx) => {
+      const loaded = await this.load(tx, ownerId, true);
+      const entries = await this.entries(tx, loaded.row.id);
+      if (entries.length > 0) {
+        throw new ActionError(
+          'Sample history only fills an empty sandbox. Start over first, then fill it.',
+        );
+      }
+      const now = this.clock();
+      const steps = samplePlan(now, loaded.config.policy.timezone);
+      const first = steps[0]?.at ?? now - MINUTE;
+      const start = first - MINUTE;
+      await this.append(tx, loaded, entries, {
+        type: SAMPLE_HISTORY,
+        agentId: '*',
+        now: start,
+        data: {
+          by: actor.by,
+          note: 'Fictional sample history for the dashboard. The entries after this one carry backdated times; they were generated at generated_at.',
+          generated_at: new Date(now).toISOString(),
+          days: SAMPLE_DAYS,
+        },
+      });
+      // Credentials valid over the whole history, and one that had lapsed, as an agent's would.
+      const valid: Record<string, CredentialFile> = {};
+      const lapsed: Record<string, CredentialFile> = {};
+      for (const agent of Object.values(loaded.config.agents)) {
+        valid[agent.id] = this.issue(loaded.row, loaded.config, agent.id, agent.owner, start, 90);
+        lapsed[agent.id] = this.issue(
+          loaded.row,
+          loaded.config,
+          agent.id,
+          agent.owner,
+          start - 60 * DAY,
+          30,
+        );
+      }
+      const paymentIds = new Map<string, string>();
+      const by = { by: SAMPLE_APPROVER };
+      for (const step of steps) {
+        if (step.kind === 'request') {
+          const decided = await this.decide(tx, loaded, entries, {
+            agentId: step.agentId,
+            request: step.request,
+            credential: (step.expiredCredential ? lapsed : valid)[step.agentId] ?? null,
+            now: step.at,
+          });
+          paymentIds.set(step.key, decided.paymentId);
+          continue;
+        }
+        const actorAt = { ...by, note: step.note, now: step.at };
+        let entry: EntryInput | null = null;
+        if (step.kind === 'kill_switch') {
+          entry = planKillSwitch(foldControls(entries), step.on, actorAt);
+        } else {
+          const id = paymentIds.get(step.key);
+          const payment = foldPayments(entries).find((p) => p.paymentId === id);
+          // The engine decides; a step that no longer fits its decision is skipped.
+          if (!id || !payment) continue;
+          if (step.kind === 'resolve' && payment.status === 'review') {
+            entry = planResolve(foldPayments(entries), id, step.status, actorAt).entry;
+          } else if (
+            step.kind === 'cancel' &&
+            payment.status === 'approved' &&
+            payment.cancellableUntil !== null &&
+            Date.parse(payment.cancellableUntil) > step.at
+          ) {
+            entry = planCancel(foldPayments(entries), id, actorAt).entry;
+          }
+        }
+        if (entry) await this.append(tx, loaded, entries, entry);
+      }
+      return entries.length;
     });
   }
 
@@ -483,6 +537,57 @@ export class SandboxStore {
     });
   }
 
+  /** Evaluate one request with the real engine and record the decision. */
+  private async decide(
+    tx: Sql,
+    loaded: Loaded,
+    entries: StoredEntry[],
+    input: {
+      agentId: string;
+      request: PaymentRequest;
+      credential: CredentialFile | null;
+      now: number;
+    },
+  ): Promise<{ paymentId: string; receiptId: string; result: EvaluationResult }> {
+    const { config, row } = loaded;
+    const agent = config.agents[input.agentId];
+    if (!agent) throw new ActionError(`Agent "${input.agentId}" is not in this sandbox.`);
+    const controls = foldControls(entries);
+    const result = evaluate(
+      {
+        id: agent.id,
+        status: effectiveStatus(agent.status, controls, agent.id),
+        credential: input.credential,
+      },
+      agent.mandate,
+      input.request,
+      {
+        now: input.now,
+        killSwitch: controls.killSwitch?.on === true,
+        ledger: toEngineViews(foldPayments(entries, agent.id)),
+        policy: config.policy,
+        kya: {
+          issuer: row.issuer,
+          requiredScope: PAYMENT_SCOPE,
+          verifySignature: signatureCheck(loaded.publicKey),
+        },
+      },
+    );
+    const paymentId = newId('pay');
+    const receipt = await this.append(tx, loaded, entries, {
+      type: PAYMENT_DECISION,
+      agentId: agent.id,
+      now: input.now,
+      data: decisionData({
+        paymentId,
+        request: input.request,
+        result,
+        baseCurrency: config.policy.baseCurrency,
+      }),
+    });
+    return { paymentId, receiptId: receipt.entry.id, result };
+  }
+
   private async append(
     tx: Sql,
     loaded: Loaded,
@@ -585,6 +690,7 @@ export class SandboxStore {
     agentId: string,
     owner: string,
     now: number,
+    validDays = CREDENTIAL_DAYS,
   ): CredentialFile {
     return issueCredential({
       privateKey: createPrivateKey(decryptSecret(row.issuer_private_key_enc, this.encryptionKey)),
@@ -595,7 +701,7 @@ export class SandboxStore {
       organisation: config.organisation ?? 'Example Labs AG (fictional)',
       scope: [PAYMENT_SCOPE],
       now,
-      validDays: CREDENTIAL_DAYS,
+      validDays,
     });
   }
 

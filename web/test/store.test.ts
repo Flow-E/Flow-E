@@ -6,6 +6,9 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { migrate, openPglite, type Db } from '@/server/db';
 import { decryptSecret, encryptSecret, parseEncryptionKey } from '@/server/keys';
+import { buildDashboard } from '@/server/analytics';
+import { OrgStore } from '@/server/org-store';
+import { SAMPLE_APPROVER } from '@/server/sample-history';
 import { SandboxStore } from '@/server/store';
 
 const CLI = path.resolve(__dirname, '../../dist/cli/index.js');
@@ -299,6 +302,83 @@ describe('reset and export', () => {
     const lines = (await store.csv(ALICE)).trimEnd().split('\r\n');
     expect(lines).toHaveLength(8);
     expect(lines[0]).toMatch(/^"seq","created_at","type"/);
+  });
+});
+
+describe('sample history (sandbox only)', () => {
+  it('fills an empty sandbox with 30 days through the real engine, in a valid chain', async () => {
+    const written = await store.fillSampleHistory(ALICE, by);
+    const v = await store.view(ALICE);
+    expect(v.entries).toHaveLength(written);
+    expect(written).toBeGreaterThan(60);
+    expect(v.audit.ok).toBe(true);
+    const [first, ...rest] = v.entries;
+    expect(first?.type).toBe('sandbox.sample_history');
+    expect(JSON.parse(first?.data ?? '{}')).toMatchObject({
+      by: by.by,
+      generated_at: new Date(NOW).toISOString(),
+    });
+    // Ledger order is time order, everything lies in the past 30 days.
+    const times = v.entries.map((e) => Date.parse(e.created_at));
+    expect(times).toEqual([...times].sort((a, b) => a - b));
+    expect(Math.max(...times)).toBeLessThan(NOW);
+    expect(Math.min(...times)).toBeGreaterThan(NOW - 31 * 86_400_000);
+    expect(rest.every((e) => e.type !== 'sandbox.sample_history')).toBe(true);
+
+    const rules = new Set(v.payments.filter((p) => p.status === 'declined').map((p) => p.rule));
+    for (const rule of [
+      'SUPPLIER',
+      'PER_PAYMENT_LIMIT',
+      'SPLIT_DETECTION',
+      'CATEGORY',
+      'COUNTRY',
+      'DAILY_BUDGET',
+      'KILL_SWITCH',
+      'KYA_CREDENTIAL',
+    ]) {
+      expect(rules, rule).toContain(rule);
+    }
+    expect(v.payments.filter((p) => p.status === 'cancelled')).toHaveLength(1);
+    expect(v.payments.some((p) => p.decidedBy === SAMPLE_APPROVER && p.status === 'declined')).toBe(
+      true,
+    );
+    expect(v.controls.killSwitch?.on).toBe(false);
+    // One equipment purchase from today still waits for a human.
+    expect(v.pending).toHaveLength(1);
+    expect(v.pending[0]?.request.merchant).toBe('Example Labware AG');
+
+    const d = buildDashboard({
+      entries: v.entries,
+      agents: v.agents.map((a) => ({ id: a.id, name: a.id, dailyBudget: a.today.budget })),
+      timezone: v.timezone,
+      now: NOW,
+      period: '30d',
+      agentId: null,
+    });
+    expect(d.approved.count).toBeGreaterThan(20);
+    expect(d.approvals.decided).toBeGreaterThan(3);
+    expect(d.activeAgents).toBe(2);
+  });
+
+  it('refuses a sandbox that already has entries; Start over and fill again works', async () => {
+    await store.playStory(ALICE);
+    await expect(store.fillSampleHistory(ALICE, by)).rejects.toThrow(/empty sandbox/);
+    expect((await store.view(ALICE)).entries).toHaveLength(7);
+    await store.resetSandbox(ALICE);
+    await store.fillSampleHistory(ALICE, by);
+    const v = await store.view(ALICE);
+    expect(v.audit.ok).toBe(true);
+    // Live use carries on after the history, with real time.
+    now = NOW + 60_000;
+    await store.playStory(ALICE);
+    expect((await store.view(ALICE)).audit.ok).toBe(true);
+  });
+
+  it('touches only that user, and organisations have no way to get sample data', async () => {
+    await store.ensureSandbox(BOB);
+    await store.fillSampleHistory(ALICE, by);
+    expect((await store.view(BOB)).entries).toHaveLength(0);
+    expect('fillSampleHistory' in OrgStore.prototype).toBe(false);
   });
 });
 

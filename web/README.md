@@ -7,25 +7,68 @@ The public site and the sandbox for [Flow-E](https://github.com/Flow-E/Flow-E): 
 | ------------------------- | ----------------------------------------------------------------------------------------- |
 | `/`                       | What Flow-E is, how it works, the thirteen rules, human control, proof, security, roadmap |
 | `/docs`                   | The repository README, synced at build time                                               |
-| `/sandbox`                | Signed-in only. Your own fictional company: approvals, cooling-off, agents, kill switch   |
+| `/sandbox`                | Signed-in only. Your own fictional company: dashboard, approvals, agents, kill switch     |
 | `/app`                    | Signed-in only. Your organisations: real agents with API keys, members and roles          |
 | `/api/mcp`                | The remote MCP endpoint for agents (Streamable HTTP, `Authorization: Bearer` agent key)   |
 | `/invite/…`, `/approve/…` | One-time links from invitation and approval emails (sign-in, then confirm)                |
 | `/dev/outbox`             | Development only: the emails Flow-E would have sent                                       |
 | `/gate`                   | The private-preview password page (only while `SITE_PASSWORD` is set)                     |
 
-Sandbox pages: Overview, Fake agent (catalog, demo story, custom request, full rule trace),
+Sandbox pages: Dashboard, Fake agent (catalog, demo story, custom request, full rule trace),
 Ledger (integrity check, CSV, issuer public key, receipt verify), Payment detail (trace,
 receipt, download), Mandate (editor validated by the core schema) and Start over.
 
 Everything in the sandbox is fictional. Flow-E authorizes payments; it never moves money.
 
+## Dashboard
+
+The first page of the sandbox and of every organisation: what the agents spend, where, how often
+Flow-E says no and why, and what waits for a human. The kill switch, the approval queue,
+cooling-off cancels and freezes stay on the same page.
+
+- **Period and agent** from the URL (`?period=today|7d|30d|90d&agent=<id>`, default 30 days):
+  shareable and server-rendered. Days are calendar days in the mandate's time zone; "today" is
+  charted per hour.
+- **Key figures:** approved spend; today against the agents' combined daily budget (approved and
+  waiting); waiting for approval (count and amount, whatever the period); share approved without
+  a human; Flow-E's declines; payments cancelled in cooling-off; agents that made requests.
+- **Charts:** approved spend per day by agent; decisions per day (approved, sent to a human,
+  declined, as the engine decided at request time); top suppliers; declines by rule with plain
+  names; budget used today per agent; human approvals (count, approved/declined, median wait
+  from request to decision); the 10 latest decisions and human actions, linking to each payment.
+- **Export this view (CSV):** the export routes take the same `period` and `agent`, and then
+  return only the payment entries of the payments requested in that view plus its kill switch
+  and freeze entries, in the same formula-safe CSV as the full export.
+
+Every number comes from the ledger already loaded for the page (`src/server/analytics.ts`, pure
+and unit-tested): the core's payment fold gives each payment's status after human actions, and
+sums stay in integer minor units of the base currency. A request stopped before the amount rule
+(kill switch, credential) has no converted amount; it counts at its requested amount when that is
+in the base currency, otherwise it is left out of sums. The charts are plain server-rendered SVG
+(`src/components/dashboard.tsx`): no chart library and no script, so the CSP nonce is untouched.
+Each has a text summary for screen readers and a "Show data table" disclosure; a column's
+tooltip is its SVG `<title>`. The colours were checked with a palette validator for both themes.
+
+**Sample history (sandbox only).** An empty sandbox offers "Fill with 30 days of sample history"
+on its dashboard. It is offered, not automatic, so the demo story and the fake agent still start
+from a clean ledger for anyone who wants that. One click writes about 75 ledger entries of
+fictional lab purchasing (`src/server/sample-history.ts`): routine approvals, equipment reviews
+decided by a fictional approver, declines for a blocked supplier, the per-payment limit, a split
+attempt, the wrong category, a blocked country, the daily budget, a lapsed credential and one
+kill-switch episode, a cooling-off cancel, and one equipment purchase from today still waiting.
+Every request goes through the real engine and every entry into the same signed hash chain;
+only the clock is set back. That is why it runs only on an empty ledger, in one transaction,
+oldest first, so ledger order stays time order. The first entry, `sandbox.sample_history`, says
+that the entries after it are fictional and backdated, and records when they were really
+written. Start over empties the sandbox as before. Organisations have no such path: only the
+sandbox store has the method, and organisation timestamps always come from the clock.
+
 ## Organisations (phase 2, local only so far)
 
 `/app` lists your organisations and creates new ones (name, base currency CHF or EUR, time
 zone). Each organisation has its own issuer key pair, its own mandate (it starts empty and
-valid) and its own signed, hash-chained ledger. Pages under `/app/<org>`: Overview (approvals,
-cooling-off, freeze, kill switch, a getting-started checklist), Agents and each agent's page
+valid) and its own signed, hash-chained ledger. Pages under `/app/<org>`: Dashboard (see above, plus
+a getting-started checklist), Agents and each agent's page
 (keys, connection instructions), Mandate, Members, Ledger, Settings.
 
 **Roles.** Written once in `src/server/permissions.ts` and checked by the store on every call,

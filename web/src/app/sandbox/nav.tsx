@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const TABS = [
-  { href: '/sandbox', label: 'Overview' },
+  { href: '/sandbox', label: 'Dashboard' },
   { href: '/sandbox/agent', label: 'Fake agent' },
   { href: '/sandbox/ledger', label: 'Ledger' },
   { href: '/sandbox/mandate', label: 'Mandate' },

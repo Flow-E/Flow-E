@@ -24,7 +24,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ id: st
         href="/sandbox"
         className="inline-flex items-center gap-1 text-sm text-ink-2 hover:text-ink"
       >
-        <ArrowLeft size={15} aria-hidden="true" /> Overview
+        <ArrowLeft size={15} aria-hidden="true" /> Dashboard
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-4">

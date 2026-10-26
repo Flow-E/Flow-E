@@ -21,6 +21,13 @@ changes.
   Bearer agent key, per-key rate limit); approval emails with one-time Approve and Decline
   links that act only after sign-in and a confirm. Each organisation has its own issuer and
   signed ledger. Migration `web/db/migrations/002_orgs.sql`.
+- Website dashboard (local only, not deployed): the sandbox's and each organisation's first page
+  shows approved spend, today against budget, approvals waiting, the share approved without a
+  human, declines by rule, cooling-off cancels, spend and decisions per day, top suppliers,
+  budget per agent, human approval times and recent activity, for today or the last 7, 30 or
+  90 days and per agent (URL parameters). Server-rendered SVG charts with data tables; the CSV
+  export can be limited to the visible view. Sandboxes can be filled once with 30 days of
+  fictional sample history that runs through the real engine and signed ledger.
 
 ### Changed
 

@@ -1,23 +1,49 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { CircleCheck, Circle } from 'lucide-react';
-import { ButtonLink, Panel, Pill, StatusPill } from '@/components/ui';
+import { DashboardBody, DashboardFilters } from '@/components/dashboard';
+import { ButtonLink, Panel, StatusPill } from '@/components/ui';
 import { dateTime, money, time } from '@/lib/format';
+import { buildDashboard, parseAgent, parsePeriod } from '@/server/analytics';
 import { can } from '@/server/permissions';
 import { orgView } from '@/server/org-view';
 import { ActionButton, AutoRefresh } from '../../sandbox/client';
 import { cancelAction, freezeAction, killSwitchAction, resolveAction } from '../actions';
 
-export default async function OrgOverview({ params }: { params: Promise<{ org: string }> }) {
+export const metadata: Metadata = { title: 'Dashboard' };
+
+export default async function OrgDashboard({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ org: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { org } = await params;
   const { view } = await orgView(org);
+  const query = await searchParams;
   const base = `/app/${view.id}`;
-  const fmt = (minor: number | null) => money(minor, view.baseCurrency, view.currencyDecimals);
   const killed = view.controls.killSwitch?.on === true;
   const decide = can(view.role, 'payment.resolve');
   const control = can(view.role, 'killswitch.set');
   const freeze = can(view.role, 'agent.freeze');
   const owner = can(view.role, 'agent.create');
-  const recent = view.payments.slice(0, 8);
+  const agents = view.agents.map((a) => ({ id: a.id, name: a.displayName }));
+  const period = parsePeriod(query.period);
+  const agentId = parseAgent(query.agent, agents);
+  const dash = buildDashboard({
+    entries: view.entries,
+    agents: view.agents.map((a) => ({
+      id: a.id,
+      name: a.displayName,
+      dailyBudget: a.today.budget,
+    })),
+    timezone: view.timezone,
+    now: view.now,
+    period,
+    agentId,
+  });
+  const exportQuery = new URLSearchParams({ period, ...(agentId ? { agent: agentId } : {}) });
   const hasKey = view.agents.some((a) => a.keys.some((k) => k.status === 'active'));
   const used = view.agents.some((a) => a.keys.some((k) => k.lastUsedAt !== null));
 
@@ -44,9 +70,9 @@ export default async function OrgOverview({ params }: { params: Promise<{ org: s
     <div className="space-y-6">
       <AutoRefresh />
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
+        <h1 className="font-serif text-3xl tracking-tight">Dashboard</h1>
         <p className="mt-1 text-ink-2">
-          What your agents asked for, what waits for a human, and what they may still spend today.
+          What your agents spend, where, how often Flow-E says no, and what waits for a human.
         </p>
       </div>
 
@@ -116,93 +142,118 @@ export default async function OrgOverview({ params }: { params: Promise<{ org: s
         )}
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Panel
-          title={`Waiting for approval${view.pending.length ? ` (${String(view.pending.length)})` : ''}`}
-        >
-          {view.pending.length === 0 ? (
-            <p className="text-sm text-ink-2">Nothing waits for a human decision.</p>
-          ) : (
-            <ul className="divide-y divide-rule">
-              {view.pending.map((p) => (
-                <li key={p.paymentId} className="space-y-2 py-3 first:pt-0 last:pb-0">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <Link
-                      href={`${base}/payments/${p.paymentId}`}
-                      className="font-medium text-ink hover:underline"
-                    >
-                      {p.request.merchant}
-                    </Link>
-                    <span className="tabular font-mono text-ink">
-                      {money(p.request.amount, p.request.currency, view.currencyDecimals)}
-                    </span>
-                  </div>
-                  <p className="text-sm text-ink-2">
-                    {p.agentId} · {dateTime(p.createdAt, view.timezone)} · {p.reason}
-                  </p>
-                  {decide ? (
-                    <div className="flex flex-wrap gap-2">
-                      <ActionButton
-                        action={resolveAction}
-                        fields={{ org: view.id, id: p.paymentId, status: 'approved' }}
-                        label="Approve"
-                        variant="primary"
-                        withNote
-                      />
-                      <ActionButton
-                        action={resolveAction}
-                        fields={{ org: view.id, id: p.paymentId, status: 'declined' }}
-                        label="Decline"
-                      />
-                    </div>
-                  ) : (
-                    <p className="text-xs text-ink-3">An owner or approver decides.</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
+      <DashboardFilters
+        basePath={base}
+        period={period}
+        agentId={agentId}
+        agents={agents}
+        exportHref={`${base}/export?${exportQuery.toString()}`}
+      />
 
-        <Panel
-          title="Cooling-off"
-          description="A first payment to a new supplier stays cancellable for 10 minutes."
-        >
-          {view.coolingOff.length === 0 ? (
-            <p className="text-sm text-ink-2">No payment is in its cooling-off window right now.</p>
-          ) : (
-            <ul className="divide-y divide-rule">
-              {view.coolingOff.map((p) => (
-                <li
-                  key={p.paymentId}
-                  className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
-                >
-                  <div className="min-w-0">
-                    <Link
-                      href={`${base}/payments/${p.paymentId}`}
-                      className="font-medium text-ink hover:underline"
+      <DashboardBody
+        dash={dash}
+        agents={agents}
+        money={{ currency: view.baseCurrency, decimals: view.currencyDecimals }}
+        timezone={view.timezone}
+        paymentHref={(id) => `${base}/payments/${id}`}
+        empty={
+          <p>
+            Payments appear here as soon as a connected agent asks. Connect an agent to the MCP
+            endpoint, or choose a longer period.
+          </p>
+        }
+        afterKpis={
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Panel
+              title={`Waiting for approval${view.pending.length ? ` (${String(view.pending.length)})` : ''}`}
+            >
+              {view.pending.length === 0 ? (
+                <p className="text-sm text-ink-2">Nothing waits for a human decision.</p>
+              ) : (
+                <ul className="divide-y divide-rule">
+                  {view.pending.map((p) => (
+                    <li key={p.paymentId} className="space-y-2 py-3 first:pt-0 last:pb-0">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <Link
+                          href={`${base}/payments/${p.paymentId}`}
+                          className="font-medium text-ink hover:underline"
+                        >
+                          {p.request.merchant}
+                        </Link>
+                        <span className="tabular font-mono text-ink">
+                          {money(p.request.amount, p.request.currency, view.currencyDecimals)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-ink-2">
+                        {p.agentId} · {dateTime(p.createdAt, view.timezone)} · {p.reason}
+                      </p>
+                      {decide ? (
+                        <div className="flex flex-wrap gap-2">
+                          <ActionButton
+                            action={resolveAction}
+                            fields={{ org: view.id, id: p.paymentId, status: 'approved' }}
+                            label="Approve"
+                            variant="primary"
+                            withNote
+                          />
+                          <ActionButton
+                            action={resolveAction}
+                            fields={{ org: view.id, id: p.paymentId, status: 'declined' }}
+                            label="Decline"
+                          />
+                        </div>
+                      ) : (
+                        <p className="text-xs text-ink-3">An owner or approver decides.</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+
+            <Panel
+              title="Cooling-off"
+              description="A first payment to a new supplier stays cancellable for 10 minutes."
+            >
+              {view.coolingOff.length === 0 ? (
+                <p className="text-sm text-ink-2">
+                  No payment is in its cooling-off window right now.
+                </p>
+              ) : (
+                <ul className="divide-y divide-rule">
+                  {view.coolingOff.map((p) => (
+                    <li
+                      key={p.paymentId}
+                      className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
                     >
-                      {money(p.request.amount, p.request.currency, view.currencyDecimals)} to{' '}
-                      {p.request.merchant}
-                    </Link>
-                    <p className="text-sm text-ink-2">
-                      Cancellable until {time(p.cancellableUntil ?? p.createdAt, view.timezone)}
-                    </p>
-                  </div>
-                  {decide ? (
-                    <ActionButton
-                      action={cancelAction}
-                      fields={{ org: view.id, id: p.paymentId }}
-                      label="Cancel payment"
-                      confirm="Click again to cancel"
-                    />
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-      </div>
+                      <div className="min-w-0">
+                        <Link
+                          href={`${base}/payments/${p.paymentId}`}
+                          className="font-medium text-ink hover:underline"
+                        >
+                          {money(p.request.amount, p.request.currency, view.currencyDecimals)} to{' '}
+                          {p.request.merchant}
+                        </Link>
+                        <p className="text-sm text-ink-2">
+                          Cancellable until {time(p.cancellableUntil ?? p.createdAt, view.timezone)}
+                        </p>
+                      </div>
+                      {decide ? (
+                        <ActionButton
+                          action={cancelAction}
+                          fields={{ org: view.id, id: p.paymentId }}
+                          label="Cancel payment"
+                          confirm="Click again to cancel"
+                        />
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+          </div>
+        }
+      />
 
       <Panel
         title="Agents"
@@ -232,18 +283,6 @@ export default async function OrgOverview({ params }: { params: Promise<{ org: s
                   </div>
                   <StatusPill status={killed ? 'stopped' : a.effectiveStatus} />
                 </div>
-                <dl className="tabular mt-4 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                  <dt className="text-ink-3">Budget today</dt>
-                  <dd className="text-right font-mono">{fmt(a.today.budget)}</dd>
-                  <dt className="text-ink-3">Approved</dt>
-                  <dd className="text-right font-mono">{fmt(a.today.approved)}</dd>
-                  <dt className="text-ink-3">Waiting</dt>
-                  <dd className="text-right font-mono">{fmt(a.today.pending)}</dd>
-                  <dt className="font-medium text-ink">Remaining</dt>
-                  <dd className="text-right font-mono font-medium text-ink">
-                    {fmt(a.today.remaining)}
-                  </dd>
-                </dl>
                 {freeze && a.configuredStatus === 'active' ? (
                   <div className="mt-4">
                     {a.frozenBy ? (
@@ -262,58 +301,6 @@ export default async function OrgOverview({ params }: { params: Promise<{ org: s
                     )}
                   </div>
                 ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Panel>
-
-      <Panel
-        title="Recent requests"
-        action={
-          <Link href={`${base}/ledger`} className="text-sm text-accent underline">
-            Full ledger
-          </Link>
-        }
-      >
-        {recent.length === 0 ? (
-          <p className="text-sm text-ink-2">
-            No requests yet. They appear here as soon as an agent asks.
-          </p>
-        ) : (
-          <ul className="divide-y divide-rule">
-            {recent.map((p) => (
-              <li key={p.paymentId}>
-                <Link
-                  href={`${base}/payments/${p.paymentId}`}
-                  className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-0.5 py-2.5 hover:bg-sunken sm:grid-cols-[6rem_1fr_auto_auto]"
-                >
-                  <span className="tabular hidden font-mono text-xs text-ink-3 sm:block">
-                    {time(p.createdAt, view.timezone)}
-                  </span>
-                  <span className="min-w-0 truncate text-sm text-ink">
-                    {p.request.merchant}
-                    <span className="block truncate text-xs text-ink-3">
-                      {p.agentId} · {p.reason}
-                    </span>
-                  </span>
-                  <span className="tabular hidden font-mono text-sm text-ink-2 sm:block">
-                    {money(p.request.amount, p.request.currency, view.currencyDecimals)}
-                  </span>
-                  <Pill
-                    tone={
-                      p.status === 'approved'
-                        ? 'approved'
-                        : p.status === 'review'
-                          ? 'review'
-                          : p.status === 'cancelled'
-                            ? 'cancelled'
-                            : 'declined'
-                    }
-                  >
-                    {p.status}
-                  </Pill>
-                </Link>
               </li>
             ))}
           </ul>

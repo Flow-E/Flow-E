@@ -32,7 +32,7 @@ export default async function PaymentPage({
         href={base}
         className="inline-flex items-center gap-1 text-sm text-ink-2 hover:text-ink"
       >
-        <ArrowLeft size={15} aria-hidden="true" /> Overview
+        <ArrowLeft size={15} aria-hidden="true" /> Dashboard
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-4">

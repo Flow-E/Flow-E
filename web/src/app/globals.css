@@ -53,6 +53,52 @@
   }
 }
 
+/*
+ * Dashboard charts. Agents take categorical slots in a fixed order; decisions use their own
+ * status hues (approved, review, declined). Both sets were checked with the dataviz palette
+ * validator against --surface in each mode (lightness band, chroma, colour-blind separation).
+ */
+:root {
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-5: #e87ba4;
+  --viz-6: #008300;
+  --viz-7: #6250d6;
+  --viz-8: #e34948;
+  --viz-other: #9a968c;
+  --viz-approved: #178a5a;
+  --viz-review: #d99400;
+  --viz-declined: #b8322f;
+  --viz-grid: #ebe6dc;
+  --viz-axis: #cfc8ba;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-3: #199e70;
+    --viz-4: #c98500;
+    --viz-5: #d55181;
+    --viz-6: #008300;
+    --viz-7: #9085e9;
+    --viz-8: #e66767;
+    --viz-other: #6f6b64;
+    --viz-approved: #1f9468;
+    --viz-review: #ae8c00;
+    --viz-declined: #e2577a;
+    --viz-grid: #23272b;
+    --viz-axis: #3a3f45;
+  }
+}
+
+/* Hover wash behind a chart column; the column's <title> is the tooltip. */
+.viz-col:hover .viz-hit {
+  fill: var(--muted-soft);
+}
+
 @theme inline {
   --color-paper: var(--paper);
   --color-surface: var(--surface);

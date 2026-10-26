@@ -121,6 +121,18 @@ export async function killSwitchAction(_prev: ActionResult, form: FormData): Pro
   return { ok: on ? 'Every agent is stopped.' : 'Kill switch released.' };
 }
 
+/** Fill an empty sandbox with 30 days of fictional history, for the dashboard. */
+export async function sampleHistoryAction(_prev: ActionResult): Promise<ActionResult> {
+  const { store, ownerId, actor } = await context();
+  try {
+    await store.fillSampleHistory(ownerId, actor);
+  } catch (err) {
+    return { error: problem(err) };
+  }
+  refresh();
+  return { ok: 'Filled with 30 days of fictional history.' };
+}
+
 // The fake agent --------------------------------------------------------------------------------
 
 export interface RequestState {

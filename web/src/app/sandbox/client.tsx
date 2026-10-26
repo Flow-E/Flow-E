@@ -209,6 +209,25 @@ export function StoryButton({ action }: { action: (prev: RequestState) => Promis
   );
 }
 
+/** Fills an empty sandbox with 30 days of fictional history (one click, no confirm needed). */
+export function SampleHistoryButton({
+  action,
+}: {
+  action: (prev: ActionResult) => Promise<ActionResult>;
+}) {
+  const [state, run, pending] = useActionState<ActionResult>(action, {});
+  return (
+    <form action={run} className="flex flex-col items-center gap-2">
+      <button type="submit" disabled={pending} className={buttonClass('primary')}>
+        {pending ? 'Writing 30 days into the ledger…' : 'Fill with 30 days of sample history'}
+      </button>
+      <span aria-live="polite" className="text-sm">
+        {state.error ? <span className="text-decline">{state.error}</span> : null}
+      </span>
+    </form>
+  );
+}
+
 export interface CatalogRow {
   n: number;
   item: string;

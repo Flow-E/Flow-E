@@ -16,6 +16,7 @@ const TYPE_LABEL: Record<string, string> = {
   'control.agent_freeze': 'Freeze change',
   'control.kill_switch': 'Kill switch',
   'config.updated': 'Mandate changed',
+  'sandbox.sample_history': 'Sample history',
 };
 
 function describe(type: string, data: Record<string, unknown>): string {
@@ -29,6 +30,9 @@ function describe(type: string, data: Record<string, unknown>): string {
     return `${data.frozen ? 'frozen' : 'unfrozen'} by ${String(data.by)}`;
   if (type === 'control.kill_switch') return `${data.on ? 'on' : 'off'}, by ${String(data.by)}`;
   if (type === 'config.updated') return `by ${String(data.by)}`;
+  if (type === 'sandbox.sample_history') {
+    return `fictional, backdated entries follow (generated ${String(data.generated_at)})`;
+  }
   return '';
 }
 

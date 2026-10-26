@@ -229,6 +229,8 @@ export interface OrgAgentView {
 }
 
 export interface OrgView {
+  /** The store's clock when the view was read; budgets and the dashboard use it. */
+  now: number;
   id: string;
   name: string;
   role: Role;
@@ -517,6 +519,7 @@ export class OrgStore {
     });
     const newestFirst = [...all].reverse();
     return {
+      now,
       id: row.id,
       name: row.name,
       role,
