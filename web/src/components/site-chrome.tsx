@@ -20,6 +20,9 @@ export function SiteHeader() {
           >
             GitHub
           </a>
+          <Link href="/app" className="rounded-md px-2 py-1.5 text-ink-2 hover:text-ink">
+            Organisations
+          </Link>
           <ButtonLink href="/sandbox" size="sm" className="ml-1">
             Try the sandbox
           </ButtonLink>

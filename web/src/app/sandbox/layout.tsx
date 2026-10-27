@@ -29,6 +29,9 @@ export default async function SandboxLayout({ children }: { children: React.Reac
             <span className="hidden max-w-[16rem] truncate text-ink-3 sm:inline">
               {session.email}
             </span>
+            <Link href="/app" className={buttonClass('quiet', 'sm')}>
+              Organisations
+            </Link>
             <form action={signOut}>
               <button type="submit" className={buttonClass('quiet', 'sm')}>
                 Sign out
