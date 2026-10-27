@@ -12,11 +12,13 @@ import { dailySpend } from '../engine/rules.js';
 import type { Credential, PaymentRequest } from '../engine/types.js';
 import { PAYMENT_SCOPE, signatureCheck, type CredentialFile } from '../kya/credential.js';
 import { loadSigningIssuer, readCredential, type SigningIssuer } from '../kya/store.js';
+import { toEngineViews } from '../ledger/fold.js';
 import { Ledger, newId } from '../ledger/ledger.js';
 import { effectiveStatus } from '../control/actions.js';
 import {
   AGENT_INSTRUCTIONS,
   AGENT_TOOLS,
+  budgetState,
   agentErrorText,
   invalidAmountText,
   mandateSummary,
@@ -124,6 +126,13 @@ export function createMandateServer(o: MandateServerOptions): MandateServer {
             config.policy.timezone,
             agent.mandate.dailyBudget,
           ),
+          budgets: budgetState({
+            config,
+            agent,
+            views: ledger.paymentViews(agent.id),
+            organisationViews: toEngineViews(ledger.payments()),
+            now: clock(),
+          }),
         }),
       );
     } catch (err) {
@@ -163,6 +172,7 @@ export function createMandateServer(o: MandateServerOptions): MandateServer {
               now,
               killSwitch: controls.killSwitch?.on === true,
               ledger: views,
+              organisationLedger: toEngineViews(ledger.payments()),
               policy,
               kya: { issuer: issuer.id, requiredScope: PAYMENT_SCOPE, verifySignature },
             },

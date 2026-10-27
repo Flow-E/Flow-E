@@ -3,8 +3,10 @@ import type { GlobalPolicy, StoredEntry } from '@flow-e/mcp/core';
 import {
   AGENT_SLOTS,
   OTHER_AGENTS,
+  MINUTES_PER_APPROVAL,
   addDays,
   buildDashboard,
+  buildValueReport,
   forAgent,
   median,
   parseAgent,
@@ -12,6 +14,10 @@ import {
   periodDays,
   periodEntries,
   spendGroups,
+  stopCategory,
+  valueSummary,
+  workSaved,
+  workingDays,
   type DashboardInput,
 } from '@/server/analytics';
 
@@ -382,5 +388,145 @@ describe('agent series and filters', () => {
     expect(forAgent(items, null)).toHaveLength(3);
     expect(forAgent(items, 'office')).toEqual([{ agentId: 'office' }]);
     expect(forAgent(items, 'nobody')).toEqual([]);
+  });
+});
+
+describe('the value report', () => {
+  const fmt = (minor: number) => `CHF ${(minor / 100).toFixed(2)}`;
+
+  /** A review flagged by the fair-price rule: `difference` above the usual price. */
+  function overpriced(id: string, at: string, amount: number, difference: number): StoredEntry {
+    return entry('payment.decision', 'lab', at, {
+      payment_id: id,
+      request: { merchant: 'Pricey AG', amount, currency: 'CHF', category: '5169', country: 'CH' },
+      decision: 'review',
+      rule: 'FAIR_PRICE',
+      reason: 'test',
+      amount_base: amount,
+      base_currency: 'CHF',
+      cancellable_until: null,
+      trace: [
+        {
+          rule: 'FAIR_PRICE',
+          outcome: 'review',
+          data: { matched: true, differenceBase: difference },
+        },
+      ],
+    });
+  }
+
+  it('sorts decline rules into plain categories, new budget rules included', () => {
+    expect(stopCategory('SUPPLIER')).toBe('blocked');
+    expect(stopCategory('COUNTRY')).toBe('blocked');
+    expect(stopCategory('DAILY_BUDGET')).toBe('limit');
+    expect(stopCategory('PER_PAYMENT_LIMIT')).toBe('limit');
+    expect(stopCategory('MONTHLY_BUDGET')).toBe('limit');
+    expect(stopCategory('PROJECT_BUDGET')).toBe('limit');
+    expect(stopCategory('SPLIT_DETECTION')).toBe('split');
+    expect(stopCategory('CATEGORY')).toBe('category');
+    expect(stopCategory('KILL_SWITCH')).toBe('stopped');
+    expect(stopCategory('AGENT_STATUS')).toBe('stopped');
+    expect(stopCategory('KYA_CREDENTIAL')).toBe('credential');
+    expect(stopCategory('BUSINESS_HOURS')).toBe('other');
+    expect(stopCategory(null)).toBe('other');
+  });
+
+  it('counts working days, Monday to Friday, never fewer than one', () => {
+    // Tue 20 Oct to Mon 26 Oct 2026: Tue, Wed, Thu, Fri, Mon.
+    expect(workingDays('2026-10-20', '2026-10-26')).toBe(5);
+    expect(workingDays('2026-10-24', '2026-10-25')).toBe(1);
+    expect(workingDays('2026-10-26', '2026-10-26')).toBe(1);
+  });
+
+  it('is calm on an empty ledger', () => {
+    const r = buildValueReport(buildDashboard(input([])));
+    expect(r).toMatchObject({ requests: 0, autoDecided: 0, sentToHuman: 0, minutesSaved: 0 });
+    expect(r.stopped.byCategory).toEqual([]);
+    expect(r.agents.every((a) => a.perWorkingDay === 0 && !a.oftenNearDaily)).toBe(true);
+    expect(valueSummary(r, 'the last 7 days', fmt)).toBe(
+      'In the last 7 days no agent asked Flow-E for a payment.',
+    );
+  });
+
+  it('adds up what Flow-E decided, stopped and avoided', () => {
+    const e = [
+      decision('a', 'lab', '2026-10-22T08:00:00.000Z', 'approved', 10_000),
+      decision('r1', 'lab', '2026-10-22T09:00:00.000Z', 'review', 600_000),
+      resolved('r1', 'lab', '2026-10-22T09:30:00.000Z', 'approved'),
+      decision('s1', 'lab', '2026-10-22T10:00:00.000Z', 'declined', 5_000, { rule: 'SUPPLIER' }),
+      decision('s2', 'lab', '2026-10-22T10:05:00.000Z', 'declined', 6_000, { rule: 'COUNTRY' }),
+      decision('d1', 'office', '2026-10-23T10:00:00.000Z', 'declined', 90_000, {
+        rule: 'DAILY_BUDGET',
+      }),
+      decision('k1', 'office', '2026-10-23T11:00:00.000Z', 'declined', 1_000, {
+        rule: 'KILL_SWITCH',
+      }),
+      overpriced('fp', '2026-10-23T12:00:00.000Z', 31_000, 21_000),
+      resolved('fp', 'lab', '2026-10-23T12:30:00.000Z', 'declined'),
+    ];
+    const r = buildValueReport(buildDashboard(input(e)));
+    expect(r.requests).toBe(7);
+    expect(r.sentToHuman).toBe(2);
+    expect(r.autoDecided).toBe(5);
+    expect(r.minutesPerApproval).toBe(MINUTES_PER_APPROVAL);
+    expect(r.minutesSaved).toBe(5 * MINUTES_PER_APPROVAL);
+    expect(r.stopped.count).toBe(4);
+    expect(r.stopped.byCategory.map((c) => [c.category, c.count, c.amount])).toEqual([
+      ['blocked', 2, 11_000],
+      ['limit', 1, 90_000],
+      ['stopped', 1, 1_000],
+    ]);
+    expect(r.overpaymentAvoided).toEqual({ count: 1, over: 21_000 });
+    expect(valueSummary(r, 'the last 7 days', fmt)).toBe(
+      'In the last 7 days Flow-E decided 5 of 7 requests on its own, stopped 4 risky purchases and avoided CHF 210.00 of overpayment.',
+    );
+  });
+
+  it('writes the sentence without the parts that are zero', () => {
+    const e = [decision('a', 'lab', '2026-10-26T08:00:00.000Z', 'approved', 10_000)];
+    const r = buildValueReport(buildDashboard(input(e, { period: 'today' })));
+    expect(valueSummary(r, 'today', fmt)).toBe('Today Flow-E decided 1 of 1 request on its own.');
+  });
+
+  it('averages approved spend per working day and flags agents near their daily budget', () => {
+    // Office (daily budget 500.00) spends 450.00 on each of five working days: 90% of budget.
+    const days = ['2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-26'];
+    const e = [
+      ...days.map((d, i) =>
+        decision(`o${String(i)}`, 'office', `${d}T08:00:00.000Z`, 'approved', 45_000),
+      ),
+      decision('l1', 'lab', '2026-10-22T08:00:00.000Z', 'approved', 100_000),
+    ];
+    const r = buildValueReport(buildDashboard(input(e)));
+    expect(r.workingDays).toBe(5);
+    const office = r.agents.find((a) => a.agentId === 'office');
+    const lab = r.agents.find((a) => a.agentId === 'lab');
+    expect(office).toMatchObject({
+      approved: 225_000,
+      perWorkingDay: 45_000,
+      oftenNearDaily: true,
+    });
+    expect(office?.dailyShare).toBeCloseTo(0.9);
+    expect(lab).toMatchObject({ approved: 100_000, perWorkingDay: 20_000, oftenNearDaily: false });
+  });
+
+  it('follows the agent filter', () => {
+    const e = [
+      decision('l', 'lab', '2026-10-22T08:00:00.000Z', 'declined', 5_000, { rule: 'CATEGORY' }),
+      decision('o', 'office', '2026-10-22T09:00:00.000Z', 'declined', 5_000, {
+        rule: 'SPLIT_DETECTION',
+      }),
+    ];
+    const r = buildValueReport(buildDashboard(input(e, { agentId: 'office' })));
+    expect(r.requests).toBe(1);
+    expect(r.stopped.byCategory.map((c) => c.category)).toEqual(['split']);
+    expect(r.agents.map((a) => a.agentId)).toEqual(['office']);
+  });
+
+  it('writes approval work in minutes or hours', () => {
+    expect(workSaved(0)).toBe('≈ 0 min');
+    expect(workSaved(48)).toBe('≈ 48 min');
+    expect(workSaved(256)).toBe('≈ 4.3 h');
+    expect(workSaved(1_560)).toBe('≈ 26 h');
   });
 });

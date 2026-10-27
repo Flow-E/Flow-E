@@ -226,8 +226,20 @@ export function samplePlan(now: number, timeZone: string, seed = 7): SampleStep[
         memo,
       });
       request(at(date, 14, 20), LAB, hplc(900_000, 'HPLC column set (10 columns)'));
-      request(at(date, 14, 26), LAB, hplc(450_000, 'HPLC column set, columns 1-5'));
-      request(at(date, 14, 29), LAB, hplc(450_000, 'HPLC column set, columns 6-10'));
+      // A person declines whichever half is held as a split.
+      for (const [mm, memo] of [
+        [26, 'HPLC column set, columns 1-5'],
+        [29, 'HPLC column set, columns 6-10'],
+      ] as const) {
+        const key = request(at(date, 14, mm), LAB, hplc(450_000, memo));
+        steps.push({
+          at: at(date, 15, 10),
+          kind: 'resolve',
+          key,
+          status: 'declined',
+          note: 'Split of a declined order. Needs a proper quote and approval.',
+        });
+      }
     } else if (episode === 15) {
       // Overpriced pipette tips: the fair-price check asks a person, who declines.
       const key = request(

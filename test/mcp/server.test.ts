@@ -210,7 +210,14 @@ describe('request_payment', () => {
     await buy({ amount: '4500' });
     now += 2 * MINUTE;
     const body = (await buy({ amount: '4000' })).json();
-    expect(body).toMatchObject({ decision: 'declined', rule: 'SPLIT_DETECTION' });
+    expect(body).toMatchObject({ decision: 'review', rule: 'SPLIT_DETECTION' });
+    expect(body.guidance).toMatch(/Never split/);
+  });
+
+  it('tells the agent what would be approved when it declines', async () => {
+    const body = (await buy({ merchant: 'Somewhere Else GmbH' })).json();
+    expect(body).toMatchObject({ decision: 'declined', rule: 'SUPPLIER' });
+    expect(body.guidance).toMatch(/^Approved suppliers: /);
   });
 
   it.each(['12.505', '1,200', '-5', 'twelve', ''])(

@@ -4,14 +4,19 @@ import { Panel, Pill, toneOf } from '@/components/ui';
 import { dateTime, decimalsOf, money } from '@/lib/format';
 import {
   AGENT_SLOTS,
+  NEAR_BUDGET_SHARE,
   PERIODS,
   PERIOD_LABELS,
+  buildValueReport,
   spendGroups,
+  valueSummary,
+  workSaved,
   type Activity,
   type Dashboard,
   type DayPoint,
   type Declined,
   type Period,
+  type ValueReport,
 } from '@/server/analytics';
 
 /**
@@ -525,6 +530,118 @@ function BudgetMeter({
   );
 }
 
+// The value report --------------------------------------------------------------------------------
+
+/** "What Flow-E did for you": what it decided, stopped and avoided in the period. */
+export function ValueReportPanel({
+  report,
+  periodText,
+  fmt,
+  agents,
+}: {
+  report: ValueReport;
+  periodText: string;
+  fmt: (minor: number) => string;
+  agents: readonly DashboardAgentRef[];
+}) {
+  const stopped = report.stopped;
+  const near = report.agents.filter((a) => a.oftenNearDaily);
+  return (
+    <Panel title="What Flow-E did for you" description={valueSummary(report, periodText, fmt)}>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
+        <div className="min-w-0">
+          <dt className="text-xs text-ink-3">Overpayment avoided</dt>
+          <dd className="break-words text-2xl font-semibold text-approve">
+            {fmt(report.overpaymentAvoided.over)}
+          </dd>
+          <dd className="text-xs text-ink-2">
+            {report.overpaymentAvoided.count > 0
+              ? `${String(report.overpaymentAvoided.count)} overpriced ${report.overpaymentAvoided.count === 1 ? 'request' : 'requests'} not paid`
+              : 'Above the usual price, not paid'}
+          </dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-xs text-ink-3">Risky purchases stopped</dt>
+          <dd className="text-2xl font-semibold text-ink">{stopped.count}</dd>
+          <dd className="text-xs text-ink-2">
+            {stopped.count > 0 ? declinedText(stopped, fmt, true) : 'None needed'}
+          </dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-xs text-ink-3">Decided automatically</dt>
+          <dd className="text-2xl font-semibold text-ink">
+            {report.autoDecided}
+            <span className="text-base font-normal text-ink-3"> of {report.requests}</span>
+          </dd>
+          <dd className="text-xs text-ink-2">{report.sentToHuman} sent to a person</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-xs text-ink-3">Approval work saved</dt>
+          <dd className="break-words text-2xl font-semibold text-ink">
+            {workSaved(report.minutesSaved)}
+          </dd>
+          <dd className="text-xs text-ink-2">
+            Estimate: ≈ {report.minutesPerApproval} min per manual approval
+          </dd>
+        </div>
+      </dl>
+
+      {stopped.byCategory.length > 0 ? (
+        <div className="mt-5 border-t border-rule pt-4">
+          <h3 className="text-sm font-medium text-ink">What was stopped</h3>
+          <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Stopped purchases by reason">
+            {stopped.byCategory.map((c) => (
+              <li key={c.category}>
+                <Pill tone="declined">
+                  {c.label} <span className="tabular">· {c.count}</span>
+                </Pill>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {report.agents.length > 0 ? (
+        <div className="mt-5 border-t border-rule pt-4">
+          <h3 className="text-sm font-medium text-ink">Budget outlook</h3>
+          <p className="mt-0.5 text-xs text-ink-3">
+            Approved spend {periodText}, averaged over {report.workingDays} working{' '}
+            {report.workingDays === 1 ? 'day' : 'days'} (Monday to Friday).
+          </p>
+          <ul className="mt-2 divide-y divide-rule">
+            {report.agents.map((a) => (
+              <li
+                key={a.agentId}
+                className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2 text-sm"
+              >
+                <span className="inline-flex min-w-0 items-center gap-1.5 text-ink">
+                  <Swatch color={agentColor(agents, a.agentId)} shape="dot" />
+                  <span className="truncate">{a.name}</span>
+                </span>
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <span className="tabular font-mono text-ink-2">
+                    {fmt(a.perWorkingDay)} / day
+                    {a.dailyBudget > 0 ? (
+                      <span className="text-ink-3"> of {fmt(a.dailyBudget)}</span>
+                    ) : null}
+                  </span>
+                  {a.oftenNearDaily ? <Pill tone="review">Often near its daily budget</Pill> : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {near.length > 0 ? (
+            <p className="mt-2 text-xs text-ink-3">
+              Above {Math.round(NEAR_BUDGET_SHARE * 100)}% of the daily budget on an average working
+              day. Requests past the budget are declined, so check the limit fits.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </Panel>
+  );
+}
+
 // The page body -----------------------------------------------------------------------------------
 
 function Tile({
@@ -679,6 +796,15 @@ export function DashboardBody({
           detail={dash.cancelled.count > 0 ? fmt(dash.cancelled.amount) : 'None'}
         />
       </dl>
+
+      {dash.requests > 0 ? (
+        <ValueReportPanel
+          report={buildValueReport(dash)}
+          periodText={periodText}
+          fmt={fmt}
+          agents={agents}
+        />
+      ) : null}
 
       {dash.requests === 0 ? (
         <>

@@ -37,12 +37,14 @@ export function evaluate(
     facts.merchantKey = normalizeName(request.merchant);
 
     const reviews: TraceEntry[] = [];
+    const hints = new Map<TraceEntry, string>();
     let newSupplier = false;
 
     for (const [index, [rule, run]] of RULES.entries()) {
-      const result = run({ agent, mandate, request, ctx: context, facts });
+      const { hint, ...result } = run({ agent, mandate, request, ctx: context, facts });
       const entry: TraceEntry = { rule, ...result };
       trace.push(entry);
+      if (hint) hints.set(entry, hint);
 
       if (result.outcome === 'decline') {
         for (const [skipped] of RULES.slice(index + 1)) {
@@ -58,6 +60,7 @@ export function evaluate(
           reason: result.detail,
           trace,
           amountBase: facts.amountBase,
+          ...(hint ? { guidance: hint } : {}),
         };
       }
       if (result.outcome === 'review') reviews.push(entry);
@@ -69,12 +72,14 @@ export function evaluate(
       if (newSupplier) {
         appendToLast(trace, ' Cooling-off will apply if a human approves.');
       }
+      const guidance = reviews.flatMap((r) => hints.get(r) ?? []).join(' ');
       return {
         decision: 'review',
         rule: firstReview.rule,
         reason: reviews.map((r) => r.detail).join(' '),
         trace,
         amountBase: facts.amountBase,
+        ...(guidance ? { guidance } : {}),
       };
     }
 

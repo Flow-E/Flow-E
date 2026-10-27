@@ -4,7 +4,9 @@ import { text } from '@/lib/form';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { ZodError } from 'zod';
-import { ActionError, ConfigError, ReceiptError } from '@flow-e/mcp/core';
+import { ActionError, ConfigError, ReceiptError, parseConfigObject } from '@flow-e/mcp/core';
+import type { PreviewState } from '../app/actions';
+import { replay } from '@/server/replay';
 import { money, ruleName } from '@/lib/format';
 import { FormProblem, rawFromForm } from '@/lib/mandate-form-data';
 import { getStore } from '@/server/runtime';
@@ -79,6 +81,8 @@ function view(o: PaymentOutcome, baseCurrency = 'CHF'): OutcomeView {
 export async function resolveAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
   const { store, ownerId, actor } = await context();
   const status = form.get('status') === 'approved' ? 'approved' : 'declined';
+  // A decline always carries a short reason for the ledger (an approval note is optional).
+  if (status === 'declined' && !note(form)) return { error: 'Give a short reason for declining.' };
   try {
     await store.resolve(ownerId, text(form, 'id'), status, { ...actor, note: note(form) });
   } catch (err) {
@@ -195,6 +199,23 @@ export async function updateMandateAction(
   }
   refresh();
   return { ok: 'Saved. The new mandate applies to the next request.' };
+}
+
+/** "What if": the last 30 days replayed against the mandate in the form. Nothing is saved. */
+export async function previewMandateAction(
+  _prev: PreviewState,
+  form: FormData,
+): Promise<PreviewState> {
+  const { store, ownerId } = await context();
+  try {
+    const view = await store.view(ownerId);
+    const proposed = parseConfigObject(rawFromForm(form, view.raw));
+    return { result: replay({ entries: view.entries, proposed, now: view.now }) };
+  } catch (err) {
+    return {
+      error: problem(err).replace(/^mandate\.yaml is invalid:\n?/, 'Cannot preview:\n'),
+    };
+  }
 }
 
 export async function resetAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {

@@ -565,6 +565,7 @@ export class SandboxStore {
         now: input.now,
         killSwitch: controls.killSwitch?.on === true,
         ledger: toEngineViews(foldPayments(entries, agent.id)),
+        organisationLedger: toEngineViews(foldPayments(entries)),
         policy: config.policy,
         kya: {
           issuer: row.issuer,

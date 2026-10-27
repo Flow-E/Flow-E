@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { mandateFields } from '@/lib/mandate-form-data';
+import { priceSuggestions } from '@/server/price-suggestions';
 import { can } from '@/server/permissions';
 import { orgView } from '@/server/org-view';
 import { MandateForm } from '../../../sandbox/mandate/mandate-form';
-import { updateMandateAction } from '../../actions';
+import { previewMandateAction, updateMandateAction } from '../../actions';
 
 export const metadata: Metadata = { title: 'Mandate' };
 
@@ -36,6 +37,8 @@ export default async function MandatePage({ params }: { params: Promise<{ org: s
       ) : null}
       <MandateForm
         data={mandateFields(view.raw, view.baseCurrency)}
+        suggestions={priceSuggestions(view)}
+        preview={previewMandateAction.bind(null, view.id)}
         action={updateMandateAction.bind(null, view.id)}
         readOnly={!edit}
         fxAsText

@@ -4,7 +4,13 @@ import { AmountError, parseAmount } from '../engine/money.js';
 import { FxError, parseRate } from '../engine/fx.js';
 import { parseClock } from '../engine/time.js';
 import { normalizeName } from '../engine/normalize.js';
-import type { AgentStatus, GlobalPolicy, Mandate, ReferencePrice } from '../engine/types.js';
+import type {
+  AgentStatus,
+  GlobalPolicy,
+  Mandate,
+  Project,
+  ReferencePrice,
+} from '../engine/types.js';
 
 /**
  * mandate.yaml: human-readable, snake_case, money in major units of the base currency.
@@ -38,7 +44,13 @@ const agentSchema = z.strictObject({
   blocked_countries: z.array(countryCode).default([]),
   velocity_per_minute: z.number().int().positive().default(10),
   business_hours_only: z.boolean().default(false),
+  monthly_budget: money.optional(),
+  require_project: z.boolean().default(false),
 });
+
+const projectId = z
+  .string()
+  .regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$/, 'Project ids use letters, digits, ".", "-" and "_"');
 
 export const configSchema = z.strictObject({
   organisation: z.string().min(1).optional(),
@@ -73,6 +85,17 @@ export const configSchema = z.strictObject({
       above: z.enum(['review', 'decline']).default('review'),
     })
     .default({ above_percent: 20, below_percent: 50, above: 'review' }),
+  projects: z
+    .record(
+      projectId,
+      z.strictObject({
+        name: z.string().trim().min(1).max(100),
+        budget: money,
+        period: z.enum(['month', 'total']).default('month'),
+        agents: z.array(z.string()).default([]),
+      }),
+    )
+    .default({}),
   agents: z.record(
     z.string().regex(/^[a-z0-9][a-z0-9_-]{0,62}$/, 'Agent ids use a-z, 0-9, "-" and "_"'),
     agentSchema,
@@ -170,8 +193,39 @@ function toEngine(raw: RawConfig): MandateConfig {
       blockedCountries: a.blocked_countries,
       velocityPerMinute: a.velocity_per_minute,
       businessHoursOnly: a.business_hours_only,
+      monthlyBudget:
+        a.monthly_budget === undefined ? null : toMinor(`${path}.monthly_budget`, a.monthly_budget),
+      requireProject: a.require_project,
     };
     agents[id] = { id, owner: a.owner, status: a.status, mandate };
+  }
+
+  const projects: Project[] = [];
+  const projectNames = new Set<string>();
+  for (const [id, p] of Object.entries(raw.projects)) {
+    const path = `projects.${id}`;
+    for (const agentId of p.agents) {
+      if (!Object.hasOwn(raw.agents, agentId))
+        problems.push(`${path}.agents: no agent "${agentId}"`);
+    }
+    const key = normalizeName(p.name);
+    if (projectNames.has(key)) problems.push(`${path}.name: "${p.name}" is used twice`);
+    projectNames.add(key);
+    projects.push({
+      id,
+      name: p.name,
+      budgetBase: toMinor(`${path}.budget`, p.budget),
+      period: p.period,
+      agents: p.agents,
+    });
+  }
+  for (const [id, a] of Object.entries(raw.agents)) {
+    if (
+      a.require_project &&
+      !projects.some((p) => p.agents.length === 0 || p.agents.includes(id))
+    ) {
+      problems.push(`agents.${id}.require_project: no project is open to this agent`);
+    }
   }
 
   const referencePrices: ReferencePrice[] = [];
@@ -200,6 +254,7 @@ function toEngine(raw: RawConfig): MandateConfig {
     timezone: raw.timezone,
     businessHours: { days: raw.business_hours.days, startMinute, endMinute },
     referencePrices,
+    projects,
     priceCheck: {
       abovePercent: raw.price_check.above_percent,
       belowPercent: raw.price_check.below_percent,

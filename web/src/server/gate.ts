@@ -83,3 +83,23 @@ export function safeNext(next: string | null | undefined): string {
   if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) return '/';
   return next;
 }
+
+/** The agents' MCP endpoint: authenticated by API key, never by the site password. */
+export const MCP_PATH = '/api/mcp';
+/** The public receipt check page, for suppliers and auditors without the preview password. */
+export const VERIFY_PATH = '/verify';
+/** Where the /verify page posts receipts (a route handler, not a Server Action). */
+export const VERIFY_API_PATH = '/api/verify';
+
+/**
+ * Which requests skip the site password gate. Exact paths only: /api/mcp/x or /verify/x are
+ * still gated. /verify is exempt for reading the page only: a POST there with a Next-Action
+ * header could name any Server Action of the site, so the page has none and posts to
+ * /api/verify (a route handler, which never dispatches Server Actions) instead.
+ */
+export function gateExempt(pathname: string, method: string, nextAction: boolean): boolean {
+  if (pathname === '/gate' || pathname === MCP_PATH) return true;
+  if (pathname === VERIFY_PATH) return (method === 'GET' || method === 'HEAD') && !nextAction;
+  if (pathname === VERIFY_API_PATH) return method === 'POST' && !nextAction;
+  return false;
+}

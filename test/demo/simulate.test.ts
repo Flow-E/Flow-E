@@ -82,7 +82,7 @@ describe('the fake agent', () => {
       'APPROVED',
       'REVIEW',
       'DECLINED',
-      'DECLINED',
+      'REVIEW',
       'DECLINED',
       'APPROVED',
       'REVIEW',
@@ -141,7 +141,7 @@ describe('the fake agent', () => {
       'Agent lab-procurement (active), owner Dr. A. Muster, Head of Lab (fictional)',
     );
     expect(out).toMatch(
-      /approved CHF 1680\.00, pending review CHF 6980\.00, remaining CHF 11340\.00/,
+      /approved CHF 1680\.00, pending review CHF 11480\.00, remaining CHF 6840\.00/,
     );
     expect(out).toContain('per payment up to CHF 8000.00; human approval above CHF 5000.00');
     expect(out).toContain('suppliers: Example Reagents AG, Example Labware AG');

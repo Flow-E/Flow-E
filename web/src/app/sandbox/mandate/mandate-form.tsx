@@ -2,6 +2,8 @@
 
 import { useActionState } from 'react';
 import { CategoryPicker } from '@/components/category-picker';
+import { MandatePreview, type PreviewAction } from './preview';
+import { PricesField, type PriceSuggestion } from './prices-field';
 import { buttonClass } from '@/components/ui';
 import type { ActionResult } from '../actions';
 import { keepValues } from '../client';
@@ -81,6 +83,8 @@ export function MandateForm({
   readOnly = false,
   fxAsText = false,
   baseHint = 'Fixed for a sandbox. Every limit is counted in it.',
+  suggestions = [],
+  preview,
 }: {
   data: MandateFields;
   action: (p: ActionResult, f: FormData) => Promise<ActionResult>;
@@ -89,6 +93,10 @@ export function MandateForm({
   /** Exchange rates as one editable list ("EUR 0.94" per line), so new currencies can be added. */
   fxAsText?: boolean;
   baseHint?: string;
+  /** Usual prices suggested from what was paid. */
+  suggestions?: readonly PriceSuggestion[];
+  /** Replays recent requests against the typed rules, without saving. */
+  preview?: PreviewAction;
 }) {
   const [state, run, pending] = useActionState<ActionResult, FormData>(action, {});
   return (
@@ -200,23 +208,14 @@ export function MandateForm({
             product or pack size. Items without a usual price are not checked.
           </p>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <label className={`${label} sm:col-span-3`}>
-              Usual prices ({data.baseCurrency})
-              <textarea
-                name="prices"
-                rows={Math.min(12, Math.max(4, data.prices.split('\n').length + 1))}
-                defaultValue={data.prices}
-                placeholder={
-                  'Phosphate buffer solution, 10 L | 1150 | phosphate buffer\nNitrile gloves | 22 | gloves | box'
-                }
-                className={`${area} tabular font-mono text-sm`}
+            <div className="sm:col-span-3">
+              <PricesField
+                value={data.prices}
+                baseCurrency={data.baseCurrency}
+                suggestions={suggestions}
+                disabled={readOnly}
               />
-              <span className={hint}>
-                One item per line: item | usual price per unit | other words that name it,
-                comma-separated (optional) | unit (optional). Agents send the item and quantity with
-                each request.
-              </span>
-            </label>
+            </div>
             <Field
               name="above_percent"
               title="Flag above the usual price by more than (%)"
@@ -340,6 +339,9 @@ export function MandateForm({
         ))}
       </fieldset>
 
+      {readOnly || !preview ? null : (
+        <MandatePreview action={preview} baseCurrency={data.baseCurrency} />
+      )}
       {readOnly ? null : (
         <div className="flex flex-wrap items-center gap-3">
           <label className="min-w-0 flex-1 text-sm font-medium text-ink">

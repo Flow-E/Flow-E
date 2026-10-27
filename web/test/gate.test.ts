@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gateToken, passwordMatches, safeNext, verifyGateToken } from '@/server/gate';
+import { gateExempt, gateToken, passwordMatches, safeNext, verifyGateToken } from '@/server/gate';
 import { authMode, readSession, signSession } from '@/server/session';
 
 const NOW = Date.parse('2026-10-22T10:00:00Z');
@@ -35,6 +35,41 @@ describe('site password gate', () => {
     for (const bad of [undefined, null, '', 'https://evil.example', '//evil.example', '/\\evil']) {
       expect(safeNext(bad)).toBe('/');
     }
+  });
+});
+
+describe('paths that skip the site password', () => {
+  it('lets through only /gate, /api/mcp and the public receipt check, by exact path', () => {
+    expect(gateExempt('/gate', 'GET', false)).toBe(true);
+    expect(gateExempt('/api/mcp', 'POST', false)).toBe(true);
+    expect(gateExempt('/verify', 'GET', false)).toBe(true);
+    expect(gateExempt('/verify', 'HEAD', false)).toBe(true);
+    expect(gateExempt('/api/verify', 'POST', false)).toBe(true);
+    for (const path of [
+      '/',
+      '/sandbox',
+      '/app',
+      '/verify/',
+      '/verify/x',
+      '/verifyx',
+      '/Verify',
+      '/api/verify/x',
+      '/api/mcp/x',
+      '/api/mcpx',
+      '/docs',
+    ]) {
+      expect(gateExempt(path, 'GET', false)).toBe(false);
+      expect(gateExempt(path, 'POST', false)).toBe(false);
+    }
+  });
+
+  it('never lets a Server Action through the public receipt check', () => {
+    // A POST with Next-Action to an ungated page could name any action of the site.
+    expect(gateExempt('/verify', 'POST', false)).toBe(false);
+    expect(gateExempt('/verify', 'POST', true)).toBe(false);
+    expect(gateExempt('/verify', 'GET', true)).toBe(false);
+    expect(gateExempt('/api/verify', 'POST', true)).toBe(false);
+    expect(gateExempt('/api/verify', 'GET', false)).toBe(false);
   });
 });
 

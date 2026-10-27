@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { ApprovalQueue } from '@/components/approval-card';
 import { DashboardBody, DashboardFilters, agentScopeNote, panelNote } from '@/components/dashboard';
 import { Panel, StatusPill, ButtonLink } from '@/components/ui';
-import { dateTime, money, time } from '@/lib/format';
+import { money, time } from '@/lib/format';
 import { buildDashboard, forAgent, parseAgent, parsePeriod } from '@/server/analytics';
 import { sandboxView } from '@/server/view';
 import {
@@ -150,41 +151,13 @@ export default async function DashboardPage({
                   to see a payment land here.
                 </p>
               ) : (
-                <ul className="divide-y divide-rule">
-                  {pending.map((p) => (
-                    <li key={p.paymentId} className="space-y-2 py-3 first:pt-0 last:pb-0">
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <Link
-                          href={`/sandbox/payments/${p.paymentId}`}
-                          className="font-medium text-ink hover:underline"
-                        >
-                          {p.request.merchant}
-                        </Link>
-                        <span className="tabular font-mono text-ink">
-                          {money(p.request.amount, p.request.currency)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-ink-2">
-                        {p.agentId} · {dateTime(p.createdAt, view.timezone)}
-                        {p.request.memo ? ` · ${p.request.memo}` : ''}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <ActionButton
-                          action={resolveAction}
-                          fields={{ id: p.paymentId, status: 'approved' }}
-                          label="Approve"
-                          variant="primary"
-                          withNote
-                        />
-                        <ActionButton
-                          action={resolveAction}
-                          fields={{ id: p.paymentId, status: 'declined' }}
-                          label="Decline"
-                        />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <ApprovalQueue
+                  view={view}
+                  pending={pending}
+                  canDecide
+                  action={resolveAction}
+                  paymentHref="/sandbox/payments"
+                />
               )}
             </Panel>
 

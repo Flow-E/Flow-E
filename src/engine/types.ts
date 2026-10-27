@@ -18,6 +18,8 @@ export const RULE_ORDER = [
   'CATEGORY',
   'PER_PAYMENT_LIMIT',
   'DAILY_BUDGET',
+  'MONTHLY_BUDGET',
+  'PROJECT_BUDGET',
   'VELOCITY',
   'SPLIT_DETECTION',
   'FAIR_PRICE',
@@ -41,6 +43,8 @@ export interface PaymentRequest {
   item?: string;
   /** How many units of `item`; the reference price is per unit. Default 1. */
   quantity?: number;
+  /** The project or cost centre this purchase is booked to, by id or name. */
+  project?: string;
 }
 
 export interface SupplierPolicy {
@@ -62,6 +66,10 @@ export interface Mandate {
   blockedCountries: readonly string[];
   velocityPerMinute: number;
   businessHoursOnly: boolean;
+  /** Approved plus pending spend per calendar month. `null` or missing: none. */
+  monthlyBudget?: number | null;
+  /** Every request must name one of the projects this agent may book to. */
+  requireProject?: boolean;
 }
 
 /** Claims of a Know Your Agent credential. Signed by the local issuer (see src/kya). */
@@ -121,6 +129,17 @@ export interface PriceCheck {
   above: 'review' | 'decline';
 }
 
+/** A project or cost centre with its own budget, shared by the agents that may book to it. */
+export interface Project {
+  id: string;
+  name: string;
+  /** Base minor units, per calendar month or over the project's whole life. */
+  budgetBase: number;
+  period: 'month' | 'total';
+  /** Agent ids that may book to it. Empty: every agent. */
+  agents: readonly string[];
+}
+
 /** Organisation-wide settings shared by every agent. */
 export interface GlobalPolicy {
   baseCurrency: string;
@@ -138,6 +157,7 @@ export interface GlobalPolicy {
   /** Usual prices for the fair-price check. Empty or missing: the check is off. */
   referencePrices?: readonly ReferencePrice[];
   priceCheck?: PriceCheck;
+  projects?: readonly Project[];
 }
 
 /** What the engine needs to know about one prior payment of this agent. */
@@ -148,6 +168,10 @@ export interface LedgerEntryView {
   status: 'approved' | 'declined' | 'review' | 'cancelled';
   /** Epoch milliseconds. */
   createdAt: number;
+  /** Project id the payment was booked to, if any. */
+  project?: string;
+  /** The rule behind the engine's decision, if it declined or flagged it. */
+  rule?: string | null;
 }
 
 export interface EvaluationContext {
@@ -156,6 +180,8 @@ export interface EvaluationContext {
   killSwitch: boolean;
   /** This agent's prior payments. */
   ledger: readonly LedgerEntryView[];
+  /** Every agent's prior payments, for budgets shared by agents (projects). Default: `ledger`. */
+  organisationLedger?: readonly LedgerEntryView[];
   policy: GlobalPolicy;
   kya: {
     issuer: string;
@@ -183,4 +209,6 @@ export interface EvaluationResult {
   amountBase: number | null;
   /** Set on the first approved payment to a new supplier. Epoch milliseconds. */
   cancellableUntil?: number;
+  /** For the agent: what would get a yes, when the answer is no or not yet. */
+  guidance?: string;
 }

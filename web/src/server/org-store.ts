@@ -29,6 +29,7 @@ import {
   generateKeyPair,
   issueCredential,
   issuerIdFor,
+  budgetState,
   mandateSummary,
   newId,
   parseConfigObject,
@@ -1164,6 +1165,13 @@ export class OrgStore {
         loaded.config.policy.timezone,
         agent.mandate.dailyBudget,
       ),
+      budgets: budgetState({
+        config: loaded.config,
+        agent,
+        views: toEngineViews(foldPayments(entries, agent.id)),
+        organisationViews: toEngineViews(foldPayments(entries)),
+        now: this.clock(),
+      }),
     });
   }
 
@@ -1196,6 +1204,7 @@ export class OrgStore {
           now,
           killSwitch: controls.killSwitch?.on === true,
           ledger: toEngineViews(foldPayments(entries, agent.id)),
+          organisationLedger: toEngineViews(foldPayments(entries)),
           policy: config.policy,
           kya: {
             issuer: row.issuer,

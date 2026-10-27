@@ -65,6 +65,8 @@ export const RULE_NAMES: Readonly<Record<string, string>> = {
   CATEGORY: 'Category',
   PER_PAYMENT_LIMIT: 'Per-payment limit',
   DAILY_BUDGET: 'Daily budget',
+  MONTHLY_BUDGET: 'Monthly budget',
+  PROJECT_BUDGET: 'Project budget',
   VELOCITY: 'Velocity',
   SPLIT_DETECTION: 'Split detection',
   FAIR_PRICE: 'Fair price',

@@ -10,7 +10,7 @@ describe('baseline', () => {
     expect(r.rule).toBeNull();
     expect(r.reason).toBe('All rules passed.');
     expect(r.amountBase).toBe(120_000);
-    expect(r.trace).toHaveLength(16);
+    expect(r.trace).toHaveLength(18);
     expect(r.trace.every((t) => t.outcome === 'pass')).toBe(true);
     expect(r.cancellableUntil).toBeUndefined();
   });
@@ -288,11 +288,26 @@ describe('rule 9: velocity', () => {
 });
 
 describe('rule 10: split detection', () => {
-  it('declines a second payment to the same supplier that sums above the limit', () => {
+  it('sends a second payment to the same supplier that sums above the limit to a person', () => {
     const ledger = [entry({ amountBase: 450_000, createdAt: NOW - 5 * MINUTE })];
     const r = run({ context: { ledger }, request: { amount: 400_000 } });
-    expect(r).toMatchObject({ decision: 'declined', rule: 'SPLIT_DETECTION' });
+    expect(r).toMatchObject({ decision: 'review', rule: 'SPLIT_DETECTION' });
     expect(r.reason).toMatch(/split payment.*total CHF 8500\.00.*CHF 8000\.00/);
+    expect(r.guidance).toMatch(/Never split/);
+  });
+  it('does not count a payment that is itself waiting as a possible split', () => {
+    const ledger = [
+      entry({
+        amountBase: 450_000,
+        status: 'review',
+        rule: 'SPLIT_DETECTION',
+        createdAt: NOW - MINUTE,
+      }),
+    ];
+    expect(
+      traceOf(run({ context: { ledger }, request: { amount: 400_000 } }), 'SPLIT_DETECTION')
+        .outcome,
+    ).toBe('pass');
   });
   it('matches the supplier name loosely', () => {
     const ledger = [
@@ -507,5 +522,109 @@ describe('fair price', () => {
       context: known,
     });
     expect(traceOf(r, 'FAIR_PRICE').data).toMatchObject({ differenceBase: 20_900 });
+  });
+});
+
+describe('monthly budget', () => {
+  it('is off when not set', () => {
+    expect(traceOf(run(), 'MONTHLY_BUDGET').detail).toBe('No monthly budget is set.');
+  });
+
+  it("declines when this month's approved and pending spend plus this one exceed it", () => {
+    const ledger = [
+      entry({ amountBase: 300_000, createdAt: NOW - 5 * 24 * 60 * MINUTE }),
+      entry({ amountBase: 100_000, status: 'review', createdAt: NOW - 60 * MINUTE }),
+      // September: another month, not counted.
+      entry({ amountBase: 900_000, createdAt: Date.parse('2026-09-30T10:00:00Z') }),
+    ];
+    const r = run({ mandate: { monthlyBudget: 500_000 }, context: { ledger } });
+    expect(r).toMatchObject({ decision: 'declined', rule: 'MONTHLY_BUDGET' });
+    expect(r.guidance).toBe(
+      'Remaining this month: CHF 1000.00. The monthly budget starts again on 2026-11-01.',
+    );
+    const ok = run({
+      mandate: { monthlyBudget: 520_000 },
+      context: { ledger },
+      request: { amount: 100_000 },
+    });
+    expect(traceOf(ok, 'MONTHLY_BUDGET').outcome).toBe('pass');
+  });
+});
+
+describe('project budget', () => {
+  const grant = {
+    id: 'snf-123',
+    name: 'Grant SNF-123',
+    budgetBase: 1_000_000,
+    period: 'total' as const,
+    agents: [],
+  };
+  const ops = {
+    id: 'ops',
+    name: 'Operations',
+    budgetBase: 50_000,
+    period: 'month' as const,
+    agents: ['someone-else'],
+  };
+
+  it('passes when no project is named and none is required', () => {
+    expect(traceOf(run({ policy: { projects: [grant] } }), 'PROJECT_BUDGET').outcome).toBe('pass');
+  });
+
+  it('declines a missing project when the mandate requires one, listing the open ones', () => {
+    const r = run({ policy: { projects: [grant, ops] }, mandate: { requireProject: true } });
+    expect(r).toMatchObject({ decision: 'declined', rule: 'PROJECT_BUDGET' });
+    expect(r.guidance).toBe('Name one of your projects: snf-123 (Grant SNF-123).');
+  });
+
+  it('finds a project by id or name, and refuses unknown or closed ones', () => {
+    const policy = { projects: [grant, ops] };
+    expect(
+      traceOf(run({ policy, request: { project: 'GRANT snf-123' } }), 'PROJECT_BUDGET').data,
+    ).toMatchObject({ project: 'snf-123' });
+    expect(run({ policy, request: { project: 'nope' } }).rule).toBe('PROJECT_BUDGET');
+    expect(run({ policy, request: { project: 'ops' } }).reason).toMatch(/may not book/);
+  });
+
+  it("counts every agent's spend on the project, over its whole life", () => {
+    const organisationLedger = [
+      entry({ amountBase: 800_000, project: 'snf-123', createdAt: NOW - 90 * 24 * 60 * MINUTE }),
+      entry({ amountBase: 100_000, project: 'snf-123', status: 'review' }),
+      entry({ amountBase: 500_000, project: 'other' }),
+    ];
+    const r = run({
+      policy: { projects: [grant] },
+      request: { project: 'snf-123', amount: 120_000 },
+      context: { organisationLedger },
+    });
+    expect(r).toMatchObject({ decision: 'declined', rule: 'PROJECT_BUDGET' });
+    expect(r.reason).toMatch(/CHF 1000\.00 left of CHF 10000\.00 in total/);
+  });
+});
+
+describe('guidance for the agent', () => {
+  it('names the approved suppliers when one is not on the list', () => {
+    const r = run({ request: { merchant: 'Elsewhere AG' } });
+    expect(r.guidance).toBe('Approved suppliers: Alpine Reagents AG, Basel Labware AG.');
+  });
+
+  it('says how far the per-payment limit goes', () => {
+    expect(run({ request: { amount: 900_000 } }).guidance).toMatch(
+      /^Payments up to CHF 8000\.00 are within your limit/,
+    );
+  });
+
+  it('collects the hints of every review reason', () => {
+    const saturday = Date.parse('2026-10-24T10:00:00Z');
+    const r = run({
+      mandate: { businessHoursOnly: true },
+      request: { amount: 600_000 },
+      context: { now: saturday, ledger: [entry()] },
+    });
+    expect(r.guidance).toMatch(/skip this check\. Payments up to CHF 5000\.00 are approved/);
+  });
+
+  it('gives none when approved', () => {
+    expect(run({ context: { ledger: [entry()] } }).guidance).toBeUndefined();
   });
 });

@@ -2,10 +2,13 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Download } from 'lucide-react';
+import { ApprovalCard } from '@/components/approval-card';
+import { ShareReceipt } from '@/components/share-receipt';
 import { Panel, StatusPill, buttonClass } from '@/components/ui';
 import { dateTime, money, ruleName } from '@/lib/format';
 import { can } from '@/server/permissions';
 import { orgView } from '@/server/org-view';
+import { siteOrigin } from '@/server/origin';
 import { ActionButton, Trace, VerifyForm } from '../../../../sandbox/client';
 import { cancelAction, resolveAction, verifyAction } from '../../../actions';
 
@@ -25,6 +28,7 @@ export default async function PaymentPage({
   const decide = can(view.role, 'payment.resolve');
   const base = `/app/${view.id}`;
   const d = view.currencyDecimals;
+  const origin = await siteOrigin();
 
   return (
     <div className="space-y-6">
@@ -57,27 +61,15 @@ export default async function PaymentPage({
       </div>
 
       {p.status === 'review' ? (
-        <section className="flex flex-wrap items-center gap-3 rounded-xl border border-review/30 bg-review-soft px-4 py-3">
-          <p className="mr-auto text-sm text-review">
-            This payment waits for a human decision.{decide ? '' : ' An owner or approver decides.'}
-          </p>
-          {decide ? (
-            <>
-              <ActionButton
-                action={resolveAction}
-                fields={{ org: view.id, id: p.paymentId, status: 'approved' }}
-                label="Approve"
-                variant="primary"
-                withNote
-              />
-              <ActionButton
-                action={resolveAction}
-                fields={{ org: view.id, id: p.paymentId, status: 'declined' }}
-                label="Decline"
-              />
-            </>
-          ) : null}
-        </section>
+        <ApprovalCard
+          view={view}
+          payment={p}
+          trace={trace}
+          canDecide={decide}
+          action={resolveAction}
+          fields={{ org: view.id }}
+          paymentHref={`${base}/payments`}
+        />
       ) : null}
       {cancellable && decide ? (
         <section className="flex flex-wrap items-center gap-3 rounded-xl border border-rule bg-surface px-4 py-3">
@@ -132,6 +124,7 @@ export default async function PaymentPage({
             <pre className="tabular max-h-80 overflow-auto rounded-lg bg-sunken p-3 font-mono text-xs leading-relaxed text-ink-2">
               {receiptJson}
             </pre>
+            <ShareReceipt origin={origin} />
           </Panel>
           <Panel title="Verify this receipt">
             <VerifyForm action={verifyAction.bind(null, view.id)} initial={receiptJson} />

@@ -255,14 +255,14 @@ describe('the demo story, played through the MCP tools', () => {
       decision: 'declined',
       rule: 'PER_PAYMENT_LIMIT',
     });
-    // An agent that tries to split the declined payment is caught. Here even the first half is,
-    // because the pending CHF 6500 centrifuge from the same supplier counts towards the sum.
+    // An agent that tries to split the declined payment is caught and a person decides. Here
+    // even the first half is, because the pending CHF 6500 centrifuge counts towards the sum.
     expect(
       await buy('HPLC column set (10 columns)', 'Example Labware AG', '4500.00'),
-    ).toMatchObject({ decision: 'declined', rule: 'SPLIT_DETECTION' });
+    ).toMatchObject({ decision: 'review', rule: 'SPLIT_DETECTION' });
     expect(
       await buy('HPLC column set (10 columns)', 'Example Labware AG', '4500.00'),
-    ).toMatchObject({ decision: 'declined', rule: 'SPLIT_DETECTION' });
+    ).toMatchObject({ decision: 'review', rule: 'SPLIT_DETECTION' });
     expect(await buy('Borosilicate glassware kit', 'Example Glass GmbH')).toMatchObject({
       decision: 'declined',
       rule: 'SUPPLIER',

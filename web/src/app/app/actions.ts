@@ -3,13 +3,20 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { ZodError, z } from 'zod';
-import { ActionError, ConfigError, CredentialError, ReceiptError } from '@flow-e/mcp/core';
+import {
+  ActionError,
+  ConfigError,
+  CredentialError,
+  ReceiptError,
+  parseConfigObject,
+} from '@flow-e/mcp/core';
 import { text } from '@/lib/form';
 import { FormProblem, codes, rawFromForm } from '@/lib/mandate-form-data';
 import { createDemoLab, DEMO_LAB_AGENT } from '@/server/demo-lab';
 import { siteOrigin } from '@/server/origin';
 import type { User } from '@/server/org-store';
-import { ForbiddenError } from '@/server/permissions';
+import { ForbiddenError, can } from '@/server/permissions';
+import { replay, type ReplayResult } from '@/server/replay';
 import { getOrgStore } from '@/server/runtime';
 import { getSession } from '@/server/session';
 
@@ -29,6 +36,11 @@ export interface ActionResult {
 export interface SecretResult extends ActionResult {
   secret?: string;
   label?: string;
+}
+
+export interface PreviewState {
+  result?: ReplayResult;
+  error?: string;
 }
 
 export interface VerifyState {
@@ -115,6 +127,8 @@ export async function renameAction(_prev: ActionResult, form: FormData): Promise
 export async function resolveAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
   const { store, user, orgId } = await context(form);
   const status = form.get('status') === 'approved' ? 'approved' : 'declined';
+  // A decline always carries a short reason for the ledger (an approval note is optional).
+  if (status === 'declined' && !note(form)) return { error: 'Give a short reason for declining.' };
   try {
     await store.resolve(orgId, user, text(form, 'id'), status, note(form));
   } catch (err) {
@@ -193,6 +207,26 @@ export async function updateMandateAction(
   }
   refresh(orgId);
   return { ok: 'Saved. The new mandate applies to the next request.' };
+}
+
+/** "What if": the last 30 days replayed against the mandate in the form. Nothing is saved. */
+export async function previewMandateAction(
+  orgId: string,
+  _prev: PreviewState,
+  form: FormData,
+): Promise<PreviewState> {
+  const { store, user } = await context();
+  try {
+    const view = await store.view(orgId, user);
+    if (!can(view.role, 'mandate.update')) throw new ForbiddenError('Only owners can change it.');
+    const proposed = parseConfigObject({
+      ...rawFromForm(form, view.raw),
+      organisation: view.name,
+    });
+    return { result: replay({ entries: view.entries, proposed, now: view.now }) };
+  } catch (err) {
+    return { error: problem(err).replace(/^Not saved:/, 'Cannot preview:') };
+  }
 }
 
 // Agents and keys -------------------------------------------------------------------------------

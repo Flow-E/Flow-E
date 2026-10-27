@@ -2,9 +2,21 @@ import { z } from 'zod';
 import { ConfigError, type AgentConfig, type MandateConfig } from '../config/schema.js';
 import { effectiveStatus } from '../control/plan.js';
 import { AmountError, formatMoney, parseAmount } from '../engine/money.js';
-import type { DailySpend } from '../engine/rules.js';
+import {
+  monthlySpend,
+  projectSpend,
+  type DailySpend,
+  type MonthlySpend,
+  type ProjectSpend,
+} from '../engine/rules.js';
 import { formatClock } from '../engine/time.js';
-import type { Credential, EvaluationResult, PaymentRequest } from '../engine/types.js';
+import type {
+  Credential,
+  EvaluationResult,
+  LedgerEntryView,
+  PaymentRequest,
+  Project,
+} from '../engine/types.js';
 import type { Controls, PaymentRecord } from '../ledger/fold.js';
 
 /**
@@ -64,6 +76,16 @@ export const requestPaymentShape = {
     .max(1_000_000)
     .optional()
     .describe('How many units of item the amount covers. Default 1.'),
+  project: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe(
+      'The project or cost centre this purchase is for, by id or name (check_mandate lists ' +
+        'yours). Required if your mandate says so.',
+    ),
 };
 
 export const getPaymentShape = {
@@ -91,7 +113,8 @@ export const AGENT_TOOLS = {
       'Ask for authorization to pay a supplier. Returns "approved", "declined" or "review" ' +
       'with the reason, a payment_id and a signed receipt_id. Only buy when approved. ' +
       'Never split a declined payment into smaller ones, and never re-submit it with a ' +
-      'disguised supplier name, category, country or currency: that is recorded and blocked. ' +
+      'disguised supplier name, category, country or currency: that is recorded and sent to ' +
+      'a person. Follow the guidance field: it says what would be approved. ' +
       'Choosing a different supplier that is genuinely allowed is fine. If the ' +
       'decision is "review", a human must approve first; tell them the payment_id and check ' +
       'get_payment later. Name the item and quantity so the price can be compared with the ' +
@@ -136,6 +159,35 @@ export const NEXT_STEP = {
 
 const DAY_NAMES = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+export interface BudgetState {
+  monthly: MonthlySpend | null;
+  projects: { project: Project; spend: ProjectSpend }[];
+}
+
+/** This agent's monthly budget and the projects it may book to, with what is left of each. */
+export function budgetState(input: {
+  config: MandateConfig;
+  agent: AgentConfig;
+  /** This agent's payments. */
+  views: readonly LedgerEntryView[];
+  /** Every agent's payments: project budgets are shared. */
+  organisationViews: readonly LedgerEntryView[];
+  now: number;
+}): BudgetState {
+  const { config, agent, now } = input;
+  const tz = config.policy.timezone;
+  const monthly = agent.mandate.monthlyBudget ?? null;
+  return {
+    monthly: monthly === null ? null : monthlySpend(input.views, now, tz, monthly),
+    projects: (config.policy.projects ?? [])
+      .filter((p) => p.agents.length === 0 || p.agents.includes(agent.id))
+      .map((project) => ({
+        project,
+        spend: projectSpend(project, input.organisationViews, now, tz),
+      })),
+  };
+}
+
 /** What check_mandate answers. */
 export function mandateSummary(input: {
   config: MandateConfig;
@@ -143,8 +195,9 @@ export function mandateSummary(input: {
   controls: Controls;
   credential: Credential | null;
   spend: DailySpend;
+  budgets?: BudgetState;
 }) {
-  const { config, agent, controls, credential, spend } = input;
+  const { config, agent, controls, credential, spend, budgets } = input;
   const { policy } = config;
   const m = agent.mandate;
   const money = (n: number) => formatMoney(n, policy.baseCurrency, policy.currencyDecimals);
@@ -169,6 +222,27 @@ export function mandateSummary(input: {
       pending_review: money(spend.pending),
       remaining: money(spend.remaining),
     },
+    this_month: budgets?.monthly
+      ? {
+          month: budgets.monthly.month,
+          monthly_budget: money(m.monthlyBudget ?? 0),
+          approved: money(budgets.monthly.approved),
+          pending_review: money(budgets.monthly.pending),
+          remaining: money(budgets.monthly.remaining),
+        }
+      : null,
+    projects:
+      budgets && budgets.projects.length > 0
+        ? {
+            required: m.requireProject === true,
+            open_to_you: budgets.projects.map(({ project, spend: s }) => ({
+              id: project.id,
+              name: project.name,
+              budget: `${money(project.budgetBase)} ${project.period === 'month' ? 'per month' : 'in total'}`,
+              remaining: money(s.remaining),
+            })),
+          }
+        : null,
     limits: {
       per_payment: money(m.perPaymentLimit),
       human_approval_above: m.approvalAbove === null ? null : money(m.approvalAbove),
@@ -225,6 +299,7 @@ export function toPaymentRequest(
     ...(args.memo === undefined ? {} : { memo: args.memo }),
     ...(args.item === undefined ? {} : { item: args.item }),
     ...(args.quantity === undefined ? {} : { quantity: args.quantity }),
+    ...(args.project === undefined ? {} : { project: args.project }),
   };
 }
 
@@ -246,6 +321,7 @@ export function paymentAnswer(input: {
     decision: result.decision,
     reason: result.reason,
     rule: result.rule,
+    guidance: result.guidance ?? null,
     amount: formatMoney(request.amount, request.currency, currencyDecimals),
     amount_in_base_currency: base(result.amountBase),
     cancellable_until:

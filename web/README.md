@@ -3,16 +3,17 @@
 The public site and the sandbox for [Flow-E](https://github.com/Flow-E/Flow-E): a Next.js 16 app
 (App Router, TypeScript strict, Tailwind 4).
 
-| Route                     | What it is                                                                                |
-| ------------------------- | ----------------------------------------------------------------------------------------- |
-| `/`                       | What Flow-E is, how it works, the fourteen rules, human control, proof, security, roadmap |
-| `/docs`                   | The repository README, synced at build time                                               |
-| `/sandbox`                | Signed-in only. Your own fictional company: dashboard, approvals, agents, kill switch     |
-| `/app`                    | Signed-in only. Your organisations: real agents with API keys, members and roles          |
-| `/api/mcp`                | The remote MCP endpoint for agents (Streamable HTTP, `Authorization: Bearer` agent key)   |
-| `/invite/…`, `/approve/…` | One-time links from invitation and approval emails (sign-in, then confirm)                |
-| `/dev/outbox`             | Development only: the emails Flow-E would have sent                                       |
-| `/gate`                   | The private-preview password page (only while `SITE_PASSWORD` is set)                     |
+| Route                     | What it is                                                                               |
+| ------------------------- | ---------------------------------------------------------------------------------------- |
+| `/`                       | What Flow-E is, how it works, the sixteen rules, human control, proof, security, roadmap |
+| `/docs`                   | The repository README, synced at build time                                              |
+| `/sandbox`                | Signed-in only. Your own fictional company: dashboard, approvals, agents, kill switch    |
+| `/app`                    | Signed-in only. Your organisations: real agents with API keys, members and roles         |
+| `/api/mcp`                | The remote MCP endpoint for agents (Streamable HTTP, `Authorization: Bearer` agent key)  |
+| `/verify`                 | Public, no password: paste a receipt to check it was authorized (POSTs to `/api/verify`) |
+| `/invite/…`, `/approve/…` | One-time links from invitation and approval emails (sign-in, then confirm)               |
+| `/dev/outbox`             | Development only: the emails Flow-E would have sent                                      |
+| `/gate`                   | The private-preview password page (only while `SITE_PASSWORD` is set)                    |
 
 Sandbox pages: Dashboard, Fake agent (catalog, demo story, custom request, full rule trace),
 Ledger (integrity check, CSV, issuer public key, receipt verify), Payment detail (trace,

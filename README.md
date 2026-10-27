@@ -141,8 +141,10 @@ human must approve) only applies once every hard rule has passed.
 | 6   | Merchant category code (MCC) allowed                               | declined           |
 | 7   | Per-payment limit, in the base currency                            | declined           |
 | 8   | Daily budget: today's approved **and pending** spend plus this one | declined           |
+| 8b  | Monthly budget (optional), counted the same way per calendar month | declined           |
+| 8c  | Project budget: the named project or cost centre, shared by agents | declined           |
 | 9   | Velocity: at most N requests per rolling minute (declines count)   | declined           |
-| 10  | Split detection: same supplier within 10 min, sum over the limit   | declined           |
+| 10  | Split detection: same supplier within 10 min, sum over the limit   | review             |
 | 11  | Fair price: compared with the item's usual price (optional)        | review or declined |
 | 12  | Business hours (optional)                                          | review             |
 | 13  | Human-approval threshold                                           | review             |
@@ -154,7 +156,14 @@ whole cents, never as floats. Foreign amounts are converted with your static rat
 
 Good to know:
 
-- **Split detection** also catches a genuine second order from the same supplier inside 10 minutes
+- **Every no says what would be a yes.** A decline or review comes with `guidance` for the agent:
+  the approved suppliers, what is left of a budget and when it starts again, the usual price, or
+  that it must not retry. Agents correct themselves instead of asking a person.
+- **Projects and cost centres** (`projects:`) have their own budget, per month or in total, and
+  may be limited to some agents. The agent names one with `project`; `require_project: true`
+  makes that mandatory for an agent.
+- **Split detection** sends a possible split to a person rather than declining it, because only a
+  person can tell it from a genuine second order. It also catches a genuine second order from the same supplier inside 10 minutes
   when the two together exceed the per-payment limit. Pending reviews count towards that sum.
 - **Fair price** compares a request with the usual price you set for the item. The agent names
   the item and quantity (`item`, `quantity`; the memo is used when there is no item), and Flow-E
@@ -281,6 +290,11 @@ agents:
     blocked_countries: []
     velocity_per_minute: 6
     business_hours_only: false
+    monthly_budget: 60000 # optional
+    require_project: false # true: every request must name a project
+projects: # optional; budgets shared by the agents that may book to them
+  snf-123: { name: 'Grant SNF-123', budget: 50000, period: total, agents: [lab-procurement] }
+  lab-ops: { name: 'Lab operations', budget: 8000, period: month } # every agent
 ```
 
 ## Roadmap

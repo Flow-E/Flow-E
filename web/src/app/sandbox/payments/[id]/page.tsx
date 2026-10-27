@@ -2,8 +2,11 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Download } from 'lucide-react';
+import { ApprovalCard } from '@/components/approval-card';
+import { ShareReceipt } from '@/components/share-receipt';
 import { Panel, StatusPill, buttonClass } from '@/components/ui';
 import { dateTime, money, ruleName } from '@/lib/format';
+import { siteOrigin } from '@/server/origin';
 import { sandboxView } from '@/server/view';
 import { cancelAction, resolveAction, verifyAction } from '../../actions';
 import { ActionButton, Trace, VerifyForm } from '../../client';
@@ -17,6 +20,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ id: st
   if (!detail) notFound();
   const { payment: p, receipt, trace, cancellable } = detail;
   const receiptJson = JSON.stringify(receipt, null, 2);
+  const origin = await siteOrigin();
 
   return (
     <div className="space-y-6">
@@ -44,21 +48,14 @@ export default async function PaymentPage({ params }: { params: Promise<{ id: st
       </div>
 
       {p.status === 'review' ? (
-        <section className="flex flex-wrap items-center gap-3 rounded-xl border border-review/30 bg-review-soft px-4 py-3">
-          <p className="mr-auto text-sm text-review">This payment waits for a human decision.</p>
-          <ActionButton
-            action={resolveAction}
-            fields={{ id: p.paymentId, status: 'approved' }}
-            label="Approve"
-            variant="primary"
-            withNote
-          />
-          <ActionButton
-            action={resolveAction}
-            fields={{ id: p.paymentId, status: 'declined' }}
-            label="Decline"
-          />
-        </section>
+        <ApprovalCard
+          view={view}
+          payment={p}
+          trace={trace}
+          canDecide
+          action={resolveAction}
+          paymentHref="/sandbox/payments"
+        />
       ) : null}
       {cancellable ? (
         <section className="flex flex-wrap items-center gap-3 rounded-xl border border-rule bg-surface px-4 py-3">
@@ -113,7 +110,8 @@ export default async function PaymentPage({ params }: { params: Promise<{ id: st
             <pre className="tabular max-h-80 overflow-auto rounded-lg bg-sunken p-3 font-mono text-xs leading-relaxed text-ink-2">
               {receiptJson}
             </pre>
-            <p className="mt-3 text-sm text-ink-3">
+            <ShareReceipt origin={origin} />
+            <p className="mt-2 text-sm text-ink-3">
               Verify it offline with the issuer public key:{' '}
               <span className="font-mono">
                 flow-e verify receipt.json --pubkey issuer.pub --offline

@@ -32,8 +32,64 @@ describe('parseConfig', () => {
         blockedCountries: [],
         velocityPerMinute: 6,
         businessHoursOnly: false,
+        monthlyBudget: null,
+        requireProject: false,
       },
     });
+  });
+
+  it('reads projects and monthly budgets', () => {
+    const { policy, agents } = parseConfig(`
+base_currency: CHF
+projects:
+  snf-123: { name: 'Grant SNF-123', budget: 50000, period: total, agents: [bot] }
+  ops: { name: Operations, budget: '2000.50' }
+agents:
+  bot:
+    owner: Someone
+    daily_budget: 1000
+    per_payment_limit: 500
+    monthly_budget: 4000
+    require_project: true
+    currencies: [CHF]
+    categories: ['5111']
+`);
+    expect(policy.projects).toEqual([
+      {
+        id: 'snf-123',
+        name: 'Grant SNF-123',
+        budgetBase: 5_000_000,
+        period: 'total',
+        agents: ['bot'],
+      },
+      { id: 'ops', name: 'Operations', budgetBase: 200_050, period: 'month', agents: [] },
+    ]);
+    expect(agents.bot?.mandate).toMatchObject({ monthlyBudget: 400_000, requireProject: true });
+  });
+
+  it.each([
+    [
+      'an unknown agent',
+      'projects: { p: { name: P, budget: 1, agents: [nobody] } }',
+      /no agent "nobody"/,
+    ],
+    [
+      'a name used twice',
+      'projects: { a: { name: P, budget: 1 }, b: { name: " p", budget: 1 } }',
+      /used twice/,
+    ],
+  ])('rejects projects with %s', (_name, line, message) => {
+    expect(() => parseConfig(`base_currency: CHF\n${line}\nagents: {}\n`)).toThrow(message);
+  });
+
+  it('rejects require_project when no project is open to the agent', () => {
+    expect(() =>
+      parseConfig(`
+base_currency: CHF
+agents:
+  bot: { owner: S, daily_budget: 1, per_payment_limit: 1, currencies: [CHF], categories: ['5111'], require_project: true }
+`),
+    ).toThrow(/no project is open/);
   });
 
   it('fills defaults for a minimal file', () => {

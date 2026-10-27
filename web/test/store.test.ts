@@ -69,7 +69,7 @@ describe('the demo story', () => {
       'approved',
       'review APPROVAL_THRESHOLD',
       'declined PER_PAYMENT_LIMIT',
-      'declined SPLIT_DETECTION',
+      'review SPLIT_DETECTION',
       'declined SUPPLIER',
       'approved',
       'review FAIR_PRICE',
@@ -101,8 +101,8 @@ describe('owner actions', () => {
     const centrifuge = story[2];
     await store.resolve(ALICE, centrifuge?.paymentId ?? '', 'approved', { ...by, note: 'ok' });
     const v = await store.view(ALICE);
-    // Only the overpriced pipette tips still wait.
-    expect(v.pending).toHaveLength(1);
+    // The split attempt and the overpriced pipette tips still wait.
+    expect(v.pending).toHaveLength(2);
     const p = v.payments.find((x) => x.paymentId === centrifuge?.paymentId);
     expect(p).toMatchObject({ status: 'approved', decidedBy: by.by, note: 'ok' });
   });
@@ -197,7 +197,7 @@ describe('isolation between users', () => {
     const alicePayment = story[2]?.paymentId ?? '';
     expect(await store.payment(BOB, alicePayment)).toBeNull();
     await expect(store.resolve(BOB, alicePayment, 'approved', by)).rejects.toThrow(/No payment/);
-    expect((await store.view(ALICE)).pending).toHaveLength(2);
+    expect((await store.view(ALICE)).pending).toHaveLength(3);
   });
 
   it('a user without a sandbox gets a clear error, not someone else’s', async () => {
@@ -229,7 +229,7 @@ describe('receipts', () => {
     );
     expect(out).toMatch(/issuer signature is valid/);
     expect(out.trim().endsWith('VALID')).toBe(true);
-    expect(detail?.trace).toHaveLength(16);
+    expect(detail?.trace).toHaveLength(18);
   });
 
   it('verifies in the sandbox, and catches an edited receipt', async () => {
@@ -331,7 +331,6 @@ describe('sample history (sandbox only)', () => {
     for (const rule of [
       'SUPPLIER',
       'PER_PAYMENT_LIMIT',
-      'SPLIT_DETECTION',
       'CATEGORY',
       'COUNTRY',
       'DAILY_BUDGET',
@@ -340,6 +339,11 @@ describe('sample history (sandbox only)', () => {
     ]) {
       expect(rules, rule).toContain(rule);
     }
+    // The second half of the split attempt goes to a person, who declines it. (The first half
+    // fits the per-payment limit on its own.)
+    expect(
+      v.payments.filter((p) => p.rule === 'SPLIT_DETECTION' && p.status === 'declined'),
+    ).toHaveLength(1);
     expect(v.payments.filter((p) => p.status === 'cancelled')).toHaveLength(1);
     expect(v.payments.some((p) => p.decidedBy === SAMPLE_APPROVER && p.status === 'declined')).toBe(
       true,

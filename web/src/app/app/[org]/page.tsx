@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { CircleCheck, Circle } from 'lucide-react';
+import { ApprovalQueue } from '@/components/approval-card';
 import { DashboardBody, DashboardFilters, agentScopeNote, panelNote } from '@/components/dashboard';
+import { GettingStarted } from '@/components/getting-started';
 import { ButtonLink, Panel, StatusPill } from '@/components/ui';
-import { dateTime, money, time } from '@/lib/format';
+import { money, time } from '@/lib/format';
 import { buildDashboard, forAgent, parseAgent, parsePeriod } from '@/server/analytics';
+import { gettingStarted } from '@/server/getting-started';
 import { can } from '@/server/permissions';
 import { orgView } from '@/server/org-view';
 import { ActionButton, AutoRefresh } from '../../sandbox/client';
@@ -48,27 +50,15 @@ export default async function OrgDashboard({
   const coolingOff = forAgent(view.coolingOff, agentId);
   const scope = agentScopeNote(agents, agentId);
   const exportQuery = new URLSearchParams({ period, ...(agentId ? { agent: agentId } : {}) });
-  const hasKey = view.agents.some((a) => a.keys.some((k) => k.status === 'active'));
-  const used = view.agents.some((a) => a.keys.some((k) => k.lastUsedAt !== null));
-
-  const steps = [
-    {
-      done: view.agents.length > 0,
-      label: 'Create an agent with a starting mandate',
-      href: `${base}/agents`,
-    },
-    {
-      done: hasKey,
-      label: 'Create an API key for it',
-      href: view.agents[0] ? `${base}/agents/${view.agents[0].id}` : `${base}/agents`,
-    },
-    {
-      done: used,
-      label: 'Connect the agent to the MCP endpoint',
-      href: view.agents[0] ? `${base}/agents/${view.agents[0].id}#connect` : `${base}/agents`,
-    },
-    { done: view.members.length > 1, label: 'Invite an approver', href: `${base}/members` },
-  ];
+  const checklist = gettingStarted({
+    base,
+    role: view.role,
+    agents: view.agents,
+    payments: view.payments.length,
+    referencePrices: view.raw.reference_prices,
+    members: view.members.length,
+    pendingInvitations: view.invitations.filter((i) => i.status === 'pending').length,
+  });
 
   return (
     <div className="space-y-6">
@@ -80,34 +70,7 @@ export default async function OrgDashboard({
         </p>
       </div>
 
-      {steps.some((s) => !s.done) ? (
-        <Panel
-          title="Get started"
-          description="Four steps from an empty organisation to a governed agent."
-        >
-          <ol className="space-y-2">
-            {steps.map((s) => (
-              <li key={s.label} className="flex items-center gap-2 text-sm">
-                {s.done ? (
-                  <CircleCheck size={16} className="shrink-0 text-approve" aria-label="done" />
-                ) : (
-                  <Circle size={16} className="shrink-0 text-ink-3" aria-label="to do" />
-                )}
-                {s.done || (!owner && s.label !== 'Invite an approver') ? (
-                  <span className={s.done ? 'text-ink-3 line-through' : 'text-ink'}>{s.label}</span>
-                ) : (
-                  <Link href={s.href} className="text-accent underline">
-                    {s.label}
-                  </Link>
-                )}
-              </li>
-            ))}
-          </ol>
-          {owner ? null : (
-            <p className="mt-3 text-sm text-ink-3">Only owners can create agents and keys.</p>
-          )}
-        </Panel>
-      ) : null}
+      <GettingStarted checklist={checklist} />
 
       <section
         className={`flex flex-wrap items-center justify-between gap-4 rounded-xl border px-4 py-4 sm:px-5 ${
@@ -175,44 +138,14 @@ export default async function OrgDashboard({
               {pending.length === 0 ? (
                 <p className="text-sm text-ink-2">Nothing waits for a human decision.</p>
               ) : (
-                <ul className="divide-y divide-rule">
-                  {pending.map((p) => (
-                    <li key={p.paymentId} className="space-y-2 py-3 first:pt-0 last:pb-0">
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <Link
-                          href={`${base}/payments/${p.paymentId}`}
-                          className="font-medium text-ink hover:underline"
-                        >
-                          {p.request.merchant}
-                        </Link>
-                        <span className="tabular font-mono text-ink">
-                          {money(p.request.amount, p.request.currency, view.currencyDecimals)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-ink-2">
-                        {p.agentId} · {dateTime(p.createdAt, view.timezone)} · {p.reason}
-                      </p>
-                      {decide ? (
-                        <div className="flex flex-wrap gap-2">
-                          <ActionButton
-                            action={resolveAction}
-                            fields={{ org: view.id, id: p.paymentId, status: 'approved' }}
-                            label="Approve"
-                            variant="primary"
-                            withNote
-                          />
-                          <ActionButton
-                            action={resolveAction}
-                            fields={{ org: view.id, id: p.paymentId, status: 'declined' }}
-                            label="Decline"
-                          />
-                        </div>
-                      ) : (
-                        <p className="text-xs text-ink-3">An owner or approver decides.</p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                <ApprovalQueue
+                  view={view}
+                  pending={pending}
+                  canDecide={decide}
+                  action={resolveAction}
+                  fields={{ org: view.id }}
+                  paymentHref={`${base}/payments`}
+                />
               )}
             </Panel>
 

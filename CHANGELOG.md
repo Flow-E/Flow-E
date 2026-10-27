@@ -9,6 +9,19 @@ changes.
 
 ### Added
 
+- **Monthly and project budgets.** Agents can have a `monthly_budget`; `projects:` (cost centres,
+  grants) have their own budget per month or in total, shared by the agents that may book to
+  them, and `require_project` makes naming one mandatory. Two new rules after the daily budget.
+- **Guidance for agents.** Every decline or review answers with `guidance`: what would be approved
+  (approved suppliers, what is left of a budget and when it starts again, the usual price), or
+  that the agent must not retry.
+- Website: an **approval card** with everything to decide (why, budget effect, supplier history,
+  similar purchases, usual price), on phones too; a decline needs a reason. A public **`/verify`**
+  page where anyone can check a receipt without signing in. A **value report** on the dashboard
+  (decided automatically, risky purchases stopped, overpayment avoided, work saved). A
+  **getting-started checklist** for new organisations. **Price lists** can be imported from CSV,
+  and usual prices are suggested from what was paid. A **what-if replay** shows how the last
+  30 days would have been decided under a mandate change before it is saved.
 - **Fair-price check**, a new rule between split detection and business hours: the mandate can
   hold usual prices per item (`reference_prices`), and a request more than `above_percent` above
   the usual price goes to a human (or is declined), more than `below_percent` below it too.
@@ -46,6 +59,8 @@ changes.
 
 ### Changed
 
+- **Split detection** now sends a possible split to a person instead of declining it; a payment
+  held as a split does not count again towards later ones while it waits.
 - Website dashboard: the approval and cooling-off panels follow the agent filter; foreign-currency
   declines count in the decline total (converted at the mandate's rate, or listed separately);
   agents beyond the eighth share one "Other agents" series; the last date label fits on phones.

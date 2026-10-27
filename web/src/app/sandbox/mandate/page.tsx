@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import { Panel } from '@/components/ui';
 import { mandateFields } from '@/lib/mandate-form-data';
+import { priceSuggestions } from '@/server/price-suggestions';
 import { sandboxView } from '@/server/view';
-import { resetAction, updateMandateAction } from '../actions';
+import { previewMandateAction, resetAction, updateMandateAction } from '../actions';
 import { ResetForm } from '../client';
 import { MandateForm } from './mandate-form';
 
@@ -20,7 +21,12 @@ export default async function MandatePage() {
           change applies to the next request and is recorded in the ledger.
         </p>
       </div>
-      <MandateForm data={mandateFields(view.raw, view.baseCurrency)} action={updateMandateAction} />
+      <MandateForm
+        data={mandateFields(view.raw, view.baseCurrency)}
+        action={updateMandateAction}
+        suggestions={priceSuggestions(view)}
+        preview={previewMandateAction}
+      />
       <Panel
         title="Start over"
         description="Archive this sandbox and begin again with new keys, an empty ledger and the original fictional mandate."

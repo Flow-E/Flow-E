@@ -1,7 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { GATE_COOKIE, verifyGateToken } from './server/gate';
-
-const MCP_PATH = '/api/mcp';
+import { GATE_COOKIE, gateExempt, verifyGateToken } from './server/gate';
 
 /**
  * Runs before every page: a per-request CSP nonce (no inline script runs without it), security
@@ -11,9 +9,10 @@ export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const password = process.env.SITE_PASSWORD;
 
-  // /api/mcp is for agents, authenticated by their API key; it is the only path that skips the
-  // password gate. Exact match: /api/mcp/anything is still gated.
-  if (password && pathname !== '/gate' && pathname !== MCP_PATH) {
+  // Exempt, by exact path: /gate itself, /api/mcp (agents, authenticated by their API key) and
+  // the public receipt check (/verify to read, /api/verify to check). See gateExempt().
+  const exempt = gateExempt(pathname, request.method, request.headers.has('next-action'));
+  if (password && !exempt) {
     const ok = await verifyGateToken(password, request.cookies.get(GATE_COOKIE)?.value, Date.now());
     if (!ok) {
       const url = request.nextUrl.clone();

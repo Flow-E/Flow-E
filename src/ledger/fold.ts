@@ -114,12 +114,14 @@ export function decisionData(input: {
   if (r.memo !== undefined) request.memo = r.memo;
   if (r.item !== undefined) request.item = r.item;
   if (r.quantity !== undefined) request.quantity = r.quantity;
+  if (r.project !== undefined) request.project = r.project;
   return {
     payment_id: input.paymentId,
     request,
     decision: result.decision,
     rule: result.rule,
     reason: result.reason,
+    ...(result.guidance === undefined ? {} : { guidance: result.guidance }),
     amount_base: result.amountBase,
     base_currency: input.baseCurrency,
     cancellable_until:
@@ -161,8 +163,11 @@ export interface PaymentRecord {
     memo?: string;
     item?: string;
     quantity?: number;
+    project?: string;
   };
   amountBase: number | null;
+  /** What the agent was told would get a yes, if the answer was no or not yet. */
+  guidance?: string;
   baseCurrency: string;
   createdAt: string;
   cancellableUntil: string | null;
@@ -179,6 +184,7 @@ interface DecisionData {
   decision: PaymentRecord['engineDecision'];
   rule: string | null;
   reason: string;
+  guidance?: string;
   amount_base: number | null;
   base_currency: string;
   cancellable_until: string | null;
@@ -225,6 +231,7 @@ export function foldPayments(
         decidedBy: 'engine',
         updatedAt: null,
         note: null,
+        ...(d.guidance === undefined ? {} : { guidance: d.guidance }),
       });
       continue;
     }
@@ -270,6 +277,8 @@ export function toEngineViews(payments: readonly PaymentRecord[]): LedgerEntryVi
     amountBase: p.amountBase ?? 0,
     status: p.status,
     createdAt: Date.parse(p.createdAt),
+    rule: p.rule,
+    ...(p.request.project === undefined ? {} : { project: p.request.project }),
   }));
 }
 

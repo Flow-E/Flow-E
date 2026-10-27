@@ -27,8 +27,8 @@ export default async function AgentPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Fake agent</h1>
         <p className="mt-1 max-w-[70ch] text-ink-2">
           Act as the AI agent <span className="font-mono text-ink">lab-procurement</span>. Every
-          request goes through the same fourteen rules a real agent meets over MCP, and lands in
-          your signed ledger. Watch the decision, the reason and the full trace.
+          request goes through the same sixteen rules a real agent meets over MCP, and lands in your
+          signed ledger. Watch the decision, the reason and the full trace.
         </p>
         <FictionalNote className="mt-2" />
       </div>

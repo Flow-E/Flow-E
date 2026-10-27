@@ -54,6 +54,8 @@ export const DECLINE_LABELS: Readonly<Record<string, string>> = {
   CATEGORY: 'Category not allowed',
   PER_PAYMENT_LIMIT: 'Per-payment limit',
   DAILY_BUDGET: 'Daily budget',
+  MONTHLY_BUDGET: 'Monthly budget',
+  PROJECT_BUDGET: 'Project budget',
   VELOCITY: 'Too many requests',
   SPLIT_DETECTION: 'Split payment',
   FAIR_PRICE: 'Far above the usual price',
@@ -596,4 +598,199 @@ export function periodEntries(
     if (e.type === AGENT_FREEZE) return keep(e.agent_id) && inPeriod(e.created_at);
     return false;
   });
+}
+
+// The value report ------------------------------------------------------------------------------
+
+/**
+ * Minutes a person would spend on one manual approval: reading the request, checking the
+ * supplier and the price, deciding. An assumption, shown next to every figure built on it.
+ */
+export const MINUTES_PER_APPROVAL = 4;
+
+/** Above this share of its daily budget, an agent's average day counts as near its budget. */
+export const NEAR_BUDGET_SHARE = 0.8;
+
+export const STOP_CATEGORIES = [
+  'blocked',
+  'limit',
+  'split',
+  'category',
+  'stopped',
+  'credential',
+  'price',
+  'other',
+] as const;
+export type StopCategory = (typeof STOP_CATEGORIES)[number];
+
+export const STOP_LABELS: Readonly<Record<StopCategory, string>> = {
+  blocked: 'Blocked supplier or country',
+  limit: 'Over a limit or budget',
+  split: 'Split into smaller payments',
+  category: 'Wrong category',
+  stopped: 'Kill switch or frozen agent',
+  credential: 'Credential problem',
+  price: 'Far above the usual price',
+  other: 'Other reasons',
+};
+
+const STOP_BY_RULE: Readonly<Record<string, StopCategory>> = {
+  SUPPLIER: 'blocked',
+  COUNTRY: 'blocked',
+  CURRENCY: 'blocked',
+  PER_PAYMENT_LIMIT: 'limit',
+  DAILY_BUDGET: 'limit',
+  VELOCITY: 'limit',
+  SPLIT_DETECTION: 'split',
+  CATEGORY: 'category',
+  KILL_SWITCH: 'stopped',
+  AGENT_STATUS: 'stopped',
+  KYA_CREDENTIAL: 'credential',
+  FAIR_PRICE: 'price',
+};
+
+/**
+ * The plain category of a decline rule. Budget rules the core adds later (monthly, project)
+ * fall under "over a limit or budget" by name, so they need no change here.
+ */
+export function stopCategory(rule: string | null | undefined): StopCategory {
+  if (!rule) return 'other';
+  return STOP_BY_RULE[rule] ?? (/BUDGET|LIMIT/.test(rule) ? 'limit' : 'other');
+}
+
+/** One agent's spend pace in the period, against its daily budget. */
+export interface AgentOutlook {
+  agentId: string;
+  name: string;
+  /** Approved spend in the period, base minor units. */
+  approved: number;
+  /** Approved spend divided by the working days (Monday to Friday) in the period. */
+  perWorkingDay: number;
+  dailyBudget: number;
+  /** perWorkingDay / dailyBudget, or null without a budget. */
+  dailyShare: number | null;
+  /** The average working day is above NEAR_BUDGET_SHARE of the daily budget. */
+  oftenNearDaily: boolean;
+  // Seam: a monthly (or project) forecast goes here once the core has those budgets, e.g.
+  // `monthly: { budget, spentSoFar, projected } | null`, computed from the same period spend.
+}
+
+export interface ValueReport {
+  requests: number;
+  /** Requests the engine approved or declined on its own, without a person. */
+  autoDecided: number;
+  /** Requests sent to a person. */
+  sentToHuman: number;
+  minutesPerApproval: number;
+  /** autoDecided × minutesPerApproval: an estimate, not a measurement. */
+  minutesSaved: number;
+  /** Engine declines, grouped into plain categories (largest first). */
+  stopped: Declined & { byCategory: (Declined & { category: StopCategory; label: string })[] };
+  overpaymentAvoided: { count: number; over: number };
+  workingDays: number;
+  agents: AgentOutlook[];
+}
+
+/** Monday to Friday between two calendar days, inclusive; at least 1. */
+export function workingDays(from: string, to: string): number {
+  let n = 0;
+  for (let d = from; d !== '' && d <= to; d = addDays(d, 1)) {
+    const day = new Date(`${d}T12:00:00Z`).getUTCDay();
+    if (day !== 0 && day !== 6) n += 1;
+  }
+  return Math.max(n, 1);
+}
+
+/**
+ * "What Flow-E did for you", derived from a built dashboard (so it follows its period and
+ * agent filter). Pure; no second ledger read.
+ */
+export function buildValueReport(dash: Dashboard): ValueReport {
+  const sentToHuman = dash.days.reduce((s, p) => s + p.review, 0);
+  const autoDecided = Math.max(dash.requests - sentToHuman, 0);
+
+  const cats = new Map<StopCategory, Declined & { category: StopCategory; label: string }>();
+  for (const r of dash.declinesByRule) {
+    const category = stopCategory(r.rules[0]);
+    const c = cats.get(category) ?? {
+      category,
+      label: STOP_LABELS[category],
+      count: 0,
+      amount: 0,
+      unconverted: 0,
+    };
+    c.count += r.count;
+    c.amount += r.amount;
+    c.unconverted += r.unconverted;
+    cats.set(category, c);
+  }
+
+  const days = workingDays(dash.from, dash.to);
+  const agents = dash.budgetToday.map((b): AgentOutlook => {
+    const approved = dash.days.reduce((s, p) => s + (p.byAgent[b.agentId] ?? 0), 0);
+    const perWorkingDay = Math.round(approved / days);
+    const dailyShare = b.budget > 0 ? perWorkingDay / b.budget : null;
+    return {
+      agentId: b.agentId,
+      name: b.name,
+      approved,
+      perWorkingDay,
+      dailyBudget: b.budget,
+      dailyShare,
+      oftenNearDaily: dailyShare !== null && dailyShare > NEAR_BUDGET_SHARE,
+    };
+  });
+
+  return {
+    requests: dash.requests,
+    autoDecided,
+    sentToHuman,
+    minutesPerApproval: MINUTES_PER_APPROVAL,
+    minutesSaved: autoDecided * MINUTES_PER_APPROVAL,
+    stopped: {
+      ...dash.declined,
+      byCategory: [...cats.values()].sort(
+        (a, b) =>
+          b.count - a.count ||
+          STOP_CATEGORIES.indexOf(a.category) - STOP_CATEGORIES.indexOf(b.category),
+      ),
+    },
+    overpaymentAvoided: { ...dash.priceCheck.avoided },
+    workingDays: days,
+    agents,
+  };
+}
+
+/** "≈ 45 min", "≈ 4.3 h", "≈ 26 h" for the approval work saved. */
+export function workSaved(minutes: number): string {
+  if (minutes < 60) return `≈ ${String(minutes)} min`;
+  const hours = minutes / 60;
+  return `≈ ${hours < 10 ? String(Number(hours.toFixed(1))) : String(Math.round(hours))} h`;
+}
+
+/**
+ * The value report in one sentence: "In the last 30 days Flow-E decided 64 of 75 requests on
+ * its own, stopped 9 risky purchases and avoided CHF 210.00 of overpayment." `periodText` is
+ * "today" or "the last 30 days", as the dashboard writes it.
+ */
+export function valueSummary(
+  report: ValueReport,
+  periodText: string,
+  fmt: (minor: number) => string,
+): string {
+  const when = periodText === 'today' ? 'Today' : `In ${periodText}`;
+  if (report.requests === 0) return `${when} no agent asked Flow-E for a payment.`;
+  const plural = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
+  const parts = [
+    `decided ${String(report.autoDecided)} of ${plural(report.requests, 'request', 'requests')} on its own`,
+  ];
+  if (report.stopped.count > 0) {
+    parts.push(`stopped ${plural(report.stopped.count, 'risky purchase', 'risky purchases')}`);
+  }
+  if (report.overpaymentAvoided.over > 0) {
+    parts.push(`avoided ${fmt(report.overpaymentAvoided.over)} of overpayment`);
+  }
+  const last = parts.pop() ?? '';
+  const list = parts.length === 0 ? last : `${parts.join(', ')} and ${last}`;
+  return `${when} Flow-E ${list}.`;
 }
