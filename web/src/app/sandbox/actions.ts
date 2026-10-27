@@ -201,6 +201,40 @@ export async function updateMandateAction(
   return { ok: 'Saved. The new mandate applies to the next request.' };
 }
 
+export async function orderAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const { store, ownerId, actor } = await context();
+  try {
+    await store.recordOrder(ownerId, text(form, 'id'), text(form, 'reference'), {
+      ...actor,
+      note: note(form),
+    });
+  } catch (err) {
+    return { error: problem(err) };
+  }
+  refresh();
+  return { ok: 'Recorded as ordered.' };
+}
+
+export async function invoiceAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const { store, ownerId, actor } = await context();
+  try {
+    await store.recordInvoice(
+      ownerId,
+      text(form, 'id'),
+      {
+        number: text(form, 'number'),
+        amount: text(form, 'amount'),
+        currency: text(form, 'currency'),
+      },
+      { ...actor, note: note(form) },
+    );
+  } catch (err) {
+    return { error: problem(err) };
+  }
+  refresh();
+  return { ok: 'Invoice matched.' };
+}
+
 /** "What if": the last 30 days replayed against the mandate in the form. Nothing is saved. */
 export async function previewMandateAction(
   _prev: PreviewState,

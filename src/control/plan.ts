@@ -6,6 +6,8 @@ import {
   ALL_AGENTS,
   KILL_SWITCH,
   PAYMENT_CANCELLED,
+  PAYMENT_INVOICED,
+  PAYMENT_ORDERED,
   PAYMENT_RESOLVED,
   type Controls,
   type EntryInput,
@@ -116,6 +118,98 @@ export function planCancel(
       agentId: payment.agentId,
       now: actor.now,
       data: { payment_id: payment.paymentId, by, note },
+    },
+  };
+}
+
+const REFERENCE = /^[\p{L}\p{N} ._/#:-]{1,80}$/u;
+
+function cleanReference(value: string | undefined, what: string): string | null {
+  const v = value?.trim() ?? '';
+  if (v === '') return null;
+  if (!REFERENCE.test(v)) {
+    throw new ActionError(`${what}: up to 80 letters, digits, spaces and . _ / # : -`);
+  }
+  return v;
+}
+
+/**
+ * Record that an approved payment was ordered from the supplier. Allowed once, and only after a
+ * cooling-off window has closed, so a purchase a person may still cancel is not ordered yet.
+ */
+export function planOrder(
+  payments: readonly PaymentRecord[],
+  id: string,
+  actor: Actor & { reference?: string },
+): { paymentId: string; entry: EntryInput } {
+  const { by, note } = checkActor(actor);
+  const payment = findPayment(payments, id);
+  if (payment.status !== 'approved') {
+    throw new ActionError(
+      `Payment ${payment.paymentId} is ${payment.status}; only approved payments can be ordered.`,
+    );
+  }
+  if (payment.cancellableUntil !== null && actor.now < Date.parse(payment.cancellableUntil)) {
+    throw new ActionError(
+      `Payment ${payment.paymentId} can still be cancelled until ${payment.cancellableUntil}; ` +
+        'order after that.',
+    );
+  }
+  if (payment.fulfilment?.ordered) {
+    throw new ActionError(`Payment ${payment.paymentId} is already recorded as ordered.`);
+  }
+  const reference = cleanReference(actor.reference, 'Order reference');
+  return {
+    paymentId: payment.paymentId,
+    entry: {
+      type: PAYMENT_ORDERED,
+      agentId: payment.agentId,
+      now: actor.now,
+      data: { payment_id: payment.paymentId, by, reference, note },
+    },
+  };
+}
+
+/**
+ * Match the supplier's invoice to an approved payment. Once per payment, in the currency of the
+ * request; an invoice above the approved amount is recorded, and shown as such.
+ */
+export function planInvoice(
+  payments: readonly PaymentRecord[],
+  id: string,
+  actor: Actor & { number: string; amount: number; currency: string },
+): { paymentId: string; entry: EntryInput } {
+  const { by, note } = checkActor(actor);
+  const payment = findPayment(payments, id);
+  if (payment.status !== 'approved') {
+    throw new ActionError(
+      `Payment ${payment.paymentId} is ${payment.status}; only approved payments get an invoice.`,
+    );
+  }
+  if (payment.fulfilment?.invoice) {
+    throw new ActionError(
+      `Payment ${payment.paymentId} already has invoice ${payment.fulfilment.invoice.number}.`,
+    );
+  }
+  const number = cleanReference(actor.number, 'Invoice number');
+  if (number === null) throw new ActionError('Enter the invoice number.');
+  if (!Number.isSafeInteger(actor.amount) || actor.amount <= 0) {
+    throw new ActionError('Enter the invoice total, above 0.');
+  }
+  const currency = actor.currency.trim().toUpperCase();
+  if (currency !== payment.request.currency.toUpperCase()) {
+    throw new ActionError(
+      `The invoice is in ${currency}, the approval in ${payment.request.currency}. ` +
+        'Match invoices in the currency that was approved.',
+    );
+  }
+  return {
+    paymentId: payment.paymentId,
+    entry: {
+      type: PAYMENT_INVOICED,
+      agentId: payment.agentId,
+      now: actor.now,
+      data: { payment_id: payment.paymentId, by, number, amount: actor.amount, currency, note },
     },
   };
 }

@@ -99,13 +99,38 @@ const buy = (args: Record<string, unknown> = {}) =>
     ...args,
   });
 
+describe('record_order', () => {
+  it('records the order of an approved payment once cooling-off has closed, never twice', async () => {
+    const first = (await buy()).json();
+    expect(first.decision).toBe('approved');
+    const id = String(first.payment_id);
+    const early = await call('record_order', { id, order_reference: 'SO-1' });
+    expect(early.isError).toBe(true);
+    expect(early.text).toMatch(/can still be cancelled until/);
+
+    now += 11 * MINUTE;
+    const done = (await call('record_order', { id, order_reference: 'SO-2026-118' })).json();
+    expect(done).toMatchObject({ status: 'approved', ordered: { reference: 'SO-2026-118' } });
+    expect((await call('record_order', { id })).text).toMatch(/already recorded as ordered/);
+    expect(mandateServer.ledger.audit(loadIssuer(home).publicKey).ok).toBe(true);
+  });
+
+  it('refuses payments that are not approved, or not the agent’s own', async () => {
+    const review = (await buy({ amount: '6000' })).json();
+    const r = await call('record_order', { id: String(review.payment_id) });
+    expect(r.text).toMatch(/is review; only approved payments can be ordered/);
+    expect((await call('record_order', { id: 'pay_unknown' })).text).toMatch(/You have no payment/);
+  });
+});
+
 describe('tool surface', () => {
-  it('exposes exactly the four agent tools, none that approve, change policy or unfreeze', async () => {
+  it('exposes exactly the five agent tools, none that approve, change policy or unfreeze', async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       'check_mandate',
       'get_payment',
       'list_payments',
+      'record_order',
       'request_payment',
     ]);
     const request = tools.find((t) => t.name === 'request_payment');

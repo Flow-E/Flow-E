@@ -1,0 +1,155 @@
+/*
+ * Home page: the worked example switcher (CSS only), the headline reveal and section entrances.
+ * Motion is transform and opacity only, and drops away under prefers-reduced-motion. Nothing
+ * here hides content when it does not run.
+ */
+
+/* Worked example ------------------------------------------------------------------------------ */
+
+.home-example .home-panel {
+  display: none;
+}
+
+.home-example:has(input[value='approved']:checked) .home-panel[data-case='approved'],
+.home-example:has(input[value='review']:checked) .home-panel[data-case='review'],
+.home-example:has(input[value='declined']:checked) .home-panel[data-case='declined'],
+.home-example:has(input[value='overpriced']:checked) .home-panel[data-case='overpriced'],
+.home-example:has(input[value='blocked']:checked) .home-panel[data-case='blocked'] {
+  display: grid;
+}
+
+.home-panel {
+  margin-top: 1.5rem;
+  gap: 2rem;
+  align-items: start;
+  animation: home-panel-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (min-width: 900px) {
+  .home-panel {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: 3rem;
+  }
+}
+
+.home-tab {
+  flex: none;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--ink-2);
+  background: var(--sunken);
+  transition:
+    background-color 150ms,
+    color 150ms,
+    transform 150ms;
+}
+
+.home-tab:hover {
+  color: var(--ink);
+}
+
+.home-tab:active {
+  transform: scale(0.97);
+}
+
+.home-tab:has(input:checked) {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.home-tab:has(input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.home-cell-pass {
+  background: var(--approve);
+}
+.home-cell-review {
+  background: var(--review);
+}
+.home-cell-decline {
+  background: var(--decline);
+}
+.home-cell-note {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--approve);
+}
+.home-cell-idle {
+  background: var(--muted-soft);
+}
+
+@keyframes home-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Headline: each line rises from behind its own baseline ------------------------------------------ */
+
+.home-line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.1em;
+  margin-bottom: -0.1em;
+}
+
+.home-line > span {
+  display: block;
+  animation: home-rise 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.home-line + .home-line > span {
+  animation-delay: 110ms;
+}
+
+.home-after {
+  animation: home-fade-up 700ms cubic-bezier(0.16, 1, 0.3, 1) 450ms both;
+}
+
+@keyframes home-rise {
+  from {
+    transform: translateY(105%);
+  }
+}
+
+@keyframes home-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+/* Section parts enter as they scroll into view (where the browser supports it). */
+@supports (animation-timeline: view()) {
+  .home-reveal {
+    animation: home-fade-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 55%;
+  }
+}
+
+/* Buttons and links: a small press. */
+.home-press {
+  transition: transform 150ms;
+}
+.home-press:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-panel,
+  .home-line > span,
+  .home-after,
+  .home-reveal {
+    animation: none;
+  }
+  .home-tab,
+  .home-press {
+    transition: none;
+  }
+}

@@ -149,6 +149,36 @@ export async function cancelAction(_prev: ActionResult, form: FormData): Promise
   return { ok: 'Cancelled.' };
 }
 
+export async function orderAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const { store, user, orgId } = await context(form);
+  try {
+    await store.recordOrder(orgId, user, text(form, 'id'), {
+      reference: text(form, 'reference'),
+      ...(note(form) ? { note: note(form) } : {}),
+    });
+  } catch (err) {
+    return { error: problem(err) };
+  }
+  refresh(orgId);
+  return { ok: 'Recorded as ordered.' };
+}
+
+export async function invoiceAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
+  const { store, user, orgId } = await context(form);
+  try {
+    await store.recordInvoice(orgId, user, text(form, 'id'), {
+      number: text(form, 'number'),
+      amount: text(form, 'amount'),
+      currency: text(form, 'currency'),
+      ...(note(form) ? { note: note(form) } : {}),
+    });
+  } catch (err) {
+    return { error: problem(err) };
+  }
+  refresh(orgId);
+  return { ok: 'Invoice matched.' };
+}
+
 export async function freezeAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
   const { store, user, orgId } = await context(form);
   const frozen = form.get('frozen') === 'true';

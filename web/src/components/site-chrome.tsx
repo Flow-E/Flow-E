@@ -7,7 +7,7 @@ export function SiteHeader() {
   return (
     <header className="border-b border-rule bg-paper/90">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" aria-label="Flow-E home" className="rounded-md">
+        <Link href="/" aria-label="Flow-E home" className="shrink-0 whitespace-nowrap rounded-md">
           <Logo />
         </Link>
         <nav aria-label="Main" className="flex items-center gap-1 text-sm sm:gap-2">
@@ -20,10 +20,13 @@ export function SiteHeader() {
           >
             GitHub
           </a>
-          <Link href="/app" className="rounded-md px-2 py-1.5 text-ink-2 hover:text-ink">
+          <Link
+            href="/app"
+            className="hidden rounded-md px-2 py-1.5 text-ink-2 hover:text-ink sm:inline"
+          >
             Organisations
           </Link>
-          <ButtonLink href="/sandbox" size="sm" className="ml-1">
+          <ButtonLink href="/sandbox" size="sm" className="ml-1 whitespace-nowrap">
             Try the sandbox
           </ButtonLink>
         </nav>

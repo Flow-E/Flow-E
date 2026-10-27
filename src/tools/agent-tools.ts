@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ConfigError, type AgentConfig, type MandateConfig } from '../config/schema.js';
-import { effectiveStatus } from '../control/plan.js';
+import { ActionError, effectiveStatus } from '../control/plan.js';
 import { AmountError, formatMoney, parseAmount } from '../engine/money.js';
 import {
   monthlySpend,
@@ -28,7 +28,18 @@ import type { Controls, PaymentRecord } from '../ledger/fold.js';
 
 export const AGENT_INSTRUCTIONS = `This server holds your spending mandate: the budget and rules your organisation set for you.
 Call check_mandate before planning purchases. Call request_payment before every purchase and only buy when the decision is "approved".
-Flow-E authorizes payments; it does not move money. A decision is final unless a human changes it: never split a declined payment, or re-submit it with a changed supplier name, category, country or currency, to get around a rule. Buying the item from a different supplier that is genuinely allowed is fine. Never place an order that is "review" until get_payment shows "approved".`;
+Flow-E authorizes payments; it does not move money. A decision is final unless a human changes it: never split a declined payment, or re-submit it with a changed supplier name, category, country or currency, to get around a rule. Buying the item from a different supplier that is genuinely allowed is fine. Never place an order that is "review" until get_payment shows "approved".
+After you order an approved purchase from the supplier, quote the payment_id as your reference and call record_order with the supplier's order number.`;
+
+export const recordOrderShape = {
+  id: z.string().trim().min(1).max(100).describe('The payment_id of the approved payment.'),
+  order_reference: z
+    .string()
+    .trim()
+    .max(80)
+    .optional()
+    .describe("The supplier's order or confirmation number, if you have one."),
+};
 
 export const requestPaymentShape = {
   merchant: z
@@ -135,6 +146,20 @@ export const AGENT_TOOLS = {
       'become "cancelled" if a human cancels it during cooling-off. Read-only.',
     inputSchema: getPaymentShape,
     annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  record_order: {
+    title: 'Record that I ordered',
+    description:
+      'After you placed the order for an approved payment with the supplier, record it here ' +
+      "with the supplier's order number. Only for your own approved payments, and only after " +
+      'any cooling-off window has closed. Recording an order changes nothing about the approval.',
+    inputSchema: recordOrderShape,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
   },
   list_payments: {
     title: 'List my payments',
@@ -350,6 +375,10 @@ export function publicPayment(p: PaymentRecord, decimals?: Readonly<Record<strin
     cancellable_until: p.cancellableUntil,
     decided_by: p.decidedBy,
     decided_at: p.updatedAt,
+    ordered: p.fulfilment?.ordered
+      ? { at: p.fulfilment.ordered.at, reference: p.fulfilment.ordered.reference }
+      : null,
+    invoiced: p.fulfilment?.invoice ? { at: p.fulfilment.invoice.at } : null,
     note_from_human: p.note,
   };
 }
@@ -357,6 +386,8 @@ export function publicPayment(p: PaymentRecord, decimals?: Readonly<Record<strin
 /** Error text for the agent: expected errors verbatim, anything else generic. Never key material. */
 export function agentErrorText(err: unknown): string {
   if (err instanceof ConfigError) return `The mandate configuration cannot be used: ${err.message}`;
+  // Our own wording about the agent's payment (status, cooling-off, a malformed reference).
+  if (err instanceof ActionError) return err.message;
   return 'Internal error.';
 }
 

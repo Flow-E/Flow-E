@@ -24,6 +24,10 @@ export const PAYMENT_DECISION = 'payment.decision';
 export const PAYMENT_RESOLVED = 'payment.resolved';
 /** A human cancelled an approved payment inside its cooling-off window. */
 export const PAYMENT_CANCELLED = 'payment.cancelled';
+/** The approved purchase was ordered from the supplier (by the agent or a person). */
+export const PAYMENT_ORDERED = 'payment.ordered';
+/** The supplier's invoice was matched to the approved payment (by a person). */
+export const PAYMENT_INVOICED = 'payment.invoiced';
 export const AGENT_FREEZE = 'control.agent_freeze';
 export const KILL_SWITCH = 'control.kill_switch';
 /** agent_id used for entries that concern every agent. */
@@ -168,6 +172,8 @@ export interface PaymentRecord {
   amountBase: number | null;
   /** What the agent was told would get a yes, if the answer was no or not yet. */
   guidance?: string;
+  /** What happened after approval: the order and the supplier's invoice. */
+  fulfilment?: Fulfilment;
   baseCurrency: string;
   createdAt: string;
   cancellableUntil: string | null;
@@ -176,6 +182,21 @@ export interface PaymentRecord {
   /** When a human last changed the status; null if never. */
   updatedAt: string | null;
   note: string | null;
+}
+
+export interface Fulfilment {
+  ordered: { at: string; by: string; reference: string | null; note: string | null } | null;
+  invoice: {
+    at: string;
+    by: string;
+    number: string;
+    /** Minor units of `currency`, the request's currency. */
+    amount: number;
+    currency: string;
+    /** Invoice amount minus the approved amount; above 0 means it costs more than approved. */
+    difference: number;
+    note: string | null;
+  } | null;
 }
 
 interface DecisionData {
@@ -198,7 +219,30 @@ interface HumanActionData {
   cancellable_until?: string | null;
 }
 
-const PAYMENT_TYPES = new Set([PAYMENT_DECISION, PAYMENT_RESOLVED, PAYMENT_CANCELLED]);
+/** Every entry type that concerns a payment, in the order they can happen. */
+export const PAYMENT_TYPES: ReadonlySet<string> = new Set([
+  PAYMENT_DECISION,
+  PAYMENT_RESOLVED,
+  PAYMENT_CANCELLED,
+  PAYMENT_ORDERED,
+  PAYMENT_INVOICED,
+]);
+
+interface OrderData {
+  payment_id: string;
+  by: string;
+  reference?: string | null;
+  note?: string | null;
+}
+
+interface InvoiceData {
+  payment_id: string;
+  by: string;
+  number: string;
+  amount: number;
+  currency: string;
+  note?: string | null;
+}
 
 /**
  * Payments with their current status, oldest first: the engine's decision with any later human
@@ -233,6 +277,33 @@ export function foldPayments(
         note: null,
         ...(d.guidance === undefined ? {} : { guidance: d.guidance }),
       });
+      continue;
+    }
+    if (row.type === PAYMENT_ORDERED || row.type === PAYMENT_INVOICED) {
+      // After-approval facts: they never change the decision, who made it or when.
+      const d = JSON.parse(row.data) as OrderData & Partial<InvoiceData>;
+      const p = byId.get(d.payment_id);
+      if (!p) continue;
+      const f = (p.fulfilment ??= { ordered: null, invoice: null });
+      if (row.type === PAYMENT_ORDERED) {
+        f.ordered = {
+          at: row.created_at,
+          by: d.by,
+          reference: d.reference ?? null,
+          note: d.note ?? null,
+        };
+      } else {
+        const amount = d.amount ?? 0;
+        f.invoice = {
+          at: row.created_at,
+          by: d.by,
+          number: d.number ?? '',
+          amount,
+          currency: d.currency ?? p.request.currency,
+          difference: amount - p.request.amount,
+          note: d.note ?? null,
+        };
+      }
       continue;
     }
     const d = JSON.parse(row.data) as HumanActionData;

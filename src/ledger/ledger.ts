@@ -4,9 +4,8 @@ import type { EvaluationResult, LedgerEntryView, PaymentRequest } from '../engin
 import {
   KILL_SWITCH,
   AGENT_FREEZE,
-  PAYMENT_CANCELLED,
   PAYMENT_DECISION,
-  PAYMENT_RESOLVED,
+  PAYMENT_TYPES,
   auditEntries,
   buildEntry,
   decisionData,
@@ -205,17 +204,18 @@ export class Ledger {
    * human approval, decline or cancellation folded in. One agent's, or everyone's.
    */
   payments(agentId?: string): PaymentRecord[] {
-    const types = [PAYMENT_DECISION, PAYMENT_RESOLVED, PAYMENT_CANCELLED];
+    const types = [...PAYMENT_TYPES];
+    const marks = types.map(() => '?').join(', ');
     const rows =
       agentId === undefined
         ? this.db
             .prepare<string[], StoredEntry>(
-              'SELECT * FROM entries WHERE type IN (?, ?, ?) ORDER BY seq',
+              `SELECT * FROM entries WHERE type IN (${marks}) ORDER BY seq`,
             )
             .all(...types)
         : this.db
             .prepare<string[], StoredEntry>(
-              'SELECT * FROM entries WHERE agent_id = ? AND type IN (?, ?, ?) ORDER BY seq',
+              `SELECT * FROM entries WHERE agent_id = ? AND type IN (${marks}) ORDER BY seq`,
             )
             .all(agentId, ...types);
     return foldPayments(rows);

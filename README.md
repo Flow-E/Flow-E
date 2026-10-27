@@ -117,12 +117,13 @@ stdio servers works the same way.
 
 ### What the agent can do
 
-| Tool              | What it does                                                                       |
-| ----------------- | ---------------------------------------------------------------------------------- |
-| `check_mandate`   | Remaining budget today, limits, allowed currencies, categories and suppliers       |
-| `request_payment` | Runs the rules, records the decision, and returns it with a payment id and receipt |
-| `get_payment`     | Current status of one of the agent's own payments                                  |
-| `list_payments`   | The agent's recent payments                                                        |
+| Tool              | What it does                                                                                         |
+| ----------------- | ---------------------------------------------------------------------------------------------------- |
+| `check_mandate`   | Remaining budget today, limits, allowed currencies, categories and suppliers                         |
+| `request_payment` | Runs the rules, records the decision, and returns it with a payment id and receipt                   |
+| `get_payment`     | Current status of one of the agent's own payments                                                    |
+| `list_payments`   | The agent's recent payments                                                                          |
+| `record_order`    | After ordering an approved purchase: the supplier's order number. Changes nothing about the approval |
 
 That is the whole list. No tool can approve, decline, freeze, unfreeze or change a rule.
 
@@ -191,6 +192,12 @@ Each action is a signed ledger entry that records who acted (`--by`, which defau
 name), when, and an optional note. It takes effect on the agent's next request; nothing needs a
 restart. You can also set `status: frozen` or `paused` for an agent in `mandate.yaml`, and that too
 applies at once.
+
+**After approval.** Flow-E never pays. The agent orders through the company's usual channel (a
+supplier account, on invoice) with the payment id as the reference, then calls `record_order`
+(only after any cooling-off window has closed). On the website a person can print a purchase
+order for each approved payment and match the supplier's invoice to it; an invoice above the
+approved amount is flagged. Both are signed ledger entries.
 
 The **control panel** shows the approval queue, payments in their cooling-off window, each agent's
 budget for today, the ledger with a live integrity check, a freeze button per agent, the kill

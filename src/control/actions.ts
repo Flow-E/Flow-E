@@ -3,6 +3,8 @@ import {
   findPayment,
   planCancel,
   planFreeze,
+  planInvoice,
+  planOrder,
   planKillSwitch,
   planResolve,
   type Actor,
@@ -34,6 +36,32 @@ export function resolvePayment(
 export function cancelCoolingOff(ledger: Ledger, id: string, actor: Actor): PaymentRecord {
   return ledger.write(() => {
     const plan = planCancel(ledger.payments(), id, actor);
+    ledger.append(plan.entry);
+    return findPayment(ledger.payments(), plan.paymentId);
+  });
+}
+
+/** Record that an approved payment was ordered from the supplier. */
+export function recordOrder(
+  ledger: Ledger,
+  id: string,
+  actor: Actor & { reference?: string },
+): PaymentRecord {
+  return ledger.write(() => {
+    const plan = planOrder(ledger.payments(), id, actor);
+    ledger.append(plan.entry);
+    return findPayment(ledger.payments(), plan.paymentId);
+  });
+}
+
+/** Match the supplier's invoice to an approved payment. */
+export function recordInvoice(
+  ledger: Ledger,
+  id: string,
+  actor: Actor & { number: string; amount: number; currency: string },
+): PaymentRecord {
+  return ledger.write(() => {
+    const plan = planInvoice(ledger.payments(), id, actor);
     ledger.append(plan.entry);
     return findPayment(ledger.payments(), plan.paymentId);
   });

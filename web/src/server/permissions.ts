@@ -14,6 +14,8 @@ export const PERMISSIONS = {
   'payment.resolve': ['owner', 'approver'],
   /** Cancel an approved payment inside its cooling-off window. */
   'payment.cancel': ['owner', 'approver'],
+  /** Record that an approved payment was ordered, and match the supplier's invoice. */
+  'payment.fulfil': ['owner', 'approver'],
   /** Freeze or unfreeze one agent. */
   'agent.freeze': ['owner', 'approver'],
   /** Turn the organisation's kill switch on or off. */

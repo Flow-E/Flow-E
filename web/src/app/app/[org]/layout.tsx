@@ -23,7 +23,7 @@ export default async function OrgLayout({
 
   return (
     <div className="min-h-dvh">
-      <header className="border-b border-rule bg-surface">
+      <header className="border-b border-rule bg-surface print:hidden">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-3 sm:px-6">
           <Link href="/app" aria-label="All organisations" className="rounded-md">
             <Logo />

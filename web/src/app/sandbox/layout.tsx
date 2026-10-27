@@ -14,7 +14,7 @@ export default async function SandboxLayout({ children }: { children: React.Reac
 
   return (
     <div className="min-h-dvh">
-      <header className="border-b border-rule bg-surface">
+      <header className="border-b border-rule bg-surface print:hidden">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 pt-3 sm:px-6">
           <Link href="/" aria-label="Flow-E home" className="rounded-md">
             <Logo />
@@ -44,7 +44,7 @@ export default async function SandboxLayout({ children }: { children: React.Reac
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</main>
-      <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-ink-3 sm:px-6">
+      <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-ink-3 print:hidden sm:px-6">
         {view.organisation ?? 'Fictional organisation'} · issuer{' '}
         <span className="font-mono">{view.issuer}</span> · Flow-E authorizes payments; it never
         moves money.

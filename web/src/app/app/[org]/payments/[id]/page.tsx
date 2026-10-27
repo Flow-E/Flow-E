@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Download } from 'lucide-react';
 import { ApprovalCard } from '@/components/approval-card';
+import { Fulfilment } from '@/components/fulfilment';
 import { ShareReceipt } from '@/components/share-receipt';
 import { Panel, StatusPill, buttonClass } from '@/components/ui';
 import { dateTime, money, ruleName } from '@/lib/format';
@@ -10,7 +11,13 @@ import { can } from '@/server/permissions';
 import { orgView } from '@/server/org-view';
 import { siteOrigin } from '@/server/origin';
 import { ActionButton, Trace, VerifyForm } from '../../../../sandbox/client';
-import { cancelAction, resolveAction, verifyAction } from '../../../actions';
+import {
+  cancelAction,
+  invoiceAction,
+  orderAction,
+  resolveAction,
+  verifyAction,
+} from '../../../actions';
 
 export const metadata: Metadata = { title: 'Payment' };
 
@@ -85,6 +92,18 @@ export default async function PaymentPage({
           />
         </section>
       ) : null}
+
+      <Fulfilment
+        payment={p}
+        now={view.now}
+        timezone={view.timezone}
+        decimals={d}
+        canAct={can(view.role, 'payment.fulfil')}
+        poHref={`${base}/payments/${p.paymentId}/po`}
+        orderAction={orderAction}
+        invoiceAction={invoiceAction}
+        fields={{ org: view.id }}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <Panel title="Decision" description={`${ruleName(p.rule)} · ${p.reason}`}>

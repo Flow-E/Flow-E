@@ -9,6 +9,16 @@ changes.
 
 ### Added
 
+- **Orders and invoices after approval.** A fifth agent tool, `record_order`, records the
+  supplier's order number for an approved payment (after cooling-off). On the website each
+  approved payment has a printable purchase order (save as PDF) and an "Order and invoice" panel
+  to record the order and match the supplier's invoice; an invoice above the approved amount is
+  flagged. New ledger entries `payment.ordered` and `payment.invoiced`; neither changes a decision.
+- Website: a **home page for companies** (the problem, how it works, a worked lab example you
+  can click through, capabilities, how the money moves, trust, the sixteen rules, FAQ) with a
+  **pilot request form** (`POST /api/pilot`: works without JavaScript, validated, honeypot, rate
+  limit per address, stored in `pilot_requests`, optional email to `FLOWE_LEADS_TO`) and an admin
+  list at `/admin/pilots` for `FLOWE_ADMIN_EMAILS`.
 - **Monthly and project budgets.** Agents can have a `monthly_budget`; `projects:` (cost centres,
   grants) have their own budget per month or in total, shared by the agents that may book to
   them, and `require_project` makes naming one mandatory. Two new rules after the daily budget.

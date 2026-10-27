@@ -5,12 +5,14 @@ The public site and the sandbox for [Flow-E](https://github.com/Flow-E/Flow-E): 
 
 | Route                     | What it is                                                                               |
 | ------------------------- | ---------------------------------------------------------------------------------------- |
-| `/`                       | What Flow-E is, how it works, the sixteen rules, human control, proof, security, roadmap |
+| `/`                       | For companies: the problem, how it works, a lab example, trust, rules, FAQ, pilot form   |
 | `/docs`                   | The repository README, synced at build time                                              |
 | `/sandbox`                | Signed-in only. Your own fictional company: dashboard, approvals, agents, kill switch    |
 | `/app`                    | Signed-in only. Your organisations: real agents with API keys, members and roles         |
 | `/api/mcp`                | The remote MCP endpoint for agents (Streamable HTTP, `Authorization: Bearer` agent key)  |
 | `/verify`                 | Public, no password: paste a receipt to check it was authorized (POSTs to `/api/verify`) |
+| `/api/pilot`              | The home page’s pilot form posts here (route handler, 303 back to `/#pilot`)             |
+| `/admin/pilots`           | Pilot requests; mark contacted or declined. Only `FLOWE_ADMIN_EMAILS`, others 404        |
 | `/invite/…`, `/approve/…` | One-time links from invitation and approval emails (sign-in, then confirm)               |
 | `/dev/outbox`             | Development only: the emails Flow-E would have sent                                      |
 | `/gate`                   | The private-preview password page (only while `SITE_PASSWORD` is set)                    |
@@ -160,6 +162,12 @@ Organisations live in `db/migrations/002_orgs.sql` (`src/server/org-store.ts`): 
 append-only triggers as the sandbox ledger), `approval_tokens` and `email_outbox`. The sandbox
 tables are untouched. Every table has RLS enabled and no policies.
 
+Pilot requests from the home page live in `db/migrations/003_pilot_requests.sql`
+(`src/server/pilot.ts`): one row per request, `status` new, contacted or declined. The form posts
+to `/api/pilot`: zod-validated with a cap on every field, a honeypot field, at most 5 requests per
+client address per 10 minutes (in memory, per instance, like `/api/verify`), and the content is
+never logged. A failed notification email never fails the request.
+
 Locally the store uses PGlite (Postgres in the process, in `web/.data/pglite`, migrated on
 start). With `DATABASE_URL` set it uses Postgres through postgres.js. Production refuses PGlite.
 
@@ -206,6 +214,8 @@ Checks: `npm run lint`, `npm run typecheck`, `npm test` (in-memory PGlite, no se
 | `NEXT_PUBLIC_SUPABASE_URL`             | production      | no     | Supabase project URL, for the email sign-in link                                                          |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | production      | no     | Supabase publishable key (public by design)                                                               |
 | `FLOWE_SITE_URL`                       | production, opt | no     | The site's public origin for sign-in links, e.g. `https://flow-e.vercel.app`. Default: the request's host |
+| `FLOWE_LEADS_TO`                       | optional        | no     | One address that gets an email for each pilot request (through the mailer above; dev: outbox)             |
+| `FLOWE_ADMIN_EMAILS`                   | optional        | no     | Comma-separated emails that may open `/admin/pilots` after signing in. Unset: nobody                      |
 
 Generate a sandbox key:
 
@@ -247,7 +257,8 @@ To move from `FLOWE_SANDBOX_KEY` to the new name, give `FLOWE_KEY_ENCRYPTION_KEY
 Project `khxqgpbgijnhckwlkorg` (Zurich), URL `https://khxqgpbgijnhckwlkorg.supabase.co`,
 publishable key `sb_publishable__LHTIX5Dmr0Fg1ctdUztJA_Ak2sFoKm` (public).
 
-1. SQL editor: run `db/migrations/001_init.sql`, then `002_orgs.sql`. Both are idempotent.
+1. SQL editor: run `db/migrations/001_init.sql`, then `002_orgs.sql`, then
+   `003_pilot_requests.sql`. All are idempotent.
 2. Project Settings → Database → Connection string → **Transaction pooler** (port 6543). That
    is `DATABASE_URL`, with the database password filled in. The client uses
    `prepare: false`, which the pooler needs.

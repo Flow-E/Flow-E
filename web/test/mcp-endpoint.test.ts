@@ -62,13 +62,14 @@ async function post(key: string | null, body: unknown, extra: Record<string, str
 const ping = { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} };
 
 describe('remote MCP endpoint', () => {
-  it('lists the same four tools as the stdio server', async () => {
+  it('lists the same five tools as the stdio server', async () => {
     const client = await connect(w.agentKey);
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       'check_mandate',
       'get_payment',
       'list_payments',
+      'record_order',
       'request_payment',
     ]);
     expect(client.getInstructions()).toContain('check_mandate');

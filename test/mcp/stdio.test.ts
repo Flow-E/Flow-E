@@ -51,7 +51,7 @@ describe('flow-e serve over stdio', () => {
     await client.connect(transport);
 
     const { tools } = await client.listTools();
-    expect(tools).toHaveLength(4);
+    expect(tools).toHaveLength(5);
 
     const result = (await client.callTool({
       name: 'request_payment',

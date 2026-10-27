@@ -37,6 +37,9 @@ import {
   parseReceipt,
   paymentAnswer,
   planCancel,
+  planInvoice,
+  planOrder,
+  parseAmount,
   planFreeze,
   planKillSwitch,
   planResolve,
@@ -625,6 +628,49 @@ export class OrgStore {
       'payment.cancel',
       (entries) => planCancel(foldPayments(entries), id, this.actor(user, note)).entry,
     );
+  }
+
+  /** Record that an approved payment was ordered from the supplier. */
+  async recordOrder(
+    orgId: string,
+    user: User,
+    id: string,
+    order: { reference?: string; note?: string },
+  ): Promise<void> {
+    await this.act(
+      orgId,
+      user,
+      'payment.fulfil',
+      (entries) =>
+        planOrder(foldPayments(entries), id, {
+          ...this.actor(user, order.note),
+          ...(order.reference ? { reference: order.reference } : {}),
+        }).entry,
+    );
+  }
+
+  /** Match the supplier's invoice to an approved payment. `amount` in normal units. */
+  async recordInvoice(
+    orgId: string,
+    user: User,
+    id: string,
+    invoice: { number: string; amount: string; currency: string; note?: string },
+  ): Promise<void> {
+    await this.act(orgId, user, 'payment.fulfil', (entries, config) => {
+      const currency = invoice.currency.trim().toUpperCase();
+      let amount: number;
+      try {
+        amount = parseAmount(invoice.amount.trim(), currency, config.policy.currencyDecimals);
+      } catch (err) {
+        throw new ActionError(`Invoice total: ${(err as Error).message}`);
+      }
+      return planInvoice(foldPayments(entries), id, {
+        ...this.actor(user, invoice.note),
+        number: invoice.number,
+        amount,
+        currency,
+      }).entry;
+    });
   }
 
   async setFrozen(orgId: string, user: User, agentId: string, frozen: boolean): Promise<void> {
@@ -1271,6 +1317,28 @@ export class OrgStore {
       (p) => p.paymentId === id || p.receiptId === id,
     );
     return payment ? publicPayment(payment, loaded.config.policy.currencyDecimals) : null;
+  }
+
+  /** record_order: the agent ordered one of its own approved payments from the supplier. */
+  async agentRecordOrder(auth: AgentAuth, id: string, reference?: string) {
+    return this.db.transaction(async (tx) => {
+      const loaded = await this.load(tx, auth.orgId, true);
+      const entries = await this.entries(tx, auth.orgId);
+      const own = foldPayments(entries, auth.agentId).find(
+        (p) => p.paymentId === id || p.receiptId === id,
+      );
+      if (!own) return null;
+      const plan = planOrder(foldPayments(entries), own.paymentId, {
+        by: `agent ${auth.agentId}`,
+        now: this.clock(),
+        ...(reference ? { reference } : {}),
+      });
+      await this.append(tx, loaded, entries, plan.entry);
+      const after = foldPayments(await this.entries(tx, auth.orgId), auth.agentId).find(
+        (p) => p.paymentId === own.paymentId,
+      );
+      return after ? publicPayment(after, loaded.config.policy.currencyDecimals) : null;
+    });
   }
 
   /** list_payments: this agent's most recent payments, newest first. */

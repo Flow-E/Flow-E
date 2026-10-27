@@ -14,7 +14,7 @@ import { PAYMENT_SCOPE, signatureCheck, type CredentialFile } from '../kya/crede
 import { loadSigningIssuer, readCredential, type SigningIssuer } from '../kya/store.js';
 import { toEngineViews } from '../ledger/fold.js';
 import { Ledger, newId } from '../ledger/ledger.js';
-import { effectiveStatus } from '../control/actions.js';
+import { effectiveStatus, recordOrder } from '../control/actions.js';
 import {
   AGENT_INSTRUCTIONS,
   AGENT_TOOLS,
@@ -202,6 +202,21 @@ export function createMandateServer(o: MandateServerOptions): MandateServer {
       return payment
         ? text(publicPayment(payment, decimals()))
         : toolError(`You have no payment "${id}".`);
+    } catch (err) {
+      return toolError(agentErrorText(err));
+    }
+  });
+
+  server.registerTool('record_order', AGENT_TOOLS.record_order, ({ id, order_reference }) => {
+    try {
+      const own = ledger.payment(o.agentId, id);
+      if (!own) return toolError(`You have no payment "${id}".`);
+      const p = recordOrder(ledger, own.paymentId, {
+        by: `agent ${o.agentId}`,
+        now: clock(),
+        ...(order_reference ? { reference: order_reference } : {}),
+      });
+      return text(publicPayment(p, decimals()));
     } catch (err) {
       return toolError(agentErrorText(err));
     }

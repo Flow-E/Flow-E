@@ -39,7 +39,9 @@ import {
   parseReceipt,
   planCancel,
   planFreeze,
+  planInvoice,
   planKillSwitch,
+  planOrder,
   planResolve,
   signatureCheck,
   toEngineViews,
@@ -464,6 +466,42 @@ export class SandboxStore {
       ownerId,
       (entries) => planCancel(foldPayments(entries), id, this.actor(actor)).entry,
     );
+  }
+
+  /** Record that an approved payment was ordered from the supplier. */
+  async recordOrder(ownerId: string, id: string, reference: string, actor: ActorInput) {
+    await this.act(
+      ownerId,
+      (entries) =>
+        planOrder(foldPayments(entries), id, {
+          ...this.actor(actor),
+          ...(reference.trim() ? { reference } : {}),
+        }).entry,
+    );
+  }
+
+  /** Match the supplier's invoice to an approved payment. `amount` in normal units. */
+  async recordInvoice(
+    ownerId: string,
+    id: string,
+    invoice: { number: string; amount: string; currency: string },
+    actor: ActorInput,
+  ) {
+    await this.act(ownerId, (entries, config) => {
+      const currency = invoice.currency.trim().toUpperCase();
+      let amount: number;
+      try {
+        amount = parseAmount(invoice.amount.trim(), currency, config.policy.currencyDecimals);
+      } catch (err) {
+        throw new ActionError(`Invoice total: ${(err as Error).message}`);
+      }
+      return planInvoice(foldPayments(entries), id, {
+        ...this.actor(actor),
+        number: invoice.number,
+        amount,
+        currency,
+      }).entry;
+    });
   }
 
   async setFrozen(ownerId: string, agentId: string, frozen: boolean, actor: ActorInput) {

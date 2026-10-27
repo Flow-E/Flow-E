@@ -17,6 +17,7 @@ const EXPECTED: Record<Permission, string> = {
   'org.read': 'oav',
   'payment.resolve': 'oa',
   'payment.cancel': 'oa',
+  'payment.fulfil': 'oa',
   'agent.freeze': 'oa',
   'killswitch.set': 'oa',
   'mandate.update': 'o',

@@ -47,6 +47,14 @@ describe('every action × role, enforced by the store', () => {
         expect(p.cancellable_until).not.toBeNull();
         await s.cancel(orgId, user, p.payment_id);
       },
+      'payment.fulfil': async (s, orgId, user) => {
+        const p = await s.requestPayment(w.auth, request('100'), ORIGIN);
+        await s.recordInvoice(orgId, user, p.payment_id, {
+          number: 'INV-1',
+          amount: '100.00',
+          currency: 'CHF',
+        });
+      },
       'agent.freeze': async (s, orgId, user) => {
         await s.setFrozen(orgId, user, 'buyer', true);
         await s.setFrozen(orgId, user, 'buyer', false);
@@ -82,6 +90,7 @@ describe('every action × role, enforced by the store', () => {
     'org.read': [ALICE, BOB, CAROL],
     'payment.resolve': [ALICE, BOB],
     'payment.cancel': [ALICE, BOB],
+    'payment.fulfil': [ALICE, BOB],
     'agent.freeze': [ALICE, BOB],
     'killswitch.set': [ALICE, BOB],
     'mandate.update': [ALICE],
@@ -497,5 +506,48 @@ describe('the development outbox', () => {
     expect(
       () => new OutboxMailer({ query: () => Promise.resolve([]) }, { NODE_ENV: 'production' }),
     ).toThrow(MailerConfigError);
+  });
+});
+
+describe('orders and invoices', () => {
+  let w: World;
+  beforeAll(async () => {
+    w = await world();
+  });
+  afterAll(async () => {
+    await w.close();
+  });
+
+  it('lets the agent record its order after cooling-off, and a person match the invoice', async () => {
+    const p = await w.store.requestPayment(w.auth, request('480'), ORIGIN);
+    expect(p.decision).toBe('approved');
+    await expect(w.store.agentRecordOrder(w.auth, p.payment_id, 'SO-1')).rejects.toThrow(
+      /still be cancelled/,
+    );
+    w.clock.now += 11 * 60_000;
+    const ordered = await w.store.agentRecordOrder(w.auth, p.payment_id, 'SO-2026-7');
+    expect(ordered).toMatchObject({ ordered: { reference: 'SO-2026-7' } });
+    await w.store.recordInvoice(w.orgId, BOB, p.payment_id, {
+      number: 'INV-88',
+      amount: '495.50',
+      currency: 'chf',
+    });
+    const v = await w.store.view(w.orgId, ALICE);
+    const record = v.payments.find((x) => x.paymentId === p.payment_id);
+    expect(record?.fulfilment?.invoice).toMatchObject({ number: 'INV-88', difference: 1_550 });
+    expect(record?.status).toBe('approved');
+    expect(v.audit.ok).toBe(true);
+  });
+
+  it("never records an order on another agent's payment, and refuses a viewer", async () => {
+    expect(await w.store.agentRecordOrder(w.auth, 'pay_unknown')).toBeNull();
+    const p = await w.store.requestPayment(w.auth, request('120'), ORIGIN);
+    await expect(
+      w.store.recordInvoice(w.orgId, CAROL, p.payment_id, {
+        number: 'INV-1',
+        amount: '120',
+        currency: 'CHF',
+      }),
+    ).rejects.toThrow(ForbiddenError);
   });
 });

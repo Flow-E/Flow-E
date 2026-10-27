@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
+  ActionError,
   AGENT_INSTRUCTIONS,
   AGENT_TOOLS,
   AmountError,
@@ -126,6 +127,16 @@ export function agentServer(store: OrgStore, auth: AgentAuth, origin: string): M
       return payment ? json(payment) : toolError(`You have no payment "${id}".`);
     } catch (err) {
       logFailure('get_payment', err);
+      return toolError(agentErrorText(err));
+    }
+  });
+
+  server.registerTool('record_order', AGENT_TOOLS.record_order, async ({ id, order_reference }) => {
+    try {
+      const payment = await store.agentRecordOrder(auth, id, order_reference);
+      return payment ? json(payment) : toolError(`You have no payment "${id}".`);
+    } catch (err) {
+      if (!(err instanceof ActionError)) logFailure('record_order', err);
       return toolError(agentErrorText(err));
     }
   });
