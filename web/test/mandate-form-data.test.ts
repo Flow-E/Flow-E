@@ -73,8 +73,13 @@ describe('the organisation mandate form', () => {
     await w.store.updateConfig(w.orgId, ALICE, rawFromForm(edited, raw));
     const v = await w.store.view(w.orgId, ALICE);
     expect(v.config.policy.referencePrices).toEqual([
-      { item: 'Phosphate buffer solution, 10 L', match: ['phosphate buffer'], priceBase: 115_000 },
-      { item: 'Nitrile gloves', match: [], priceBase: 2_200, unit: 'box' },
+      {
+        item: 'Phosphate buffer solution, 10 L',
+        match: ['phosphate buffer'],
+        priceMinor: 115_000,
+        currency: 'CHF',
+      },
+      { item: 'Nitrile gloves', match: [], priceMinor: 2_200, currency: 'CHF', unit: 'box' },
     ]);
     expect(v.config.policy.priceCheck).toEqual({
       abovePercent: 15,

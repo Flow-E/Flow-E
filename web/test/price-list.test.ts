@@ -66,7 +66,7 @@ describe('suggested usual prices', () => {
   });
 
   it('skips items that already have a usual price, and anything not approved', () => {
-    const refs = [{ item: 'Pipette tips', match: [], priceBase: 30_000 }];
+    const refs = [{ item: 'Pipette tips', match: [], priceMinor: 30_000, currency: 'CHF' }];
     const declined = { ...paid('Gloves', 2_000), status: 'declined' };
     expect(
       suggestPrices(

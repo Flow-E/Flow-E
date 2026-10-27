@@ -413,3 +413,56 @@ describe('receipts', () => {
     expect(() => parseReceipt(JSON.stringify(bad))).toThrow(/malformed/);
   });
 });
+
+describe('every entry type', () => {
+  it('audits clean with decisions, approvals, orders, invoices and controls in one chain', async () => {
+    const { cancelCoolingOff, recordOrder, resolvePayment, setAgentFrozen, setKillSwitch } =
+      await import('../../src/control/actions.js');
+    const { planInvoiceRecord, planInvoiceResolve, foldInvoices } =
+      await import('../../src/control/invoices.js');
+    const by = (now: number) => ({ by: 'tester', now });
+    const stored = () => s.ledger.entries().map((e) => ({ ...e, data: JSON.stringify(e.data) }));
+    const ok = pay(s.ledger, {}, NOW - 60 * MINUTE);
+    const review = pay(s.ledger, { amount: 600_000 }, NOW - 50 * MINUTE);
+    const fresh = pay(s.ledger, { merchant: 'Basel Labware AG' }, NOW - 1 * MINUTE);
+    const id = (r: Receipt) => (r.entry.data as { payment_id: string }).payment_id;
+    resolvePayment(s.ledger, id(review), 'approved', by(NOW - 40 * MINUTE));
+    cancelCoolingOff(s.ledger, id(fresh), by(NOW));
+    recordOrder(s.ledger, id(ok), { ...by(NOW), reference: 'SO-1' });
+    const policy = context().policy;
+    for (const amount of [120_000, 999_999]) {
+      const rows = stored();
+      const plan = planInvoiceRecord({
+        invoice: {
+          supplier: 'Alpine Reagents AG',
+          number: `INV-${String(amount)}`,
+          invoiceDate: '2026-10-20',
+          amount,
+          currency: 'CHF',
+          reference: id(ok),
+          source: 'manual',
+        },
+        payments: s.ledger.payments(),
+        invoices: foldInvoices(rows),
+        policy,
+        actor: by(NOW),
+      });
+      s.ledger.write(() => s.ledger.append(plan.entry));
+    }
+    const invoices = foldInvoices(stored());
+    const dup = invoices.find((i) => i.match !== 'matched');
+    expect(dup?.match).toBe('duplicate');
+    s.ledger.write(() =>
+      s.ledger.append(
+        planInvoiceResolve(invoices, dup?.invoiceId ?? '', 'rejected', {
+          ...by(NOW),
+          note: 'twice',
+        }),
+      ),
+    );
+    setAgentFrozen(s.ledger, 'lab-procurement', true, by(NOW));
+    setKillSwitch(s.ledger, true, by(NOW));
+    s.ledger.close();
+    expect(audit()).toMatchObject({ ok: true, entries: 11 });
+  });
+});

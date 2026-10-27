@@ -125,7 +125,8 @@ export const AGENT_TOOLS = {
       'with the reason, a payment_id and a signed receipt_id. Only buy when approved. ' +
       'Never split a declined payment into smaller ones, and never re-submit it with a ' +
       'disguised supplier name, category, country or currency: that is recorded and sent to ' +
-      'a person. Follow the guidance field: it says what would be approved. ' +
+      'a person. Follow how_to_comply (and the guidance text): it says what would be ' +
+      'approved, e.g. the approved suppliers or what is left of a budget and when it resets. ' +
       'Choosing a different supplier that is genuinely allowed is fine. If the ' +
       'decision is "review", a human must approve first; tell them the payment_id and check ' +
       'get_payment later. Name the item and quantity so the price can be compared with the ' +
@@ -347,6 +348,7 @@ export function paymentAnswer(input: {
     reason: result.reason,
     rule: result.rule,
     guidance: result.guidance ?? null,
+    how_to_comply: result.howToComply ?? [],
     amount: formatMoney(request.amount, request.currency, currencyDecimals),
     amount_in_base_currency: base(result.amountBase),
     cancellable_until:
@@ -380,6 +382,7 @@ export function publicPayment(p: PaymentRecord, decimals?: Readonly<Record<strin
       : null,
     invoiced: p.fulfilment?.invoice ? { at: p.fulfilment.invoice.at } : null,
     note_from_human: p.note,
+    how_to_comply: p.status === 'approved' ? [] : (p.howToComply ?? []),
   };
 }
 

@@ -48,7 +48,9 @@ describe('rule ordering', () => {
 
   it('split detection is checked before the fair price, and the fair price before review', () => {
     const policy = {
-      referencePrices: [{ item: 'Buffer solution, 10 L', match: [], priceBase: 10_000 }],
+      referencePrices: [
+        { item: 'Buffer solution, 10 L', match: [], priceMinor: 10_000, currency: 'CHF' },
+      ],
       priceCheck: { abovePercent: 20, belowPercent: null, above: 'review' as const },
     };
     const ledger = [entry({ amountBase: 450_000, createdAt: NOW - 2 * MINUTE })];

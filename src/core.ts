@@ -50,3 +50,5 @@ export {
   demoPrompt,
   type CatalogItem,
 } from './demo/content.js';
+export * from './control/invoices.js';
+export { mandateDiff, type MandateChange } from './config/diff.js';

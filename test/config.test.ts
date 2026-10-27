@@ -122,8 +122,13 @@ reference_prices:
 agents: {}
 `);
     expect(policy.referencePrices).toEqual([
-      { item: 'Phosphate buffer solution, 10 L', match: ['phosphate buffer'], priceBase: 48_000 },
-      { item: 'Nitrile gloves', match: [], priceBase: 2_450, unit: 'box' },
+      {
+        item: 'Phosphate buffer solution, 10 L',
+        match: ['phosphate buffer'],
+        priceMinor: 48_000,
+        currency: 'CHF',
+      },
+      { item: 'Nitrile gloves', match: [], priceMinor: 2_450, currency: 'CHF', unit: 'box' },
     ]);
     expect(policy.priceCheck).toEqual({ abovePercent: 20, belowPercent: 50, above: 'review' });
   });

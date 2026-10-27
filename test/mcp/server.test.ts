@@ -99,6 +99,23 @@ const buy = (args: Record<string, unknown> = {}) =>
     ...args,
   });
 
+describe('how_to_comply, end to end', () => {
+  it('an agent that follows the hint after a decline gets approved', async () => {
+    const declined = (await buy({ merchant: 'Somewhere Else GmbH' })).json();
+    expect(declined).toMatchObject({ decision: 'declined', rule: 'SUPPLIER' });
+    const [hint] = declined.how_to_comply as { action: string; approved_suppliers: string[] }[];
+    expect(hint?.action).toBe('choose_supplier');
+    const supplier = hint?.approved_suppliers[0] ?? '';
+    const retry = (await buy({ merchant: supplier })).json();
+    expect(retry).toMatchObject({ decision: 'approved', how_to_comply: [] });
+  });
+
+  it('never shows another agent’s suppliers or limits', async () => {
+    const declined = (await buy({ merchant: 'Somewhere Else GmbH' })).text;
+    expect(declined).not.toMatch(/marketing|7311|J. Doe/i);
+  });
+});
+
 describe('record_order', () => {
   it('records the order of an approved payment once cooling-off has closed, never twice', async () => {
     const first = (await buy()).json();

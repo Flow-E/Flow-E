@@ -73,11 +73,21 @@ export const configSchema = z.strictObject({
         item: z.string().trim().min(1).max(200),
         match: z.array(z.string().trim().min(2).max(100)).max(20).default([]),
         price: money,
+        /** The price's currency; default the base currency. Converted through `fx`. */
+        currency: currencyCode.optional(),
+        /** Only for this supplier; without it, for every supplier. */
+        supplier: z.string().trim().min(1).max(200).optional(),
         unit: z.string().trim().min(1).max(40).optional(),
       }),
     )
     .max(1000)
     .default([]),
+  invoice_check: z
+    .strictObject({
+      tolerance_percent: z.number().min(0).max(50).default(2),
+      tolerance_min: money.default(5),
+    })
+    .default({ tolerance_percent: 2, tolerance_min: 5 }),
   price_check: z
     .strictObject({
       above_percent: z.number().int().min(0).max(1000).default(20),
@@ -93,6 +103,11 @@ export const configSchema = z.strictObject({
         budget: money,
         period: z.enum(['month', 'total']).default('month'),
         agents: z.array(z.string()).default([]),
+        /** Last day purchases may be booked to it, YYYY-MM-DD in the organisation's time zone. */
+        ends: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a date like 2027-06-30')
+          .optional(),
       }),
     )
     .default({}),
@@ -211,12 +226,16 @@ function toEngine(raw: RawConfig): MandateConfig {
     const key = normalizeName(p.name);
     if (projectNames.has(key)) problems.push(`${path}.name: "${p.name}" is used twice`);
     projectNames.add(key);
+    if (p.ends !== undefined && Number.isNaN(Date.parse(`${p.ends}T00:00:00Z`))) {
+      problems.push(`${path}.ends: "${p.ends}" is not a date`);
+    }
     projects.push({
       id,
       name: p.name,
       budgetBase: toMinor(`${path}.budget`, p.budget),
       period: p.period,
       agents: p.agents,
+      ...(p.ends === undefined ? {} : { ends: p.ends }),
     });
   }
   for (const [id, a] of Object.entries(raw.agents)) {
@@ -232,12 +251,26 @@ function toEngine(raw: RawConfig): MandateConfig {
   const seen = new Set<string>();
   for (const [i, r] of raw.reference_prices.entries()) {
     const path = `reference_prices[${String(i)}]`;
-    const key = normalizeName(r.item);
-    if (seen.has(key)) problems.push(`${path}: "${r.item}" is listed twice`);
+    const key = `${normalizeName(r.item)}\u0000${normalizeName(r.supplier ?? '')}`;
+    if (seen.has(key)) {
+      problems.push(
+        `${path}: "${r.item}"${r.supplier ? ` from ${r.supplier}` : ''} is listed twice`,
+      );
+    }
     seen.add(key);
-    const priceBase = toMinor(`${path}.price`, r.price);
-    if (priceBase === 0) problems.push(`${path}.price: must be above 0`);
-    const ref: ReferencePrice = { item: r.item, match: r.match, priceBase };
+    const currency = r.currency ?? baseCurrency;
+    if (currency !== baseCurrency && !Object.hasOwn(raw.fx, currency)) {
+      problems.push(`${path}.currency: ${currency} has no rate in fx`);
+    }
+    let priceMinor = 0;
+    try {
+      priceMinor = parseAmount(r.price, currency, decimals);
+    } catch (err) {
+      problems.push(`${path}.price: ${(err as AmountError).message}`);
+    }
+    if (priceMinor === 0) problems.push(`${path}.price: must be above 0`);
+    const ref: ReferencePrice = { item: r.item, match: r.match, priceMinor, currency };
+    if (r.supplier !== undefined) ref.supplier = r.supplier;
     if (r.unit !== undefined) ref.unit = r.unit;
     referencePrices.push(ref);
   }
@@ -255,6 +288,10 @@ function toEngine(raw: RawConfig): MandateConfig {
     businessHours: { days: raw.business_hours.days, startMinute, endMinute },
     referencePrices,
     projects,
+    invoiceCheck: {
+      tolerancePercent: raw.invoice_check.tolerance_percent,
+      toleranceMinBase: toMinor('invoice_check.tolerance_min', raw.invoice_check.tolerance_min),
+    },
     priceCheck: {
       abovePercent: raw.price_check.above_percent,
       belowPercent: raw.price_check.below_percent,

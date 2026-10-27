@@ -1,5 +1,5 @@
 import { normalizeCode, normalizeName } from './normalize.js';
-import { COOLING_OFF_MS, RULES, type Facts } from './rules.js';
+import { COOLING_OFF_MS, RULES, type Facts, type Hint } from './rules.js';
 import type {
   AgentState,
   EvaluationContext,
@@ -37,7 +37,7 @@ export function evaluate(
     facts.merchantKey = normalizeName(request.merchant);
 
     const reviews: TraceEntry[] = [];
-    const hints = new Map<TraceEntry, string>();
+    const hints = new Map<TraceEntry, Hint>();
     let newSupplier = false;
 
     for (const [index, [rule, run]] of RULES.entries()) {
@@ -60,7 +60,7 @@ export function evaluate(
           reason: result.detail,
           trace,
           amountBase: facts.amountBase,
-          ...(hint ? { guidance: hint } : {}),
+          ...(hint ? { guidance: hint.text, howToComply: [hint.comply] } : {}),
         };
       }
       if (result.outcome === 'review') reviews.push(entry);
@@ -72,14 +72,19 @@ export function evaluate(
       if (newSupplier) {
         appendToLast(trace, ' Cooling-off will apply if a human approves.');
       }
-      const guidance = reviews.flatMap((r) => hints.get(r) ?? []).join(' ');
+      const given = reviews.flatMap((r) => hints.get(r) ?? []);
       return {
         decision: 'review',
         rule: firstReview.rule,
         reason: reviews.map((r) => r.detail).join(' '),
         trace,
         amountBase: facts.amountBase,
-        ...(guidance ? { guidance } : {}),
+        ...(given.length > 0
+          ? {
+              guidance: given.map((h) => h.text).join(' '),
+              howToComply: given.map((h) => h.comply),
+            }
+          : {}),
       };
     }
 

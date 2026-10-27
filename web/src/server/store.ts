@@ -59,6 +59,8 @@ import {
   type PaymentRequest,
   type Receipt,
   type StoredEntry,
+  mandateDiff,
+  type JsonValue,
 } from '@flow-e/mcp/core';
 import type { Db, Sql } from './db';
 import { decryptSecret, encryptSecret } from './keys';
@@ -551,6 +553,7 @@ export class SandboxStore {
         data: {
           by: a.by,
           note: a.note ?? null,
+          diff: mandateDiff(loaded.raw, raw) as unknown as JsonValue,
           config_sha256: createHash('sha256').update(canonicalJson(raw)).digest('hex'),
         },
       });

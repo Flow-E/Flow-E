@@ -110,12 +110,16 @@ export interface BusinessHours {
   endMinute: number;
 }
 
-/** The usual price of one unit of an item, in base minor units. */
+/** The usual price of one unit of an item. */
 export interface ReferencePrice {
   item: string;
   /** Extra words that identify the item in a request, e.g. "phosphate buffer". */
   match: readonly string[];
-  priceBase: number;
+  /** Minor units of `currency`; converted to the base currency through the fx table. */
+  priceMinor: number;
+  currency: string;
+  /** Only for this supplier; without it, the price applies to every supplier. */
+  supplier?: string;
   /** Shown with the price, e.g. "10 L". */
   unit?: string;
 }
@@ -138,6 +142,8 @@ export interface Project {
   period: 'month' | 'total';
   /** Agent ids that may book to it. Empty: every agent. */
   agents: readonly string[];
+  /** Last day (YYYY-MM-DD, organisation time zone) on which purchases may be booked to it. */
+  ends?: string;
 }
 
 /** Organisation-wide settings shared by every agent. */
@@ -158,6 +164,15 @@ export interface GlobalPolicy {
   referencePrices?: readonly ReferencePrice[];
   priceCheck?: PriceCheck;
   projects?: readonly Project[];
+  /** How far an invoice may differ from what was authorized and still match. */
+  invoiceCheck?: InvoiceCheck;
+}
+
+export interface InvoiceCheck {
+  /** Percent of the authorized amount, e.g. 2. */
+  tolerancePercent: number;
+  /** At least this much difference is always tolerated, in base minor units (rounding). */
+  toleranceMinBase: number;
 }
 
 /** What the engine needs to know about one prior payment of this agent. */
@@ -199,6 +214,27 @@ export interface TraceEntry {
   data?: Record<string, string | number | boolean | null>;
 }
 
+/**
+ * What would get a yes, for the agent, as data: one entry per reason. Only facts from the
+ * agent's own mandate, never other agents' data. `action` says what to do next.
+ */
+export interface Comply {
+  action:
+    | 'stop'
+    | 'fix_request'
+    | 'use_currency'
+    | 'choose_supplier'
+    | 'choose_category'
+    | 'stay_within_limit'
+    | 'wait_for_budget'
+    | 'name_project'
+    | 'wait'
+    | 'find_better_offer'
+    | 'wait_for_human';
+  [key: string]:
+    string | number | boolean | null | readonly string[] | readonly Record<string, string>[];
+}
+
 export interface EvaluationResult {
   decision: Decision;
   /** The rule that decided a decline or review; `null` when approved. */
@@ -211,4 +247,6 @@ export interface EvaluationResult {
   cancellableUntil?: number;
   /** For the agent: what would get a yes, when the answer is no or not yet. */
   guidance?: string;
+  /** The same as data, one entry per reason. */
+  howToComply?: Comply[];
 }

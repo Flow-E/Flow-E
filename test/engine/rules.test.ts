@@ -426,9 +426,17 @@ describe('rule 13: cooling-off', () => {
 });
 
 describe('fair price', () => {
-  const buffer = { item: 'Buffer solution, 10 L', match: ['phosphate buffer'], priceBase: 100_000 };
+  const buffer = {
+    item: 'Buffer solution, 10 L',
+    match: ['phosphate buffer'],
+    priceMinor: 100_000,
+    currency: 'CHF',
+  };
   const priced = (over: Partial<GlobalPolicy> = {}) => ({
-    referencePrices: [buffer, { item: 'Nitrile gloves', match: [], priceBase: 2_400, unit: 'box' }],
+    referencePrices: [
+      buffer,
+      { item: 'Nitrile gloves', match: [], priceMinor: 2_400, currency: 'CHF', unit: 'box' },
+    ],
     priceCheck: { abovePercent: 20, belowPercent: 50, above: 'review' as const },
     ...over,
   });
@@ -496,7 +504,10 @@ describe('fair price', () => {
   it('uses match words, and the longest match wins', () => {
     const r = run({
       policy: priced({
-        referencePrices: [buffer, { item: 'Buffer', match: [], priceBase: 1_000 }],
+        referencePrices: [
+          buffer,
+          { item: 'Buffer', match: [], priceMinor: 1_000, currency: 'CHF' },
+        ],
       }),
       request: { memo: 'PHOSPHATE  buffer for the cell lab' },
       context: known,

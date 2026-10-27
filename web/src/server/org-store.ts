@@ -30,6 +30,7 @@ import {
   issueCredential,
   issuerIdFor,
   budgetState,
+  mandateDiff,
   mandateSummary,
   newId,
   parseConfigObject,
@@ -60,6 +61,7 @@ import {
   type Receipt,
   type RequestPaymentArgs,
   type StoredEntry,
+  type JsonValue,
 } from '@flow-e/mcp/core';
 import type { Db, Sql } from './db';
 import { approvalEmail, invitationEmail, type EmailMessage, type Mailer } from './email';
@@ -754,10 +756,12 @@ export class OrgStore {
       }
       const changes = changedKeys(loaded.raw, next);
       if (changes.length === 0) return;
+      // Who changed what, with the values before and after, in the signed ledger.
+      const diff = mandateDiff(loaded.raw, next) as unknown as JsonValue;
       await this.writeConfig(tx, loaded, next, {
         type: CONFIG_UPDATED,
         agentId: '*',
-        data: { by: by(user), note: cleanNote(note), changes },
+        data: { by: by(user), note: cleanNote(note), changes, diff },
       });
     });
   }

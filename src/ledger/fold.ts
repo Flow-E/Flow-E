@@ -1,7 +1,7 @@
 import { randomBytes, type KeyObject } from 'node:crypto';
 import { canonicalJson } from '../crypto/canonical.js';
 import { issuerIdFor } from '../crypto/ed25519.js';
-import type { EvaluationResult, LedgerEntryView, PaymentRequest } from '../engine/types.js';
+import type { Comply, EvaluationResult, LedgerEntryView, PaymentRequest } from '../engine/types.js';
 import {
   GENESIS_HASH,
   entryHash,
@@ -26,8 +26,14 @@ export const PAYMENT_RESOLVED = 'payment.resolved';
 export const PAYMENT_CANCELLED = 'payment.cancelled';
 /** The approved purchase was ordered from the supplier (by the agent or a person). */
 export const PAYMENT_ORDERED = 'payment.ordered';
-/** The supplier's invoice was matched to the approved payment (by a person). */
+/** The supplier's invoice was matched to the approved payment (by a person). Older entries. */
 export const PAYMENT_INVOICED = 'payment.invoiced';
+/** An invoice was recorded and matched (or not) against the authorizations. */
+export const INVOICE_RECORDED = 'invoice.recorded';
+/** A person accepted or rejected an invoice that did not match. */
+export const INVOICE_RESOLVED = 'invoice.resolved';
+
+export type InvoiceMatch = 'matched' | 'mismatch' | 'unmatched' | 'duplicate';
 export const AGENT_FREEZE = 'control.agent_freeze';
 export const KILL_SWITCH = 'control.kill_switch';
 /** agent_id used for entries that concern every agent. */
@@ -126,6 +132,9 @@ export function decisionData(input: {
     rule: result.rule,
     reason: result.reason,
     ...(result.guidance === undefined ? {} : { guidance: result.guidance }),
+    ...(result.howToComply === undefined
+      ? {}
+      : { how_to_comply: result.howToComply as unknown as JsonValue }),
     amount_base: result.amountBase,
     base_currency: input.baseCurrency,
     cancellable_until:
@@ -172,6 +181,8 @@ export interface PaymentRecord {
   amountBase: number | null;
   /** What the agent was told would get a yes, if the answer was no or not yet. */
   guidance?: string;
+  /** The same, as data. */
+  howToComply?: Comply[];
   /** What happened after approval: the order and the supplier's invoice. */
   fulfilment?: Fulfilment;
   baseCurrency: string;
@@ -195,6 +206,9 @@ export interface Fulfilment {
     currency: string;
     /** Invoice amount minus the approved amount; above 0 means it costs more than approved. */
     difference: number;
+    /** How the invoice matched; older entries were matched by a person ("matched"). */
+    match: InvoiceMatch;
+    invoiceId: string | null;
     note: string | null;
   } | null;
 }
@@ -206,6 +220,7 @@ interface DecisionData {
   rule: string | null;
   reason: string;
   guidance?: string;
+  how_to_comply?: Comply[];
   amount_base: number | null;
   base_currency: string;
   cancellable_until: string | null;
@@ -226,6 +241,7 @@ export const PAYMENT_TYPES: ReadonlySet<string> = new Set([
   PAYMENT_CANCELLED,
   PAYMENT_ORDERED,
   PAYMENT_INVOICED,
+  INVOICE_RECORDED,
 ]);
 
 interface OrderData {
@@ -276,6 +292,7 @@ export function foldPayments(
         updatedAt: null,
         note: null,
         ...(d.guidance === undefined ? {} : { guidance: d.guidance }),
+        ...(d.how_to_comply === undefined ? {} : { howToComply: d.how_to_comply }),
       });
       continue;
     }
@@ -302,8 +319,39 @@ export function foldPayments(
           currency: d.currency ?? p.request.currency,
           difference: amount - p.request.amount,
           note: d.note ?? null,
+          match: 'matched',
+          invoiceId: null,
         };
       }
+      continue;
+    }
+    if (row.type === INVOICE_RECORDED) {
+      const d = JSON.parse(row.data) as {
+        invoice_id: string;
+        payment_id: string | null;
+        number: string;
+        amount: number;
+        currency: string;
+        difference: number | null;
+        match: InvoiceMatch;
+        by: string;
+        note?: string | null;
+      };
+      const p = d.payment_id === null ? undefined : byId.get(d.payment_id);
+      // A duplicate never replaces the invoice already on the payment.
+      if (!p || d.match === 'duplicate') continue;
+      const f = (p.fulfilment ??= { ordered: null, invoice: null });
+      f.invoice = {
+        at: row.created_at,
+        by: d.by,
+        number: d.number,
+        amount: d.amount,
+        currency: d.currency,
+        difference: d.difference ?? d.amount - p.request.amount,
+        note: d.note ?? null,
+        match: d.match,
+        invoiceId: d.invoice_id,
+      };
       continue;
     }
     const d = JSON.parse(row.data) as HumanActionData;
