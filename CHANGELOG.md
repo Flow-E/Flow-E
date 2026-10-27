@@ -28,9 +28,20 @@ changes.
   90 days and per agent (URL parameters). Server-rendered SVG charts with data tables; the CSV
   export can be limited to the visible view. Sandboxes can be filled once with 30 days of
   fictional sample history that runs through the real engine and signed ledger.
+- Website: real email through Resend (`RESEND_API_KEY`, `EMAIL_FROM`) for invitations and
+  approval links. It replaces the unwired SMTP adapter; `SMTP_URL` is no longer read.
+- Website: a one-click demo lab organisation ("Example Labs AG (demo, fictional)") with the
+  sandbox's lab agent, suppliers and limits, an empty ledger and a ready-made Claude prompt, plus
+  a five-minute demo script in `docs/demo-script.md`.
+- Website: categories are picked from a list with plain names (chemicals, lab equipment, office
+  supplies, ...) instead of typed as four-digit codes; other codes still work. New agents start
+  with filled-in example limits instead of placeholders.
 
 ### Changed
 
+- Website dashboard: the approval and cooling-off panels follow the agent filter; foreign-currency
+  declines count in the decline total (converted at the mandate's rate, or listed separately);
+  agents beyond the eighth share one "Other agents" series; the last date label fits on phones.
 - Renamed from the working name "Mandate" to **Flow-E** before the first release. It will be
   published as `@flow-e/mcp`, with the CLI command `flow-e`. The state folder is
   `.flow-e/`, the environment variables are `FLOWE_HOME` and `FLOWE_CONFIG`, and signed

@@ -165,7 +165,7 @@ export const createAgentSchema = z.object({
   approvalAbove: moneyText.optional(),
   categories: z
     .array(z.string().regex(/^\d{4}$/, 'Categories are four-digit merchant category codes.'))
-    .min(1, 'Allow at least one merchant category code.')
+    .min(1, 'Choose at least one category the agent may buy.')
     .max(50),
 });
 export type CreateAgentInput = z.input<typeof createAgentSchema>;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { CategoryPicker } from '@/components/category-picker';
 import { buttonClass } from '@/components/ui';
 import type { ActionResult } from '../actions';
 import { keepValues } from '../client';
@@ -239,13 +240,6 @@ export function MandateForm({
                 help="Comma-separated, e.g. CHF, EUR."
               />
               <Field
-                name={`${a.id}.categories`}
-                title="Categories (MCC)"
-                value={a.categories}
-                mono
-                help="Four-digit codes, comma-separated."
-              />
-              <Field
                 name={`${a.id}.blocked_countries`}
                 title="Blocked countries for this agent"
                 value={a.blocked_countries}
@@ -279,6 +273,13 @@ export function MandateForm({
                 />
                 Outside business hours, a human must approve
               </label>
+              <div className="sm:col-span-2 lg:col-span-3">
+                <CategoryPicker
+                  name={`${a.id}.categories`}
+                  defaultValue={a.categories}
+                  title="Categories"
+                />
+              </div>
             </div>
           </fieldset>
         ))}

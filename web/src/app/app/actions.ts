@@ -6,6 +6,7 @@ import { ZodError, z } from 'zod';
 import { ActionError, ConfigError, CredentialError, ReceiptError } from '@flow-e/mcp/core';
 import { text } from '@/lib/form';
 import { FormProblem, codes, rawFromForm } from '@/lib/mandate-form-data';
+import { createDemoLab, DEMO_LAB_AGENT } from '@/server/demo-lab';
 import { siteOrigin } from '@/server/origin';
 import type { User } from '@/server/org-store';
 import { ForbiddenError } from '@/server/permissions';
@@ -83,6 +84,18 @@ export async function createOrgAction(_prev: ActionResult, form: FormData): Prom
     return { error: problem(err) };
   }
   redirect(`/app/${id}`);
+}
+
+/** A fictional lab organisation for demos, then straight to its agent to create a key. */
+export async function createDemoLabAction(_prev: ActionResult): Promise<ActionResult> {
+  const { store, user } = await context();
+  let id: string;
+  try {
+    id = await createDemoLab(store, user);
+  } catch (err) {
+    return { error: problem(err) };
+  }
+  redirect(`/app/${id}/agents/${DEMO_LAB_AGENT}`);
 }
 
 export async function renameAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {

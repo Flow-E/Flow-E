@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import type { StoredEntry } from '@flow-e/mcp/core';
+import type { GlobalPolicy, StoredEntry } from '@flow-e/mcp/core';
 import {
+  AGENT_SLOTS,
+  OTHER_AGENTS,
   addDays,
   buildDashboard,
+  forAgent,
   median,
   parseAgent,
   parsePeriod,
   periodDays,
   periodEntries,
+  spendGroups,
   type DashboardInput,
 } from '@/server/analytics';
 
@@ -72,6 +76,35 @@ const resolved = (id: string, agentId: string, at: string, status: 'approved' | 
   entry('payment.resolved', agentId, at, { payment_id: id, status, by: 'Approver', note: null });
 const cancelled = (id: string, agentId: string, at: string) =>
   entry('payment.cancelled', agentId, at, { payment_id: id, by: 'Approver', note: null });
+
+/** A request declined before the currency rule ran: no base amount in the ledger. */
+function foreignDecline(
+  id: string,
+  at: string,
+  amount: number,
+  currency: string,
+  rule: string,
+): StoredEntry {
+  return entry('payment.decision', 'lab', at, {
+    payment_id: id,
+    request: { merchant: 'X', amount, currency, category: '5169', country: 'DE' },
+    decision: 'declined',
+    rule,
+    reason: 'test',
+    amount_base: null,
+    base_currency: 'CHF',
+    cancellable_until: null,
+  });
+}
+
+const POLICY: GlobalPolicy = {
+  baseCurrency: 'CHF',
+  fx: { EUR: '0.93' },
+  blockedCountries: [],
+  blockedSuppliers: [],
+  timezone: TZ,
+  businessHours: { days: [1, 2, 3, 4, 5], startMinute: 480, endMinute: 1080 },
+};
 
 function input(entries: StoredEntry[], over: Partial<DashboardInput> = {}): DashboardInput {
   return { entries, agents: AGENTS, timezone: TZ, now: NOW, period: '7d', agentId: null, ...over };
@@ -153,9 +186,15 @@ describe('the dashboard', () => {
     expect(d.requests).toBe(6);
     expect(d.autoApproved).toBe(2);
     expect(d.autoApprovedShare).toBeCloseTo(2 / 6);
-    expect(d.declined).toEqual({ count: 1, amount: 90_000 });
+    expect(d.declined).toEqual({ count: 1, amount: 90_000, unconverted: 0 });
     expect(d.declinesByRule).toEqual([
-      { label: 'Per-payment limit', rules: ['PER_PAYMENT_LIMIT'], count: 1, amount: 90_000 },
+      {
+        label: 'Per-payment limit',
+        rules: ['PER_PAYMENT_LIMIT'],
+        count: 1,
+        amount: 90_000,
+        unconverted: 0,
+      },
     ]);
     expect(d.cancelled).toEqual({ count: 1, amount: 4_000 });
     expect(d.pending).toEqual({ count: 1, amount: 550_000 });
@@ -242,8 +281,48 @@ describe('the dashboard', () => {
       base_currency: 'CHF',
       cancellable_until: null,
     });
+    // No policy passed: the EUR request has no rate here, so it is counted but not summed.
     const d = buildDashboard(input([stopped, eur], { period: 'today' }));
-    expect(d.declined).toEqual({ count: 2, amount: 12_000 });
+    expect(d.declined).toEqual({ count: 2, amount: 12_000, unconverted: 1 });
+  });
+
+  it('converts a foreign-currency decline through the mandate fx table, rounding up', () => {
+    const e = [
+      // 10.01 EUR at 0.93 = 9.3093 CHF: rounded up to 9.31, like the engine.
+      foreignDecline('e', '2026-10-26T08:00:00.000Z', 1_001, 'EUR', 'CURRENCY'),
+      // No rate for JPY: counted, never silently summed or dropped.
+      foreignDecline('j', '2026-10-26T08:01:00.000Z', 5_000, 'JPY', 'CURRENCY'),
+      foreignDecline('k', '2026-10-26T08:02:00.000Z', 7_000, 'JPY', 'KILL_SWITCH'),
+      decision('c', 'lab', '2026-10-26T08:03:00.000Z', 'declined', 300_000, {
+        rule: 'CURRENCY',
+      }),
+    ];
+    const d = buildDashboard(input(e, { period: 'today', policy: POLICY }));
+    expect(d.declined).toEqual({ count: 4, amount: 300_931, unconverted: 2 });
+    expect(d.declinesByRule).toEqual([
+      {
+        label: 'Currency not allowed',
+        rules: ['CURRENCY'],
+        count: 3,
+        amount: 300_931,
+        unconverted: 1,
+      },
+      {
+        label: 'Kill switch or frozen agent',
+        rules: ['KILL_SWITCH'],
+        count: 1,
+        amount: 0,
+        unconverted: 1,
+      },
+    ]);
+  });
+
+  it('does not convert with a mandate whose base currency changed since the request', () => {
+    const e = [foreignDecline('e', '2026-10-26T08:00:00.000Z', 1_000, 'EUR', 'CURRENCY')];
+    const d = buildDashboard(
+      input(e, { period: 'today', policy: { ...POLICY, baseCurrency: 'EUR' } }),
+    );
+    expect(d.declined).toEqual({ count: 1, amount: 0, unconverted: 1 });
   });
 
   it('exports only the entries of the visible period and agent', () => {
@@ -259,5 +338,49 @@ describe('the dashboard', () => {
     expect(ids(all)).toEqual([e[1], e[2], e[3]].map((x) => x?.seq));
     const lab = periodEntries(input(e, { period: '90d', agentId: 'lab' }));
     expect(ids(lab)).toEqual([e[0], e[1], e[2]].map((x) => x?.seq));
+  });
+});
+
+describe('agent series and filters', () => {
+  const many = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ id: `a${String(i)}`, name: `Agent ${String(i)}` }));
+
+  it('gives the first eight agents their own colour slot', () => {
+    const g = spendGroups(many(8), null);
+    expect(g.map((x) => x.slot)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(g.every((x) => x.agentIds.length === 1)).toBe(true);
+  });
+
+  it('groups agents past the colour slots as one "Other agents" series', () => {
+    const g = spendGroups(many(11), null);
+    expect(g).toHaveLength(AGENT_SLOTS + 1);
+    expect(g.at(-1)).toEqual({
+      key: OTHER_AGENTS,
+      label: 'Other agents (3)',
+      slot: null,
+      agentIds: ['a8', 'a9', 'a10'],
+    });
+    // Every series looks different: distinct slots, and only one without a slot.
+    const slots = g.map((x) => x.slot);
+    expect(new Set(slots).size).toBe(slots.length);
+  });
+
+  it('keeps a single extra agent as its own grey series', () => {
+    const g = spendGroups(many(9), null);
+    expect(g.at(-1)).toEqual({ key: 'a8', label: 'Agent 8', slot: null, agentIds: ['a8'] });
+  });
+
+  it('shows only the filtered agent, keeping its colour slot', () => {
+    expect(spendGroups(many(11), 'a3')).toEqual([
+      { key: 'a3', label: 'Agent 3', slot: 3, agentIds: ['a3'] },
+    ]);
+    expect(spendGroups(many(11), 'a9')[0]?.slot).toBeNull();
+  });
+
+  it('filters approval and cooling-off items by agent', () => {
+    const items = [{ agentId: 'lab' }, { agentId: 'office' }, { agentId: 'lab' }];
+    expect(forAgent(items, null)).toHaveLength(3);
+    expect(forAgent(items, 'office')).toEqual([{ agentId: 'office' }]);
+    expect(forAgent(items, 'nobody')).toEqual([]);
   });
 });

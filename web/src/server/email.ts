@@ -8,8 +8,7 @@ import type { Sql } from './db';
  *
  * - `OutboxMailer` (development): stores messages in the email_outbox table; /dev/outbox shows
  *   them. Refuses to run when NODE_ENV is production, so links never sit in a database there.
- * - `SmtpMailer`: the shape for a real provider (EMAIL_FROM, SMTP_URL). Not wired yet: sending
- *   throws until a transport is added and reviewed.
+ * - `ResendMailer`: real delivery through the Resend HTTP API (RESEND_API_KEY, EMAIL_FROM).
  */
 
 export interface EmailMessage {
@@ -51,22 +50,81 @@ export class OutboxMailer implements Mailer {
   }
 }
 
-export class SmtpMailer implements Mailer {
-  readonly name = 'smtp';
+export class EmailSendError extends Error {
+  override name = 'EmailSendError';
+}
+
+export const RESEND_ENDPOINT = 'https://api.resend.com/emails';
+const RESEND_TIMEOUT_MS = 10_000;
+
+/**
+ * Sends through Resend (https://resend.com): one POST per message, 10 second timeout. Errors
+ * carry the HTTP status and Resend's own message, never the API key or the email body (bodies
+ * hold one-time links).
+ */
+export class ResendMailer implements Mailer {
+  readonly name = 'resend';
   readonly from: string;
+  readonly #apiKey: string;
 
-  constructor(env: NodeJS.ProcessEnv = process.env) {
-    if (!env.EMAIL_FROM || !env.SMTP_URL) {
-      throw new MailerConfigError('EMAIL_FROM and SMTP_URL must both be set to send email.');
+  constructor(
+    env: NodeJS.ProcessEnv = process.env,
+    private readonly fetchImpl: typeof fetch = (input, init) => fetch(input, init),
+  ) {
+    const apiKey = env.RESEND_API_KEY?.trim();
+    const from = env.EMAIL_FROM?.trim();
+    if (!apiKey || !from) {
+      throw new MailerConfigError('RESEND_API_KEY and EMAIL_FROM must both be set to send email.');
     }
-    this.from = env.EMAIL_FROM;
+    this.#apiKey = apiKey;
+    this.from = from;
   }
 
-  send(_message: EmailMessage): Promise<void> {
-    return Promise.reject(
-      new MailerConfigError('SMTP sending is not wired yet; see web/README.md.'),
-    );
+  async send(m: EmailMessage): Promise<void> {
+    let res: Response;
+    try {
+      res = await this.fetchImpl(RESEND_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.#apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: this.from,
+          to: [m.to],
+          subject: m.subject,
+          text: m.text,
+          html: m.html,
+        }),
+        signal: AbortSignal.timeout(RESEND_TIMEOUT_MS),
+      });
+    } catch (err) {
+      const why =
+        err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
+          ? 'timed out'
+          : 'could not be reached';
+      throw new EmailSendError(`Resend ${why}.`);
+    }
+    if (res.ok) return;
+    const detail = (await resendErrorMessage(res)).replaceAll(this.#apiKey, '[redacted]');
+    const text = `Resend refused the email (HTTP ${res.status}${detail ? `: ${detail}` : ''}).`;
+    // The caller logs only the error name; this says why, without the key or the body.
+    console.error('email not sent:', text);
+    throw new EmailSendError(text);
   }
+}
+
+/** Resend answers errors as `{ statusCode, name, message }`. Only the message, kept short. */
+async function resendErrorMessage(res: Response): Promise<string> {
+  try {
+    const body: unknown = await res.json();
+    if (body && typeof body === 'object' && 'message' in body && typeof body.message === 'string') {
+      return body.message.slice(0, 300);
+    }
+  } catch {
+    // Not JSON: the status alone has to do.
+  }
+  return '';
 }
 
 /** Production without email configured: every send fails (and is logged), nothing is stored. */
@@ -79,14 +137,15 @@ export class DisabledMailer implements Mailer {
 }
 
 /**
- * The mailer for this environment: SMTP when configured, the outbox outside production, and
- * otherwise a mailer that refuses. Never throws here, so a missing email setup cannot take the
- * rest of the site (the sandbox) down.
+ * The mailer for this environment: Resend when RESEND_API_KEY and EMAIL_FROM are set, the outbox
+ * outside production, and otherwise a mailer that refuses. Setting only one of the two refuses
+ * too, rather than quietly falling back to the outbox. Never throws here, so a missing email
+ * setup cannot take the rest of the site (the sandbox) down.
  */
 export function mailerFromEnv(sql: Sql, env: NodeJS.ProcessEnv = process.env): Mailer {
-  if (env.SMTP_URL || env.EMAIL_FROM) {
+  if (env.RESEND_API_KEY || env.EMAIL_FROM) {
     try {
-      return new SmtpMailer(env);
+      return new ResendMailer(env);
     } catch {
       return new DisabledMailer();
     }

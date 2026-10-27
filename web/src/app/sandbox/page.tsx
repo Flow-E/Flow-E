@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { DashboardBody, DashboardFilters } from '@/components/dashboard';
+import { DashboardBody, DashboardFilters, agentScopeNote, panelNote } from '@/components/dashboard';
 import { Panel, StatusPill, ButtonLink } from '@/components/ui';
 import { dateTime, money, time } from '@/lib/format';
-import { buildDashboard, parseAgent, parsePeriod } from '@/server/analytics';
+import { buildDashboard, forAgent, parseAgent, parsePeriod } from '@/server/analytics';
 import { sandboxView } from '@/server/view';
 import {
   cancelAction,
@@ -36,7 +36,11 @@ export default async function DashboardPage({
     now: view.now,
     period,
     agentId,
+    policy: view.config.policy,
   });
+  const pending = forAgent(view.pending, agentId);
+  const coolingOff = forAgent(view.coolingOff, agentId);
+  const scope = agentScopeNote(agents, agentId);
   const query = new URLSearchParams({ period, ...(agentId ? { agent: agentId } : {}) });
 
   return (
@@ -131,12 +135,13 @@ export default async function DashboardPage({
           <div className="grid gap-6 lg:grid-cols-2">
             {/* Approvals */}
             <Panel
-              title={`Waiting for approval${view.pending.length ? ` (${String(view.pending.length)})` : ''}`}
-              description={
-                threshold === null ? undefined : `Payments above ${fmt(threshold)} need a human.`
-              }
+              title={`Waiting for approval${pending.length ? ` (${String(pending.length)})` : ''}`}
+              description={panelNote(
+                threshold === null ? null : `Payments above ${fmt(threshold)} need a human.`,
+                scope,
+              )}
             >
-              {view.pending.length === 0 ? (
+              {pending.length === 0 ? (
                 <p className="text-sm text-ink-2">
                   Nothing waits for you.{' '}
                   <Link href="/sandbox/agent" className="text-accent underline">
@@ -146,7 +151,7 @@ export default async function DashboardPage({
                 </p>
               ) : (
                 <ul className="divide-y divide-rule">
-                  {view.pending.map((p) => (
+                  {pending.map((p) => (
                     <li key={p.paymentId} className="space-y-2 py-3 first:pt-0 last:pb-0">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <Link
@@ -186,15 +191,18 @@ export default async function DashboardPage({
             {/* Cooling-off */}
             <Panel
               title="Cooling-off"
-              description="A first payment to a new supplier stays cancellable for 10 minutes."
+              description={panelNote(
+                'A first payment to a new supplier stays cancellable for 10 minutes.',
+                scope,
+              )}
             >
-              {view.coolingOff.length === 0 ? (
+              {coolingOff.length === 0 ? (
                 <p className="text-sm text-ink-2">
                   No payment is in its cooling-off window right now.
                 </p>
               ) : (
                 <ul className="divide-y divide-rule">
-                  {view.coolingOff.map((p) => (
+                  {coolingOff.map((p) => (
                     <li
                       key={p.paymentId}
                       className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"

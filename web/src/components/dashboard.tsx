@@ -3,11 +3,14 @@ import type { ReactNode } from 'react';
 import { Panel, Pill, toneOf } from '@/components/ui';
 import { dateTime, decimalsOf, money } from '@/lib/format';
 import {
+  AGENT_SLOTS,
   PERIODS,
   PERIOD_LABELS,
+  spendGroups,
   type Activity,
   type Dashboard,
   type DayPoint,
+  type Declined,
   type Period,
 } from '@/server/analytics';
 
@@ -27,12 +30,33 @@ interface Money {
   decimals: Readonly<Record<string, number>> | undefined;
 }
 
-const SLOTS = 8;
+function slotColor(slot: number | null): string {
+  return slot !== null && slot >= 0 && slot < AGENT_SLOTS
+    ? `var(--viz-${String(slot + 1)})`
+    : 'var(--viz-other)';
+}
 
-/** Colour follows the agent (its place in the full list), never its rank in a filtered view. */
+/**
+ * Colour follows the agent (its place in the full list), never its rank in a filtered view.
+ * Agents past the validated slots are grey: in the spend chart they are one "Other agents" series.
+ */
 export function agentColor(agents: readonly DashboardAgentRef[], id: string): string {
-  const i = agents.findIndex((a) => a.id === id);
-  return i >= 0 && i < SLOTS ? `var(--viz-${String(i + 1)})` : 'var(--viz-other)';
+  return slotColor(agents.findIndex((a) => a.id === id));
+}
+
+/** "Showing Lab Agent only." when the dashboard is filtered to one agent, for panel notes. */
+export function agentScopeNote(
+  agents: readonly DashboardAgentRef[],
+  agentId: string | null,
+): string | null {
+  const a = agentId === null ? undefined : agents.find((x) => x.id === agentId);
+  return a ? `Showing ${a.name} only.` : null;
+}
+
+/** Joins a panel's description parts, leaving out the empty ones. */
+export function panelNote(...parts: (string | null | undefined)[]): string | undefined {
+  const text = parts.filter((x): x is string => Boolean(x)).join(' ');
+  return text === '' ? undefined : text;
 }
 
 function href(basePath: string, period: Period, agent: string | null): string {
@@ -124,6 +148,21 @@ function Swatch({ color, shape = 'square' }: { color: string; shape?: 'square' |
 }
 
 // Formatting --------------------------------------------------------------------------------------
+
+function others(n: number, short: boolean): string {
+  if (short) return `${String(n)} foreign`;
+  return n === 1 ? '1 in another currency' : `${String(n)} in other currencies`;
+}
+
+/**
+ * A decline sum that does not hide what it could not convert: "CHF 3,000.00 + 1 in another
+ * currency", or only the count when nothing had a base amount.
+ */
+export function declinedText(d: Declined, fmt: (minor: number) => string, short = false): string {
+  if (d.unconverted === 0) return fmt(d.amount);
+  if (d.unconverted >= d.count) return others(d.unconverted, short);
+  return `${fmt(d.amount)} + ${others(d.unconverted, short)}`;
+}
 
 function percent(share: number | null): string {
   return share === null ? '—' : `${String(Math.round(share * 100))}%`;
@@ -334,8 +373,19 @@ export function StackedColumns({
             className="tabular mt-1.5 grid text-[11px] leading-none text-ink-3"
             style={{ gridTemplateColumns: `repeat(${String(n)}, minmax(0, 1fr))` }}
           >
+            {/* Flex alignment lets a label wider than its column overflow on both sides (centred),
+                and keeps the first and last labels inside the plot on narrow screens. */}
             {points.map((p, i) => (
-              <span key={p.date} className="overflow-visible whitespace-nowrap text-center">
+              <span
+                key={p.date}
+                className={`flex min-w-0 whitespace-nowrap ${
+                  i === n - 1 && n > 1
+                    ? 'justify-end'
+                    : i === 0 && n > 1
+                      ? 'justify-start'
+                      : 'justify-center'
+                }`}
+              >
                 {(n - 1 - i) % every === 0 ? bucketLabel(p.date, unit) : ''}
               </span>
             ))}
@@ -536,12 +586,13 @@ export function DashboardBody({
 }) {
   const fmt = (minor: number) => money(minor, m.currency, m.decimals);
   const tick = (minor: number) => compact(minor, m);
-  const visible = dash.agentId === null ? agents : agents.filter((a) => a.id === dash.agentId);
-  const spendSeries: Series[] = visible.map((a) => ({
-    key: a.id,
-    label: a.name,
-    color: agentColor(agents, a.id),
+  const groups = spendGroups(agents, dash.agentId);
+  const spendSeries: Series[] = groups.map((g) => ({
+    key: g.key,
+    label: g.label,
+    color: slotColor(g.slot),
   }));
+  const groupOf = new Map(groups.map((g) => [g.key, g.agentIds]));
   const decisionSeries: Series[] = [
     { key: 'approved', label: 'Approved', color: 'var(--viz-approved)' },
     { key: 'review', label: 'Sent to a human', color: 'var(--viz-review)' },
@@ -620,7 +671,7 @@ export function DashboardBody({
         <Tile
           label="Declined by Flow-E"
           value={dash.declined.count}
-          detail={dash.declined.count > 0 ? fmt(dash.declined.amount) : 'None'}
+          detail={dash.declined.count > 0 ? declinedText(dash.declined, fmt) : 'None'}
         />
         <Tile
           label="Cancelled in cooling-off"
@@ -651,7 +702,9 @@ export function DashboardBody({
                 title="Approved spend"
                 points={dash.days}
                 series={spendSeries}
-                value={(p, key) => p.byAgent[key] ?? 0}
+                value={(p, key) =>
+                  (groupOf.get(key) ?? []).reduce((s, id) => s + (p.byAgent[id] ?? 0), 0)
+                }
                 unit={dash.unit}
                 format={fmt}
                 tick={tick}
@@ -709,7 +762,7 @@ export function DashboardBody({
                     label: r.label,
                     value: r.count,
                     text: `${String(r.count)}×`,
-                    detail: fmt(r.amount),
+                    detail: declinedText(r, fmt, true),
                   }))}
                 />
               )}

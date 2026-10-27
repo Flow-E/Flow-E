@@ -12,6 +12,7 @@ import {
 import { CircleCheck, CircleMinus, CircleX, Clock, Info } from 'lucide-react';
 import { Pill, buttonClass } from '@/components/ui';
 import { RULE_NAMES } from '@/lib/format';
+import { CATEGORY_GROUPS } from '@/lib/mcc';
 import type { ActionResult, OutcomeView, RequestState, VerifyState } from './actions';
 
 type Act = (prev: ActionResult, form: FormData) => Promise<ActionResult>;
@@ -339,15 +340,18 @@ export function CustomRequestForm({ action, agents }: { action: Req; agents: str
           />
         </label>
         <label className="text-sm font-medium text-ink">
-          Category (MCC)
-          <input
-            name="category"
-            required
-            inputMode="numeric"
-            maxLength={4}
-            placeholder="5047"
-            className={`${field} tabular font-mono`}
-          />
+          Category
+          <select name="category" required defaultValue="5047" className={field}>
+            {CATEGORY_GROUPS.map((g) => (
+              <optgroup key={g.title} label={g.title}>
+                {g.items.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.name} ({c.code})
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
         </label>
         <label className="text-sm font-medium text-ink">
           Supplier country

@@ -6,7 +6,8 @@ import { ROLE_LABEL } from '@/server/permissions';
 import { requireUser } from '@/server/org-view';
 import { getOrgStore } from '@/server/runtime';
 import { signOut } from '../login/actions';
-import { createOrgAction } from './actions';
+import { ActionButton } from '../sandbox/client';
+import { createDemoLabAction, createOrgAction } from './actions';
 import { CreateOrgForm } from './client';
 
 export const metadata: Metadata = { title: 'Organisations' };
@@ -70,6 +71,18 @@ export default async function OrgsPage() {
           description="You become its owner. It gets its own issuer key, an empty mandate and an empty ledger."
         >
           <CreateOrgForm action={createOrgAction} timezone="Europe/Zurich" />
+        </Panel>
+
+        <Panel
+          title="Demo lab"
+          description="Creates “Example Labs AG (demo, fictional)” with a lab procurement agent, the sandbox's fictional suppliers and limits, and an empty ledger. Use it to show a real Claude buying through Flow-E."
+        >
+          <ActionButton
+            action={createDemoLabAction}
+            fields={{}}
+            label="Create the demo lab"
+            pendingLabel="Creating…"
+          />
         </Panel>
 
         <Link

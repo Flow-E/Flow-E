@@ -487,7 +487,7 @@ describe('the development outbox', () => {
   it('is never chosen in production, and the choice never throws', () => {
     const sql = { query: () => Promise.resolve([]) };
     expect(mailerFromEnv(sql, { NODE_ENV: 'production' }).name).toBe('disabled');
-    expect(mailerFromEnv(sql, { NODE_ENV: 'production', SMTP_URL: 'smtp://x' }).name).toBe(
+    expect(mailerFromEnv(sql, { NODE_ENV: 'production', RESEND_API_KEY: 're_x' }).name).toBe(
       'disabled',
     );
     expect(mailerFromEnv(sql, { NODE_ENV: 'development' }).name).toBe('outbox');

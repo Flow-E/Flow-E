@@ -2,6 +2,7 @@
 
 import { useActionState, useId, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
+import { CategoryPicker } from '@/components/category-picker';
 import { buttonClass } from '@/components/ui';
 import { keepValues } from '../sandbox/client';
 import type { ActionResult, SecretResult } from './actions';
@@ -198,7 +199,7 @@ export function CreateAgentForm({
           name="dailyBudget"
           required
           inputMode="decimal"
-          placeholder="2000"
+          defaultValue="2000"
           className={`${field} tabular font-mono`}
         />
       </label>
@@ -208,7 +209,7 @@ export function CreateAgentForm({
           name="perPaymentLimit"
           required
           inputMode="decimal"
-          placeholder="1000"
+          defaultValue="1000"
           className={`${field} tabular font-mono`}
         />
       </label>
@@ -217,24 +218,18 @@ export function CreateAgentForm({
         <input
           name="approvalAbove"
           inputMode="decimal"
-          placeholder="500"
+          defaultValue="500"
           className={`${field} tabular font-mono`}
         />
         <span className={hint}>Optional. Above this, an owner or approver decides.</span>
       </label>
-      <label className={`${label} sm:col-span-2 lg:col-span-3`}>
-        Allowed categories (MCC)
-        <input
-          name="categories"
-          required
-          placeholder="5169, 5047"
-          className={`${field} tabular font-mono`}
-        />
-        <span className={hint}>
-          Four-digit merchant category codes, comma-separated. Suppliers, countries, currencies and
-          business hours can be refined on the Mandate page afterwards.
-        </span>
-      </label>
+      <div className="sm:col-span-2 lg:col-span-3">
+        <CategoryPicker name="categories" />
+        <p className={hint}>
+          Suppliers, countries, currencies and business hours can be refined on the Mandate page
+          afterwards.
+        </p>
+      </div>
       <div className="space-y-2 sm:col-span-2 lg:col-span-3">
         <button type="submit" disabled={pending} className={buttonClass('primary')}>
           {pending ? 'Creating…' : 'Create agent'}

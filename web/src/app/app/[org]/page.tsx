@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { CircleCheck, Circle } from 'lucide-react';
-import { DashboardBody, DashboardFilters } from '@/components/dashboard';
+import { DashboardBody, DashboardFilters, agentScopeNote, panelNote } from '@/components/dashboard';
 import { ButtonLink, Panel, StatusPill } from '@/components/ui';
 import { dateTime, money, time } from '@/lib/format';
-import { buildDashboard, parseAgent, parsePeriod } from '@/server/analytics';
+import { buildDashboard, forAgent, parseAgent, parsePeriod } from '@/server/analytics';
 import { can } from '@/server/permissions';
 import { orgView } from '@/server/org-view';
 import { ActionButton, AutoRefresh } from '../../sandbox/client';
@@ -42,7 +42,11 @@ export default async function OrgDashboard({
     now: view.now,
     period,
     agentId,
+    policy: view.config.policy,
   });
+  const pending = forAgent(view.pending, agentId);
+  const coolingOff = forAgent(view.coolingOff, agentId);
+  const scope = agentScopeNote(agents, agentId);
   const exportQuery = new URLSearchParams({ period, ...(agentId ? { agent: agentId } : {}) });
   const hasKey = view.agents.some((a) => a.keys.some((k) => k.status === 'active'));
   const used = view.agents.some((a) => a.keys.some((k) => k.lastUsedAt !== null));
@@ -165,13 +169,14 @@ export default async function OrgDashboard({
         afterKpis={
           <div className="grid gap-6 lg:grid-cols-2">
             <Panel
-              title={`Waiting for approval${view.pending.length ? ` (${String(view.pending.length)})` : ''}`}
+              title={`Waiting for approval${pending.length ? ` (${String(pending.length)})` : ''}`}
+              description={panelNote(scope)}
             >
-              {view.pending.length === 0 ? (
+              {pending.length === 0 ? (
                 <p className="text-sm text-ink-2">Nothing waits for a human decision.</p>
               ) : (
                 <ul className="divide-y divide-rule">
-                  {view.pending.map((p) => (
+                  {pending.map((p) => (
                     <li key={p.paymentId} className="space-y-2 py-3 first:pt-0 last:pb-0">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <Link
@@ -213,15 +218,18 @@ export default async function OrgDashboard({
 
             <Panel
               title="Cooling-off"
-              description="A first payment to a new supplier stays cancellable for 10 minutes."
+              description={panelNote(
+                'A first payment to a new supplier stays cancellable for 10 minutes.',
+                scope,
+              )}
             >
-              {view.coolingOff.length === 0 ? (
+              {coolingOff.length === 0 ? (
                 <p className="text-sm text-ink-2">
                   No payment is in its cooling-off window right now.
                 </p>
               ) : (
                 <ul className="divide-y divide-rule">
-                  {view.coolingOff.map((p) => (
+                  {coolingOff.map((p) => (
                     <li
                       key={p.paymentId}
                       className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"

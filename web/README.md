@@ -122,8 +122,12 @@ status. Once a payment is decided, all its links are spent.
 
 **Email delivery** is an adapter (`src/server/email.ts`). In development emails go to the
 `email_outbox` table and `/dev/outbox` shows them (only with `NODE_ENV` not production and
-`FLOWE_DEV_LOGIN=1`); production refuses the outbox. The SMTP adapter reads `EMAIL_FROM` and
-`SMTP_URL` but is not wired to a transport yet. Plain text plus simple HTML, no tracking.
+`FLOWE_DEV_LOGIN=1`); production refuses the outbox. With `RESEND_API_KEY` and `EMAIL_FROM`
+set, emails go out through the Resend HTTP API instead, in any environment (10 second timeout,
+no retries). Setting only one of the two makes every send fail on purpose. A failed send never
+fails the request: it is logged with the HTTP status and Resend's message, never the key or the
+body (bodies hold one-time links). Without either, production refuses to send. Plain text plus
+simple HTML, no tracking.
 
 ## How it uses the core
 
@@ -191,7 +195,8 @@ Checks: `npm run lint`, `npm run typecheck`, `npm test` (in-memory PGlite, no se
 | -------------------------------------- | --------------- | ------ | --------------------------------------------------------------------------------------------------------- |
 | `FLOWE_KEY_ENCRYPTION_KEY`             | everywhere      | yes    | 32 random bytes, base64. Encrypts every issuer private key (sandboxes and organisations)                  |
 | `FLOWE_SANDBOX_KEY`                    | older name      | yes    | Same key under its old name; still read when `FLOWE_KEY_ENCRYPTION_KEY` is not set. Set only one          |
-| `EMAIL_FROM`, `SMTP_URL`               | later           | yes    | Real email delivery. Not wired yet: setting either makes sending fail on purpose until it is              |
+| `RESEND_API_KEY`                       | production      | yes    | Resend API key (sending access is enough). With `EMAIL_FROM`, sends invitation and approval emails        |
+| `EMAIL_FROM`                           | production      | no     | Sender, e.g. `Flow-E <approvals@yourdomain>`. The domain must be verified in Resend                       |
 | `FLOWE_SESSION_SECRET`                 | everywhere      | yes    | 32+ random characters. Signs the session cookie                                                           |
 | `SITE_PASSWORD`                        | optional        | yes    | Private-preview gate for every page. Remove to make the site public                                       |
 | `DATABASE_URL`                         | production      | yes    | Postgres connection string (Supabase transaction pooler)                                                  |
@@ -265,7 +270,7 @@ publishable key `sb_publishable__LHTIX5Dmr0Fg1ctdUztJA_Ak2sFoKm` (public).
    `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and
    `FLOWE_SITE_URL` (links in emails and on agent pages must not follow the request's Host
    header). Never set `FLOWE_DEV_LOGIN` there. Organisations need real email first
-   (`EMAIL_FROM`, `SMTP_URL` and a wired transport): production refuses the dev outbox.
+   (`RESEND_API_KEY`, `EMAIL_FROM`): production refuses the dev outbox.
 4. Region: Frankfurt (`fra1`) or Zurich-near, to sit next to the database.
 
 ### What is and is not verified

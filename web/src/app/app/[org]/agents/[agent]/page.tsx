@@ -4,8 +4,10 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { Panel, Pill, StatusPill } from '@/components/ui';
 import { dateTime, money } from '@/lib/format';
+import { categoryLabel } from '@/lib/mcc';
 import { can } from '@/server/permissions';
 import { orgView } from '@/server/org-view';
+import { DEMO_LAB_AGENT, DEMO_LAB_NAME, demoLabPrompt } from '@/server/demo-lab';
 import { siteOrigin } from '@/server/origin';
 import { ActionButton } from '../../../../sandbox/client';
 import {
@@ -85,7 +87,7 @@ export default async function AgentPage({
                 : fmt(mandate.approvalAbove)}
             </dd>
             <dt className="text-ink-3">Categories</dt>
-            <dd className="text-right font-mono">{mandate?.categories.join(', ')}</dd>
+            <dd className="text-right">{mandate?.categories.map(categoryLabel).join(', ')}</dd>
             <dt className="text-ink-3">Credential valid until</dt>
             <dd className="text-right">
               {a.credentialExpires ? dateTime(a.credentialExpires, view.timezone) : '—'}
@@ -214,6 +216,9 @@ export default async function AgentPage({
         <div id="connect" className="space-y-5">
           <CopyBlock title="Claude Code" value={claude} />
           <CopyBlock title="Other MCP clients (JSON)" value={json} />
+          {view.name === DEMO_LAB_NAME && a.id === DEMO_LAB_AGENT ? (
+            <CopyBlock title="Demo prompt to paste into Claude" value={demoLabPrompt()} />
+          ) : null}
           <p className="text-sm text-ink-3">
             Endpoint: <span className="font-mono">{endpoint}</span> · Streamable HTTP · POST only ·
             60 requests per minute per key.

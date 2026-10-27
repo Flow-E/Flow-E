@@ -7,7 +7,9 @@ import {
   dailySpend,
   foldPayments,
   localTime,
+  toBaseMinor,
   toEngineViews,
+  type GlobalPolicy,
   type PaymentRecord,
   type StoredEntry,
 } from '@flow-e/mcp/core';
@@ -75,11 +77,24 @@ export interface DashboardInput {
   now: number;
   period: Period;
   agentId: string | null;
+  /**
+   * The mandate's policy, for its fx table: a request declined before the currency rule has no
+   * base amount, and is converted here at the mandate's rate (rounded up, like the engine). The
+   * ledger keeps no rate history, so this is the current rate. Without it, or without a rate,
+   * such a request is counted but not summed (see `Declined.unconverted`).
+   */
+  policy?: GlobalPolicy;
 }
 
 export interface Amount {
   count: number;
   amount: number;
+}
+
+/** Declines: `amount` sums what has a base-currency amount; `unconverted` counts the rest. */
+export interface Declined extends Amount {
+  /** Declines in a foreign currency with no rate to convert them: counted, not in `amount`. */
+  unconverted: number;
 }
 
 export interface DayPoint {
@@ -122,7 +137,7 @@ export interface Dashboard {
   autoApprovedShare: number | null;
   autoApproved: number;
   /** The engine's declines in the period. */
-  declined: Amount;
+  declined: Declined;
   cancelled: Amount;
   /** Everything waiting for a human now, whatever the period. */
   pending: Amount;
@@ -132,7 +147,7 @@ export interface Dashboard {
   todayBudget: { approved: number; pending: number; budget: number };
   days: DayPoint[];
   topSuppliers: (Amount & { merchant: string })[];
-  declinesByRule: (Amount & { label: string; rules: string[] })[];
+  declinesByRule: (Declined & { label: string; rules: string[] })[];
   budgetToday: {
     agentId: string;
     name: string;
@@ -189,6 +204,89 @@ function text(v: unknown, fallback = ''): string {
   return typeof v === 'string' ? v : fallback;
 }
 
+// Base-currency amounts --------------------------------------------------------------------------
+
+/**
+ * A payment's amount in base-currency minor units, or null when it cannot be known honestly.
+ * The engine records `amount_base` once the currency rule ran. A request stopped before that
+ * (kill switch, credential, currency not allowed, no rate) has none: in the base currency the
+ * requested amount is exact; otherwise it is converted through the mandate's fx table, rounded
+ * up like the engine does, and stays null when there is no rate.
+ */
+export function baseAmount(policy: DashboardInput['policy']): (p: PaymentRecord) => number | null {
+  return (p) => {
+    if (p.amountBase !== null) return p.amountBase;
+    const currency = p.request.currency.trim().toUpperCase();
+    if (currency === p.baseCurrency) return p.request.amount;
+    if (!policy || policy.baseCurrency !== p.baseCurrency || !Object.hasOwn(policy.fx, currency)) {
+      return null;
+    }
+    try {
+      return toBaseMinor(p.request.amount, currency, policy);
+    } catch {
+      return null;
+    }
+  };
+}
+
+// Agent colours -----------------------------------------------------------------------------------
+
+/** Validated categorical colours; agents beyond these are grouped as "Other agents". */
+export const AGENT_SLOTS = 8;
+/** Series key of the grouped agents. Agent ids start with [a-z0-9], so it cannot clash. */
+export const OTHER_AGENTS = '_other';
+
+export interface SpendGroup {
+  key: string;
+  label: string;
+  /** Index into the colour slots, or null for the grouped "Other agents". */
+  slot: number | null;
+  agentIds: string[];
+}
+
+/**
+ * The per-agent spend series. Each of the first AGENT_SLOTS agents (by place in the full list,
+ * so a colour follows its agent) gets its own series; any further agents share one series,
+ * "Other agents", so no two agents ever look the same. A filter to one agent shows just it.
+ */
+export function spendGroups(
+  agents: readonly { id: string; name: string }[],
+  agentId: string | null,
+): SpendGroup[] {
+  const own = (a: { id: string; name: string }, i: number): SpendGroup => ({
+    key: a.id,
+    label: a.name,
+    slot: i < AGENT_SLOTS ? i : null,
+    agentIds: [a.id],
+  });
+  if (agentId !== null) {
+    const i = agents.findIndex((a) => a.id === agentId);
+    const a = agents[i];
+    return a ? [own(a, i)] : [];
+  }
+  const groups = agents.slice(0, AGENT_SLOTS).map(own);
+  const rest = agents.slice(AGENT_SLOTS);
+  // One extra agent keeps its own (grey) series: no other series is grey, so it stays distinct.
+  if (rest.length === 1 && rest[0]) groups.push(own(rest[0], AGENT_SLOTS));
+  else if (rest.length > 1) {
+    groups.push({
+      key: OTHER_AGENTS,
+      label: `Other agents (${String(rest.length)})`,
+      slot: null,
+      agentIds: rest.map((a) => a.id),
+    });
+  }
+  return groups;
+}
+
+/** Items of one agent when the dashboard is filtered to it; all items otherwise. */
+export function forAgent<T extends { agentId: string }>(
+  items: readonly T[],
+  agentId: string | null,
+): T[] {
+  return agentId === null ? [...items] : items.filter((p) => p.agentId === agentId);
+}
+
 // The computation ------------------------------------------------------------------------------
 
 export function buildDashboard(input: DashboardInput): Dashboard {
@@ -206,13 +304,15 @@ export function buildDashboard(input: DashboardInput): Dashboard {
   const all = foldPayments(entries).filter((p) => keep(p.agentId));
   const byId = new Map(all.map((p) => [p.paymentId, p]));
   const payments = all.filter((p) => inPeriod(p.createdAt));
-  // A request stopped before the amount rule (kill switch, credential) has no amount_base; in
-  // the base currency the requested amount is exact, otherwise it is left out of sums.
-  const base = (p: PaymentRecord) =>
-    p.amountBase ?? (p.request.currency === p.baseCurrency ? p.request.amount : 0);
+  const toBase = baseAmount(input.policy);
+  const base = (p: PaymentRecord) => toBase(p) ?? 0;
   const sum = (list: readonly PaymentRecord[]): Amount => ({
     count: list.length,
     amount: list.reduce((s, p) => s + base(p), 0),
+  });
+  const sumDeclined = (list: readonly PaymentRecord[]): Declined => ({
+    ...sum(list),
+    unconverted: list.filter((p) => toBase(p) === null).length,
   });
 
   const unit = period === 'today' ? 'hour' : 'day';
@@ -229,7 +329,7 @@ export function buildDashboard(input: DashboardInput): Dashboard {
     ]),
   );
   const suppliers = new Map<string, Amount & { merchant: string }>();
-  const rules = new Map<string, Amount & { label: string; rules: string[] }>();
+  const rules = new Map<string, Declined & { label: string; rules: string[] }>();
   for (const p of payments) {
     const point = points.get(bucket(p.createdAt));
     if (point) point[p.engineDecision] += 1;
@@ -246,9 +346,10 @@ export function buildDashboard(input: DashboardInput): Dashboard {
     }
     if (p.engineDecision === 'declined') {
       const label = declineLabel(p.rule);
-      const r = rules.get(label) ?? { label, rules: [], count: 0, amount: 0 };
+      const r = rules.get(label) ?? { label, rules: [], count: 0, amount: 0, unconverted: 0 };
       r.count += 1;
       r.amount += base(p);
+      if (toBase(p) === null) r.unconverted += 1;
       if (p.rule !== null && !r.rules.includes(p.rule)) r.rules.push(p.rule);
       rules.set(label, r);
     }
@@ -297,7 +398,7 @@ export function buildDashboard(input: DashboardInput): Dashboard {
     approved: sum(payments.filter((p) => p.status === 'approved')),
     autoApproved: engineApproved,
     autoApprovedShare: payments.length === 0 ? null : engineApproved / payments.length,
-    declined: sum(payments.filter((p) => p.engineDecision === 'declined')),
+    declined: sumDeclined(payments.filter((p) => p.engineDecision === 'declined')),
     cancelled: sum(payments.filter((p) => p.status === 'cancelled')),
     pending: sum(all.filter((p) => p.status === 'review')),
     activeAgents: new Set(payments.map((p) => p.agentId)).size,
