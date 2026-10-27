@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { AmountError, parseAmount } from '../engine/money.js';
 import { FxError, parseRate } from '../engine/fx.js';
 import { parseClock } from '../engine/time.js';
-import type { AgentStatus, GlobalPolicy, Mandate } from '../engine/types.js';
+import { normalizeName } from '../engine/normalize.js';
+import type { AgentStatus, GlobalPolicy, Mandate, ReferencePrice } from '../engine/types.js';
 
 /**
  * mandate.yaml: human-readable, snake_case, money in major units of the base currency.
@@ -54,6 +55,24 @@ export const configSchema = z.strictObject({
       end: clock.default('18:00'),
     })
     .default({ days: [1, 2, 3, 4, 5], start: '08:00', end: '18:00' }),
+  reference_prices: z
+    .array(
+      z.strictObject({
+        item: z.string().trim().min(1).max(200),
+        match: z.array(z.string().trim().min(2).max(100)).max(20).default([]),
+        price: money,
+        unit: z.string().trim().min(1).max(40).optional(),
+      }),
+    )
+    .max(1000)
+    .default([]),
+  price_check: z
+    .strictObject({
+      above_percent: z.number().int().min(0).max(1000).default(20),
+      below_percent: z.number().int().min(1).max(99).nullable().default(50),
+      above: z.enum(['review', 'decline']).default('review'),
+    })
+    .default({ above_percent: 20, below_percent: 50, above: 'review' }),
   agents: z.record(
     z.string().regex(/^[a-z0-9][a-z0-9_-]{0,62}$/, 'Agent ids use a-z, 0-9, "-" and "_"'),
     agentSchema,
@@ -155,6 +174,20 @@ function toEngine(raw: RawConfig): MandateConfig {
     agents[id] = { id, owner: a.owner, status: a.status, mandate };
   }
 
+  const referencePrices: ReferencePrice[] = [];
+  const seen = new Set<string>();
+  for (const [i, r] of raw.reference_prices.entries()) {
+    const path = `reference_prices[${String(i)}]`;
+    const key = normalizeName(r.item);
+    if (seen.has(key)) problems.push(`${path}: "${r.item}" is listed twice`);
+    seen.add(key);
+    const priceBase = toMinor(`${path}.price`, r.price);
+    if (priceBase === 0) problems.push(`${path}.price: must be above 0`);
+    const ref: ReferencePrice = { item: r.item, match: r.match, priceBase };
+    if (r.unit !== undefined) ref.unit = r.unit;
+    referencePrices.push(ref);
+  }
+
   if (problems.length > 0) {
     throw new ConfigError(`mandate.yaml is invalid:\n${problems.map((p) => `✖ ${p}`).join('\n')}`);
   }
@@ -166,6 +199,12 @@ function toEngine(raw: RawConfig): MandateConfig {
     blockedSuppliers: raw.blocked_suppliers,
     timezone: raw.timezone,
     businessHours: { days: raw.business_hours.days, startMinute, endMinute },
+    referencePrices,
+    priceCheck: {
+      abovePercent: raw.price_check.above_percent,
+      belowPercent: raw.price_check.below_percent,
+      above: raw.price_check.above,
+    },
   };
   if (decimals) policy.currencyDecimals = decimals;
   return raw.organisation ? { organisation: raw.organisation, policy, agents } : { policy, agents };

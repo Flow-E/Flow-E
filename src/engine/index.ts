@@ -6,6 +6,7 @@ export {
   SPLIT_WINDOW_MS,
   VELOCITY_WINDOW_MS,
   dailySpend,
+  findReference,
   type DailySpend,
 } from './rules.js';
 export { localTime, parseClock } from './time.js';

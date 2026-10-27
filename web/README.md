@@ -5,7 +5,7 @@ The public site and the sandbox for [Flow-E](https://github.com/Flow-E/Flow-E): 
 
 | Route                     | What it is                                                                                |
 | ------------------------- | ----------------------------------------------------------------------------------------- |
-| `/`                       | What Flow-E is, how it works, the thirteen rules, human control, proof, security, roadmap |
+| `/`                       | What Flow-E is, how it works, the fourteen rules, human control, proof, security, roadmap |
 | `/docs`                   | The repository README, synced at build time                                               |
 | `/sandbox`                | Signed-in only. Your own fictional company: dashboard, approvals, agents, kill switch     |
 | `/app`                    | Signed-in only. Your organisations: real agents with API keys, members and roles          |

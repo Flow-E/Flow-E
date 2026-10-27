@@ -32,6 +32,11 @@ export interface MandateFields {
   days: number[];
   start: string;
   end: string;
+  /** "Item | price | other words | unit" per line. */
+  prices: string;
+  above_percent: string;
+  below_percent: string;
+  price_action: string;
   agents: AgentFields[];
 }
 
@@ -184,6 +189,56 @@ export function MandateForm({
                 </label>
               </div>
             </div>
+          </div>
+        </fieldset>
+
+        <fieldset className="rounded-xl border border-rule bg-surface px-4 py-5 sm:px-5">
+          <legend className="px-1 text-base font-semibold">Fair price</legend>
+          <p className="text-sm text-ink-2">
+            Usual prices for items your agents buy. A request well above the usual price goes to a
+            person; one far below it too, because a suspiciously cheap offer is often the wrong
+            product or pack size. Items without a usual price are not checked.
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <label className={`${label} sm:col-span-3`}>
+              Usual prices ({data.baseCurrency})
+              <textarea
+                name="prices"
+                rows={Math.min(12, Math.max(4, data.prices.split('\n').length + 1))}
+                defaultValue={data.prices}
+                placeholder={
+                  'Phosphate buffer solution, 10 L | 1150 | phosphate buffer\nNitrile gloves | 22 | gloves | box'
+                }
+                className={`${area} tabular font-mono text-sm`}
+              />
+              <span className={hint}>
+                One item per line: item | usual price per unit | other words that name it,
+                comma-separated (optional) | unit (optional). Agents send the item and quantity with
+                each request.
+              </span>
+            </label>
+            <Field
+              name="above_percent"
+              title="Flag above the usual price by more than (%)"
+              value={data.above_percent}
+              mono
+              inputMode="numeric"
+            />
+            <label className={label}>
+              Then
+              <select name="price_action" defaultValue={data.price_action} className={input}>
+                <option value="review">A person decides</option>
+                <option value="decline">Decline</option>
+              </select>
+            </label>
+            <Field
+              name="below_percent"
+              title="Flag below the usual price by more than (%)"
+              value={data.below_percent}
+              mono
+              inputMode="numeric"
+              help="Leave empty to never flag cheap offers."
+            />
           </div>
         </fieldset>
 

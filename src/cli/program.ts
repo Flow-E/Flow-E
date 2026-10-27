@@ -306,7 +306,7 @@ Press Ctrl+C to stop.
   program
     .command('simulate [action] [arg]')
     .description(
-      'a fake agent for the demo folder: story (default), buy <1-6>, list, status <id>, mandate',
+      'a fake agent for the demo folder: story (default), buy <1-7>, list, status <id>, mandate',
     )
     .option('--dir <dir>', 'demo folder made by "flow-e demo"', 'flow-e-demo')
     .action(

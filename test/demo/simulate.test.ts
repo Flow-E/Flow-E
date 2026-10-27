@@ -85,7 +85,9 @@ describe('the fake agent', () => {
       'DECLINED',
       'DECLINED',
       'APPROVED',
+      'REVIEW',
     ]);
+    expect(story).toMatch(/Pipette tips, 20 racks[\s\S]*55% above the usual CHF 310\.00/);
     expect(story).toMatch(/Example Chem Trading LLC" is on the organisation's blocklist/);
     expect(story).toMatch(/above the per-payment limit of CHF 8000\.00/);
     expect(story).toMatch(
@@ -98,7 +100,7 @@ describe('the fake agent', () => {
     try {
       expect(ledger.audit(loadIssuer(join(demo, '.flow-e')).publicKey)).toMatchObject({
         ok: true,
-        entries: 7,
+        entries: 8,
       });
     } finally {
       ledger.close();
@@ -111,9 +113,9 @@ describe('the fake agent', () => {
   });
 
   it('lists the catalog and fails for a wrong item number', async () => {
-    for (const arg of ['9', '0', 'x', undefined]) {
+    for (const arg of ['8', '0', 'x', undefined]) {
       await expect(simulate('buy', arg)).rejects.toThrow(
-        /1\. Phosphate[\s\S]*Pick an item number from 1 to 6/,
+        /1\. Phosphate[\s\S]*Pick an item number from 1 to 7/,
       );
     }
   });
@@ -139,7 +141,7 @@ describe('the fake agent', () => {
       'Agent lab-procurement (active), owner Dr. A. Muster, Head of Lab (fictional)',
     );
     expect(out).toMatch(
-      /approved CHF 1680\.00, pending review CHF 6500\.00, remaining CHF 11820\.00/,
+      /approved CHF 1680\.00, pending review CHF 6980\.00, remaining CHF 11340\.00/,
     );
     expect(out).toContain('per payment up to CHF 8000.00; human approval above CHF 5000.00');
     expect(out).toContain('suppliers: Example Reagents AG, Example Labware AG');

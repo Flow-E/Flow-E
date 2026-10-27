@@ -57,6 +57,37 @@ agents:
     });
   });
 
+  it('reads reference prices in minor units, with price-check defaults', () => {
+    const { policy } = parseConfig(`
+base_currency: CHF
+reference_prices:
+  - { item: 'Phosphate buffer solution, 10 L', match: ['phosphate buffer'], price: 480 }
+  - { item: 'Nitrile gloves', price: '24.50', unit: box }
+agents: {}
+`);
+    expect(policy.referencePrices).toEqual([
+      { item: 'Phosphate buffer solution, 10 L', match: ['phosphate buffer'], priceBase: 48_000 },
+      { item: 'Nitrile gloves', match: [], priceBase: 2_450, unit: 'box' },
+    ]);
+    expect(policy.priceCheck).toEqual({ abovePercent: 20, belowPercent: 50, above: 'review' });
+  });
+
+  it.each([
+    ['a zero price', '[{ item: Gloves, price: 0 }]', /must be above 0/],
+    [
+      'an item listed twice',
+      '[{ item: Gloves, price: 1 }, { item: " gloves", price: 2 }]',
+      /twice/,
+    ],
+  ])('rejects reference prices with %s', (_name, list, message) => {
+    expect(() =>
+      parseConfig(`base_currency: CHF
+reference_prices: ${list}
+agents: {}
+`),
+    ).toThrow(message);
+  });
+
   const invalid: [string, string, RegExp][] = [
     ['not YAML', 'agents: [', /not valid YAML/],
     ['an unknown key (typo)', example.replace('daily_budget', 'daily_budgte'), /daily_budgte/],

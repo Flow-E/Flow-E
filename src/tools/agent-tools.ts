@@ -47,6 +47,23 @@ export const requestPaymentShape = {
     .max(500)
     .optional()
     .describe('What is being bought and why, for the people who review the ledger.'),
+  item: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .optional()
+    .describe(
+      'The product as named on the quote, e.g. "Phosphate buffer solution, 10 L". Used to ' +
+        'compare the price with the usual one.',
+    ),
+  quantity: z
+    .number()
+    .int()
+    .min(1)
+    .max(1_000_000)
+    .optional()
+    .describe('How many units of item the amount covers. Default 1.'),
 };
 
 export const getPaymentShape = {
@@ -77,7 +94,8 @@ export const AGENT_TOOLS = {
       'disguised supplier name, category, country or currency: that is recorded and blocked. ' +
       'Choosing a different supplier that is genuinely allowed is fine. If the ' +
       'decision is "review", a human must approve first; tell them the payment_id and check ' +
-      'get_payment later. This authorizes only; it does not move money.',
+      'get_payment later. Name the item and quantity so the price can be compared with the ' +
+      'usual one. This authorizes only; it does not move money.',
     inputSchema: requestPaymentShape,
     annotations: {
       readOnlyHint: false,
@@ -169,6 +187,16 @@ export function mandateSummary(input: {
       blocked_suppliers: [...policy.blockedSuppliers, ...m.suppliers.block],
       blocked_countries: [...new Set([...policy.blockedCountries, ...m.blockedCountries])],
     },
+    price_check: policy.referencePrices?.length
+      ? {
+          reference_prices: policy.referencePrices.length,
+          flagged_above: `${String(policy.priceCheck?.abovePercent ?? 0)}% over the usual price`,
+          flagged_below:
+            policy.priceCheck?.belowPercent == null
+              ? null
+              : `${String(policy.priceCheck.belowPercent)}% under the usual price`,
+        }
+      : null,
     rules: [
       'Every purchase needs request_payment first.',
       'A payment to the same supplier within 10 minutes counts with the previous ones.',
@@ -195,6 +223,8 @@ export function toPaymentRequest(
     category: String(args.category).padStart(4, '0'),
     country: args.country.toUpperCase(),
     ...(args.memo === undefined ? {} : { memo: args.memo }),
+    ...(args.item === undefined ? {} : { item: args.item }),
+    ...(args.quantity === undefined ? {} : { quantity: args.quantity }),
   };
 }
 

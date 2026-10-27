@@ -46,6 +46,20 @@ describe('rule ordering', () => {
     expect(run({ context: { ledger }, request: { amount: 400_000 } }).rule).toBe('VELOCITY');
   });
 
+  it('split detection is checked before the fair price, and the fair price before review', () => {
+    const policy = {
+      referencePrices: [{ item: 'Buffer solution, 10 L', match: [], priceBase: 10_000 }],
+      priceCheck: { abovePercent: 20, belowPercent: null, above: 'review' as const },
+    };
+    const ledger = [entry({ amountBase: 450_000, createdAt: NOW - 2 * MINUTE })];
+    expect(run({ policy, context: { ledger }, request: { amount: 400_000 } }).rule).toBe(
+      'SPLIT_DETECTION',
+    );
+    const r = run({ policy, mandate: { businessHoursOnly: true }, request: { amount: 600_000 } });
+    expect(r.rule).toBe('FAIR_PRICE');
+    expect(r.reason).toMatch(/above the usual.*above the approval threshold/);
+  });
+
   it('review only happens once every hard rule passed, and lists every review reason', () => {
     const saturday = Date.parse('2026-10-24T10:00:00Z');
     const r = run({

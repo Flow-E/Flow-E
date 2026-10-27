@@ -56,6 +56,7 @@ export const DECLINE_LABELS: Readonly<Record<string, string>> = {
   DAILY_BUDGET: 'Daily budget',
   VELOCITY: 'Too many requests',
   SPLIT_DETECTION: 'Split payment',
+  FAIR_PRICE: 'Far above the usual price',
   BUSINESS_HOURS: 'Outside business hours',
   INTERNAL: 'Internal error',
 };
@@ -156,7 +157,38 @@ export interface Dashboard {
     pending: number;
   }[];
   approvals: { decided: number; approved: number; declined: number; medianMs: number | null };
+  priceCheck: PriceCheckStats;
   recent: Activity[];
+}
+
+/** What the fair-price rule found for requests in the period. Amounts in base minor units. */
+export interface PriceCheckStats {
+  /** Requests whose item matched a usual price. */
+  checked: number;
+  /** Flagged as above the usual price; `over` is how much more than usual they asked for. */
+  above: { count: number; over: number };
+  /** Flagged as suspiciously cheap. */
+  below: number;
+  /** The extra asked for by flagged requests that were not paid (declined or cancelled). */
+  avoided: { count: number; over: number };
+}
+
+interface FairPriceStep {
+  rule?: unknown;
+  outcome?: unknown;
+  data?: { matched?: unknown; differenceBase?: unknown };
+}
+
+/** The fair-price finding recorded in a decision entry's trace, if the item had a usual price. */
+function fairPriceFinding(e: StoredEntry): { flagged: boolean; difference: number } | null {
+  const data = JSON.parse(e.data) as { trace?: unknown };
+  if (!Array.isArray(data.trace)) return null;
+  const step = (data.trace as FairPriceStep[]).find((t) => t.rule === 'FAIR_PRICE');
+  if (step?.data?.matched !== true || typeof step.data.differenceBase !== 'number') return null;
+  return {
+    flagged: step.outcome === 'review' || step.outcome === 'decline',
+    difference: step.data.differenceBase,
+  };
 }
 
 // Calendar days --------------------------------------------------------------------------------
@@ -369,6 +401,31 @@ export function buildDashboard(input: DashboardInput): Dashboard {
     waits.push(Date.parse(e.created_at) - Date.parse(p.createdAt));
   }
 
+  const priceCheck: PriceCheckStats = {
+    checked: 0,
+    above: { count: 0, over: 0 },
+    below: 0,
+    avoided: { count: 0, over: 0 },
+  };
+  for (const e of entries) {
+    if (e.type !== PAYMENT_DECISION || !keep(e.agent_id) || !inPeriod(e.created_at)) continue;
+    const finding = fairPriceFinding(e);
+    if (!finding) continue;
+    priceCheck.checked += 1;
+    if (!finding.flagged) continue;
+    if (finding.difference < 0) {
+      priceCheck.below += 1;
+      continue;
+    }
+    priceCheck.above.count += 1;
+    priceCheck.above.over += finding.difference;
+    const p = byId.get(text((JSON.parse(e.data) as { payment_id?: unknown }).payment_id));
+    if (p && (p.status === 'declined' || p.status === 'cancelled')) {
+      priceCheck.avoided.count += 1;
+      priceCheck.avoided.over += finding.difference;
+    }
+  }
+
   const today = localDate(now, timezone);
   const budgetToday = agents.map((a) => {
     const spend = dailySpend(
@@ -424,6 +481,7 @@ export function buildDashboard(input: DashboardInput): Dashboard {
       declined: humanDeclined,
       medianMs: median(waits),
     },
+    priceCheck,
     recent: recentActivity(entries, byId, keep, inPeriod, 10),
   };
 }

@@ -1,11 +1,12 @@
 'use server';
 
-import { text, texts } from '@/lib/form';
+import { text } from '@/lib/form';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { ZodError, z } from 'zod';
+import { ZodError } from 'zod';
 import { ActionError, ConfigError, ReceiptError } from '@flow-e/mcp/core';
 import { money, ruleName } from '@/lib/format';
+import { FormProblem, rawFromForm } from '@/lib/mandate-form-data';
 import { getStore } from '@/server/runtime';
 import { getSession } from '@/server/session';
 import type { PaymentOutcome, TraceStep } from '@/server/store';
@@ -45,6 +46,7 @@ function problem(err: unknown): string {
   if (err instanceof ActionError || err instanceof ConfigError || err instanceof ReceiptError) {
     return err.message;
   }
+  if (err instanceof FormProblem) return err.message;
   if (err instanceof ZodError) return err.issues.map((i) => i.message).join(' ');
   console.error('sandbox action failed', err instanceof Error ? err.name : 'unknown');
   return 'Something went wrong. Nothing was changed; please try again.';
@@ -179,16 +181,6 @@ export async function storyAction(_prev: RequestState): Promise<RequestState> {
 
 // Mandate ---------------------------------------------------------------------------------------
 
-const list = (value: string, separator: RegExp) =>
-  value
-    .split(separator)
-    .map((s) => s.trim())
-    .filter((s) => s !== '');
-const codes = (value: string) => list(value, /[\s,]+/).map((s) => s.toUpperCase());
-const lines = (value: string) => list(value, /\r?\n/);
-
-const agentIds = z.array(z.string().regex(/^[a-z0-9][a-z0-9_-]{0,62}$/));
-
 export async function updateMandateAction(
   _prev: ActionResult,
   form: FormData,
@@ -196,50 +188,7 @@ export async function updateMandateAction(
   const { store, ownerId, actor } = await context();
   try {
     const current = (await store.view(ownerId)).raw;
-    const fx: Record<string, string> = {};
-    for (const [k, v] of form.entries()) {
-      const m = /^fx\.([A-Z]{3,5})$/.exec(k);
-      if (m?.[1] && typeof v === 'string') fx[m[1]] = v.trim();
-    }
-    const agents: Record<string, unknown> = {};
-    for (const id of agentIds.parse(texts(form, 'agent'))) {
-      const f = (name: string, fallback = '') => text(form, `${id}.${name}`, fallback).trim();
-      const approval = f('approval_above');
-      agents[id] = {
-        owner: f('owner'),
-        status: f('status', 'active'),
-        daily_budget: f('daily_budget'),
-        per_payment_limit: f('per_payment_limit'),
-        ...(approval === '' ? {} : { approval_above: approval }),
-        currencies: codes(f('currencies')),
-        categories: list(f('categories'), /[\s,]+/),
-        suppliers: {
-          mode: f('supplier_mode', 'any'),
-          allow: lines(f('allow')),
-          block: lines(f('block')),
-        },
-        blocked_countries: codes(f('blocked_countries')),
-        velocity_per_minute: Number(f('velocity_per_minute')),
-        business_hours_only: f('business_hours_only') === 'on',
-      };
-    }
-    const raw: Record<string, unknown> = {
-      ...(current.organisation === undefined ? {} : { organisation: current.organisation }),
-      base_currency: current.base_currency,
-      timezone: text(form, 'timezone').trim(),
-      fx,
-      ...(current.currency_decimals === undefined
-        ? {}
-        : { currency_decimals: current.currency_decimals }),
-      blocked_countries: codes(text(form, 'blocked_countries')),
-      blocked_suppliers: lines(text(form, 'blocked_suppliers')),
-      business_hours: {
-        days: texts(form, 'days').map(Number),
-        start: text(form, 'start'),
-        end: text(form, 'end'),
-      },
-      agents,
-    };
+    const raw = rawFromForm(form, current);
     await store.updateConfig(ownerId, raw, { ...actor, note: note(form) });
   } catch (err) {
     return { error: problem(err).replace(/^mandate\.yaml is invalid:\n?/, 'Not saved:\n') };

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { GlobalPolicy } from '../../src/engine/types.js';
 import { COOLING_OFF_MS } from '../../src/engine/rules.js';
 import { MINUTE, NOW, credential, entry, run, traceOf } from './fixtures.js';
 
@@ -9,7 +10,7 @@ describe('baseline', () => {
     expect(r.rule).toBeNull();
     expect(r.reason).toBe('All rules passed.');
     expect(r.amountBase).toBe(120_000);
-    expect(r.trace).toHaveLength(15);
+    expect(r.trace).toHaveLength(16);
     expect(r.trace.every((t) => t.outcome === 'pass')).toBe(true);
     expect(r.cancellableUntil).toBeUndefined();
   });
@@ -406,5 +407,105 @@ describe('rule 13: cooling-off', () => {
     expect(r.decision).toBe('review');
     expect(r.cancellableUntil).toBeUndefined();
     expect(traceOf(r, 'COOLING_OFF').detail).toMatch(/Cooling-off will apply if a human approves/);
+  });
+});
+
+describe('fair price', () => {
+  const buffer = { item: 'Buffer solution, 10 L', match: ['phosphate buffer'], priceBase: 100_000 };
+  const priced = (over: Partial<GlobalPolicy> = {}) => ({
+    referencePrices: [buffer, { item: 'Nitrile gloves', match: [], priceBase: 2_400, unit: 'box' }],
+    priceCheck: { abovePercent: 20, belowPercent: 50, above: 'review' as const },
+    ...over,
+  });
+  const known = { ledger: [entry()] };
+
+  it('passes when no reference prices are set', () => {
+    expect(traceOf(run({ context: known }), 'FAIR_PRICE')).toMatchObject({
+      outcome: 'pass',
+      detail: 'No reference prices are set.',
+    });
+  });
+
+  it('passes a price within the tolerance (memo matched, 20% exactly)', () => {
+    const r = run({ policy: priced(), context: known });
+    expect(r.decision).toBe('approved');
+    expect(traceOf(r, 'FAIR_PRICE')).toMatchObject({
+      outcome: 'pass',
+      data: { item: 'Buffer solution, 10 L', expectedBase: 100_000, differencePercent: 20 },
+    });
+  });
+
+  it('sends a price above the tolerance to a human, with the usual price', () => {
+    const r = run({ policy: priced(), request: { amount: 120_100 }, context: known });
+    expect(r).toMatchObject({ decision: 'review', rule: 'FAIR_PRICE' });
+    expect(r.reason).toContain('20% above the usual CHF 1000.00');
+    expect(traceOf(r, 'FAIR_PRICE').data).toMatchObject({ differenceBase: 20_100 });
+  });
+
+  it('declines above the tolerance when the mandate says so', () => {
+    const r = run({
+      policy: priced({ priceCheck: { abovePercent: 10, belowPercent: null, above: 'decline' } }),
+      request: { amount: 120_000 },
+      context: known,
+    });
+    expect(r).toMatchObject({ decision: 'declined', rule: 'FAIR_PRICE' });
+    expect(traceOf(r, 'BUSINESS_HOURS').outcome).toBe('skip');
+  });
+
+  it('flags a suspiciously cheap price for a human', () => {
+    const r = run({ policy: priced(), request: { amount: 40_000 }, context: known });
+    expect(r).toMatchObject({ decision: 'review', rule: 'FAIR_PRICE' });
+    expect(r.reason).toMatch(/60% below .*unusually cheap/);
+  });
+
+  it('does not flag cheap prices when below_percent is off', () => {
+    const r = run({
+      policy: priced({ priceCheck: { abovePercent: 20, belowPercent: null, above: 'review' } }),
+      request: { amount: 10_000 },
+      context: known,
+    });
+    expect(r.decision).toBe('approved');
+  });
+
+  it('multiplies the unit price by the quantity, and prefers the item over the memo', () => {
+    const r = run({
+      policy: priced(),
+      request: { item: 'Nitrile gloves, size M', quantity: 10, amount: 36_000 },
+      context: known,
+    });
+    expect(r).toMatchObject({ decision: 'review', rule: 'FAIR_PRICE' });
+    expect(r.reason).toContain('10 × Nitrile gloves');
+    expect(r.reason).toContain('(CHF 24.00 each)');
+  });
+
+  it('uses match words, and the longest match wins', () => {
+    const r = run({
+      policy: priced({
+        referencePrices: [buffer, { item: 'Buffer', match: [], priceBase: 1_000 }],
+      }),
+      request: { memo: 'PHOSPHATE  buffer for the cell lab' },
+      context: known,
+    });
+    expect(traceOf(r, 'FAIR_PRICE').data).toMatchObject({ item: 'Buffer solution, 10 L' });
+  });
+
+  it('passes an item it does not know', () => {
+    const r = run({ policy: priced(), request: { memo: 'Centrifuge rotor' }, context: known });
+    expect(traceOf(r, 'FAIR_PRICE')).toMatchObject({ outcome: 'pass', data: { matched: false } });
+  });
+
+  it('declines a quantity that is not a whole number of at least 1', () => {
+    const r = run({ policy: priced(), request: { quantity: 0 }, context: known });
+    expect(r).toMatchObject({ decision: 'declined', rule: 'FAIR_PRICE' });
+  });
+
+  it('compares the converted base amount for foreign currencies', () => {
+    // EUR 1,300 at 0.93 = CHF 1,209: above CHF 1,000 + 20%.
+    const r = run({
+      policy: priced(),
+      request: { currency: 'EUR', amount: 130_000 },
+      context: known,
+    });
+    expect(traceOf(r, 'FAIR_PRICE').data).toMatchObject({ differenceBase: 20_900 });
   });
 });

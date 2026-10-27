@@ -13,6 +13,10 @@ function formFrom(raw: Record<string, unknown>, edit: (f: FormData) => void = ()
   for (const d of v.days) f.append('days', String(d));
   f.set('start', v.start);
   f.set('end', v.end);
+  f.set('prices', v.prices);
+  f.set('above_percent', v.above_percent);
+  f.set('below_percent', v.below_percent);
+  f.set('price_action', v.price_action);
   for (const a of v.agents) {
     f.append('agent', a.id);
     for (const [k, val] of Object.entries(a) as [string, string | boolean][]) {
@@ -54,6 +58,42 @@ describe('the organisation mandate form', () => {
     expect(JSON.parse(v.entries.at(-1)?.data ?? '{}')).toMatchObject({
       changes: ['agents.buyer', 'fx'],
     });
+  });
+
+  it('saves usual prices from lines and shows them back the same way', async () => {
+    const raw = (await w.store.view(w.orgId, ALICE)).raw;
+    const lines =
+      'Phosphate buffer solution, 10 L | 1150 | phosphate buffer\nNitrile gloves | 22 |  | box';
+    const edited = formFrom(raw, (f) => {
+      f.set('prices', lines);
+      f.set('above_percent', '15');
+      f.set('below_percent', '');
+      f.set('price_action', 'decline');
+    });
+    await w.store.updateConfig(w.orgId, ALICE, rawFromForm(edited, raw));
+    const v = await w.store.view(w.orgId, ALICE);
+    expect(v.config.policy.referencePrices).toEqual([
+      { item: 'Phosphate buffer solution, 10 L', match: ['phosphate buffer'], priceBase: 115_000 },
+      { item: 'Nitrile gloves', match: [], priceBase: 2_200, unit: 'box' },
+    ]);
+    expect(v.config.policy.priceCheck).toEqual({
+      abovePercent: 15,
+      belowPercent: null,
+      above: 'decline',
+    });
+    const shown = mandateFields(v.raw, 'CHF');
+    expect(shown.prices).toBe(lines);
+    expect(shown).toMatchObject({
+      above_percent: '15',
+      below_percent: '',
+      price_action: 'decline',
+    });
+  });
+
+  it('explains a malformed usual-price line', () => {
+    const f = new FormData();
+    f.set('prices', 'Gloves without a price');
+    expect(() => rawFromForm(f, { base_currency: 'CHF' })).toThrow(/Item \| price/);
   });
 
   it('explains a malformed exchange-rate line', () => {

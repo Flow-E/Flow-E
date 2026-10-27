@@ -27,6 +27,7 @@ const RULES: readonly [string, string, 'declined' | 'review' | 'note'][] = [
   ['Daily budget', 'Today’s approved and pending spend, plus this one', 'declined'],
   ['Velocity', 'At most N requests per rolling minute', 'declined'],
   ['Split detection', 'Same supplier within 10 minutes, over the limit together', 'declined'],
+  ['Fair price', 'Optional: far above or below the item’s usual price, a human decides', 'review'],
   ['Business hours', 'Optional: outside them, a human decides', 'review'],
   ['Human-approval threshold', 'Above it, a human decides', 'review'],
   ['Cooling-off', 'A first payment to a new supplier stays cancellable for 10 minutes', 'note'],
@@ -166,7 +167,7 @@ export default function Home() {
         <section className="mx-auto grid max-w-6xl gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[0.8fr_1.2fr]">
           <div className="lg:sticky lg:top-8 lg:self-start">
             <h2 className="font-serif text-3xl leading-tight tracking-[-0.015em] sm:text-4xl">
-              Thirteen rules, always in the same order.
+              Fourteen rules, always in the same order.
             </h2>
             <p className="mt-4 max-w-[52ch] text-ink-2">
               The first decline stops evaluation. A human is asked only when every hard rule has

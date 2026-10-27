@@ -20,6 +20,7 @@ export const RULE_ORDER = [
   'DAILY_BUDGET',
   'VELOCITY',
   'SPLIT_DETECTION',
+  'FAIR_PRICE',
   'BUSINESS_HOURS',
   'APPROVAL_THRESHOLD',
   'COOLING_OFF',
@@ -36,6 +37,10 @@ export interface PaymentRequest {
   /** ISO 3166-1 alpha-2 country of the supplier. */
   country: string;
   memo?: string;
+  /** What is bought, matched against the reference prices. Falls back to `memo`. */
+  item?: string;
+  /** How many units of `item`; the reference price is per unit. Default 1. */
+  quantity?: number;
 }
 
 export interface SupplierPolicy {
@@ -97,6 +102,25 @@ export interface BusinessHours {
   endMinute: number;
 }
 
+/** The usual price of one unit of an item, in base minor units. */
+export interface ReferencePrice {
+  item: string;
+  /** Extra words that identify the item in a request, e.g. "phosphate buffer". */
+  match: readonly string[];
+  priceBase: number;
+  /** Shown with the price, e.g. "10 L". */
+  unit?: string;
+}
+
+export interface PriceCheck {
+  /** More than this many percent above the reference is flagged. */
+  abovePercent: number;
+  /** More than this many percent below the reference is flagged too. `null`: never. */
+  belowPercent: number | null;
+  /** What happens above the tolerance. Below it, a human always checks. */
+  above: 'review' | 'decline';
+}
+
 /** Organisation-wide settings shared by every agent. */
 export interface GlobalPolicy {
   baseCurrency: string;
@@ -111,6 +135,9 @@ export interface GlobalPolicy {
   /** IANA time zone used for "today" and business hours. */
   timezone: string;
   businessHours: BusinessHours;
+  /** Usual prices for the fair-price check. Empty or missing: the check is off. */
+  referencePrices?: readonly ReferencePrice[];
+  priceCheck?: PriceCheck;
 }
 
 /** What the engine needs to know about one prior payment of this agent. */

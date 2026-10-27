@@ -112,6 +112,8 @@ export function decisionData(input: {
     country: r.country,
   };
   if (r.memo !== undefined) request.memo = r.memo;
+  if (r.item !== undefined) request.item = r.item;
+  if (r.quantity !== undefined) request.quantity = r.quantity;
   return {
     payment_id: input.paymentId,
     request,
@@ -157,6 +159,8 @@ export interface PaymentRecord {
     category: string;
     country: string;
     memo?: string;
+    item?: string;
+    quantity?: number;
   };
   amountBase: number | null;
   baseCurrency: string;

@@ -1,4 +1,4 @@
-import { localTime } from '@flow-e/mcp/core';
+import { DEMO_REFERENCE_PRICES, localTime } from '@flow-e/mcp/core';
 
 /**
  * Thirty days of fictional lab purchasing for a SANDBOX, so the dashboard has something to show
@@ -19,6 +19,8 @@ export interface SampleRequest {
   category: string;
   country: string;
   memo: string;
+  /** The item, for the fair-price check. */
+  item?: string;
 }
 
 export type SampleStep =
@@ -103,22 +105,35 @@ const OFFICE_ITEMS = [
   'Labels',
 ];
 
-const reagents = (rand: () => number): SampleRequest => ({
-  merchant: 'Example Reagents AG',
-  amount: chf(rand, 250, 2400),
-  currency: 'CHF',
-  category: '5169',
-  country: 'CH',
-  memo: pick(rand, REAGENTS),
-});
-const labware = (rand: () => number): SampleRequest => ({
-  merchant: 'Example Labware AG',
-  amount: chf(rand, 120, 2800),
-  currency: 'CHF',
-  category: '5047',
-  country: 'CH',
-  memo: pick(rand, LABWARE),
-});
+/** The usual price of a demo item in CHF minor units. */
+export function usualPrice(item: string): number {
+  const ref = DEMO_REFERENCE_PRICES.find((r) => r.item === item);
+  if (!ref) throw new Error(`no usual price for ${item}`);
+  return ref.price * 100;
+}
+
+/** A price near the usual one: between `low` and `high` times it, rounded to 5 francs. */
+function near(rand: () => number, item: string, low: number, high: number): number {
+  const usual = usualPrice(item) / 100;
+  return chf(rand, usual * low, usual * high);
+}
+
+const lab = (
+  merchant: string,
+  category: string,
+  item: string,
+  amount: number,
+  memo = item,
+): SampleRequest => ({ merchant, amount, currency: 'CHF', category, country: 'CH', memo, item });
+
+const reagents = (rand: () => number): SampleRequest => {
+  const item = pick(rand, REAGENTS);
+  return lab('Example Reagents AG', '5169', item, near(rand, item, 0.92, 1.12));
+};
+const labware = (rand: () => number): SampleRequest => {
+  const item = pick(rand, LABWARE);
+  return lab('Example Labware AG', '5047', item, near(rand, item, 0.92, 1.12));
+};
 const office = (rand: () => number, amount?: number): SampleRequest => ({
   merchant: 'Example Office Supplies AG',
   amount: amount ?? chf(rand, 25, 180),
@@ -172,14 +187,12 @@ export function samplePlan(now: number, timeZone: string, seed = 7): SampleStep[
     // Every third day an equipment purchase above the approval threshold: a human decides.
     if (i % 3 === 1) {
       const t = at(date, 13, 10 + Math.floor(rand() * 30));
-      const key = request(t, LAB, {
-        merchant: 'Example Labware AG',
-        amount: chf(rand, 5200, 7800),
-        currency: 'CHF',
-        category: '5047',
-        country: 'CH',
-        memo: pick(rand, EQUIPMENT),
-      });
+      const item = pick(rand, EQUIPMENT);
+      const key = request(
+        t,
+        LAB,
+        lab('Example Labware AG', '5047', item, near(rand, item, 0.95, 1.1)),
+      );
       const declined = i % 9 === 7;
       steps.push({
         at: t + (20 + Math.floor(rand() * 200)) * MINUTE,
@@ -215,6 +228,48 @@ export function samplePlan(now: number, timeZone: string, seed = 7): SampleStep[
       request(at(date, 14, 20), LAB, hplc(900_000, 'HPLC column set (10 columns)'));
       request(at(date, 14, 26), LAB, hplc(450_000, 'HPLC column set, columns 1-5'));
       request(at(date, 14, 29), LAB, hplc(450_000, 'HPLC column set, columns 6-10'));
+    } else if (episode === 15) {
+      // Overpriced pipette tips: the fair-price check asks a person, who declines.
+      const key = request(
+        at(date, 9, 20),
+        LAB,
+        lab('Example Labware AG', '5047', 'Pipette tips, 20 racks', 52_000),
+      );
+      steps.push({
+        at: at(date, 10, 5),
+        kind: 'resolve',
+        key,
+        status: 'declined',
+        note: 'Ordered at the usual price through the framework contract instead.',
+      });
+    } else if (episode === 14) {
+      // Above the usual price, but a real price rise: a person approves it.
+      const key = request(
+        at(date, 9, 35),
+        LAB,
+        lab('Example Reagents AG', '5169', 'Cell culture medium, 24 bottles', 110_000),
+      );
+      steps.push({
+        at: at(date, 11, 0),
+        kind: 'resolve',
+        key,
+        status: 'approved',
+        note: 'Supplier price rise confirmed; usual price to be updated.',
+      });
+    } else if (episode === 12) {
+      // Suspiciously cheap: the quote was for the wrong pack size.
+      const key = request(
+        at(date, 13, 40),
+        LAB,
+        lab('Example Reagents AG', '5169', 'PCR master mix, 10 kits', 69_000),
+      );
+      steps.push({
+        at: at(date, 14, 25),
+        kind: 'resolve',
+        key,
+        status: 'declined',
+        note: 'The quote was for 1 kit, not 10.',
+      });
     } else if (episode === 13) {
       // The office agent tries to buy lab gloves: wrong category for its mandate.
       request(at(date, 10, 45), OFFICE, {
@@ -285,14 +340,11 @@ export function samplePlan(now: number, timeZone: string, seed = 7): SampleStep[
   // Today, relative to now: two routine purchases and one equipment purchase still waiting.
   request(now - 150 * MINUTE, LAB, reagents(rand));
   request(now - 95 * MINUTE, OFFICE, office(rand));
-  request(now - 40 * MINUTE, LAB, {
-    merchant: 'Example Labware AG',
-    amount: 650_000,
-    currency: 'CHF',
-    category: '5047',
-    country: 'CH',
-    memo: 'Benchtop centrifuge',
-  });
+  request(
+    now - 40 * MINUTE,
+    LAB,
+    lab('Example Labware AG', '5047', 'Benchtop centrifuge', 650_000),
+  );
 
   return steps.filter((s) => s.at < now - MINUTE).sort((a, b) => a.at - b.at);
 }

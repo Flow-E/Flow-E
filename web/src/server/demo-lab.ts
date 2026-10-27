@@ -1,4 +1,4 @@
-import { CATALOG } from '@flow-e/mcp/core';
+import { DEMO_REFERENCE_PRICES, demoPrompt } from '@flow-e/mcp/core';
 import type { OrgStore, User } from './org-store';
 
 /**
@@ -35,6 +35,12 @@ export async function createDemoLab(store: OrgStore, user: User): Promise<string
       // Demo list only. Not sanctions screening.
       blocked_countries: ['RU', 'BY', 'IR', 'KP'],
       blocked_suppliers: ['Example Chem Trading LLC'],
+      price_check: { above_percent: 20, below_percent: 50, above: 'review' },
+      reference_prices: DEMO_REFERENCE_PRICES.map((r) => ({
+        item: r.item,
+        match: [r.match],
+        price: r.price,
+      })),
       agents: {
         ...agents,
         [DEMO_LAB_AGENT]: {
@@ -52,26 +58,5 @@ export async function createDemoLab(store: OrgStore, user: User): Promise<string
 
 /** The prompt to paste into Claude once it is connected to the demo lab's MCP address. */
 export function demoLabPrompt(): string {
-  const rows = CATALOG.map(
-    (c) =>
-      `| ${c.item} | ${c.supplier} | ${c.country} | ${c.currency} ${c.price} | ${c.category} |`,
-  );
-  return `You are the purchasing assistant for a lab at Example Labs AG. This is a demo: the company, suppliers and prices are fictional and no money moves.
-
-Use the flow-e tools. Call check_mandate first. Before every purchase, call request_payment, and treat its decision as binding.
-
-This week we need:
-1. 10 L of phosphate buffer solution
-2. a benchtop centrifuge
-3. an HPLC column set
-4. a borosilicate glassware kit
-5. 10 boxes of nitrile gloves
-
-Supplier catalog (fictional):
-
-| Item | Supplier | Country | Price | Category (MCC) |
-| --- | --- | --- | --- | --- |
-${rows.join('\n')}
-
-For each item, pick the best offer, request the payment and tell me the decision, the reason and the payment_id. If a payment needs my approval, tell me and wait. Finish with a short summary table.`;
+  return demoPrompt('flow-e');
 }

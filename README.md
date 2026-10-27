@@ -45,7 +45,7 @@ catalog and fresh keys. It also starts the control panel and prints three things
 1. **A command that connects Claude** to the demo agent: `claude mcp add …` for Claude Code, or a
    JSON block for Claude Desktop. Run it, then start Claude.
 2. **A link to the control panel.** Open it to watch requests arrive.
-3. **A prompt to paste into Claude.** It asks Claude to buy five lab items from the catalog.
+3. **A prompt to paste into Claude.** It asks Claude to buy six lab items from the catalog.
 
 You should then see Claude:
 
@@ -56,7 +56,8 @@ You should then see Claude:
   approval when it checks again;
 - get **declined** for the CHF 9,000 column set, which is over the per-payment limit. Splitting it
   into smaller payments is caught too;
-- get **declined** for glassware from a supplier that is not on the approved list.
+- get **declined** for glassware from a supplier that is not on the approved list;
+- send CHF 480 pipette tips to **review**: 55% above their usual price of CHF 310.
 
 **No Claude handy?** A built-in fake agent sends the same requests through the same MCP tools,
 so the control panel fills up straight away:
@@ -142,9 +143,10 @@ human must approve) only applies once every hard rule has passed.
 | 8   | Daily budget: today's approved **and pending** spend plus this one | declined           |
 | 9   | Velocity: at most N requests per rolling minute (declines count)   | declined           |
 | 10  | Split detection: same supplier within 10 min, sum over the limit   | declined           |
-| 11  | Business hours (optional)                                          | review             |
-| 12  | Human-approval threshold                                           | review             |
-| 13  | Cooling-off: the first approved payment to a new supplier          | cancellable 10 min |
+| 11  | Fair price: compared with the item's usual price (optional)        | review or declined |
+| 12  | Business hours (optional)                                          | review             |
+| 13  | Human-approval threshold                                           | review             |
+| 14  | Cooling-off: the first approved payment to a new supplier          | cancellable 10 min |
 
 Every decision comes with a trace that names each rule and the numbers it used. Money is handled as
 whole cents, never as floats. Foreign amounts are converted with your static rate table and rounded
@@ -154,6 +156,13 @@ Good to know:
 
 - **Split detection** also catches a genuine second order from the same supplier inside 10 minutes
   when the two together exceed the per-payment limit. Pending reviews count towards that sum.
+- **Fair price** compares a request with the usual price you set for the item. The agent names
+  the item and quantity (`item`, `quantity`; the memo is used when there is no item), and Flow-E
+  matches it by the item's name or extra words such as "phosphate buffer"; the longest match
+  wins. More than `above_percent` over the usual price goes to a human (or is declined, if you
+  set `above: decline`); more than `below_percent` under it goes to a human too, because a
+  suspiciously cheap offer is often the wrong product or pack size. Items without a usual price
+  pass.
 - **Supplier names** are compared case- and whitespace-insensitively. Names can be imitated, so
   later versions will use verified supplier identities.
 
@@ -254,6 +263,11 @@ fx: { EUR: 0.93, USD: 0.80 } # base-currency units per unit; static in v1
 blocked_countries: [RU, BY, IR, KP] # demo list, NOT sanctions screening
 blocked_suppliers: []
 business_hours: { days: [1, 2, 3, 4, 5], start: '08:00', end: '18:00' }
+# Optional fair-price check. Prices per unit, in the base currency.
+price_check: { above_percent: 20, below_percent: 50, above: review } # above: review | decline
+reference_prices:
+  - { item: 'Phosphate buffer solution, 10 L', match: ['phosphate buffer'], price: 1150 }
+  - { item: 'Nitrile gloves', price: 22, unit: box }
 agents:
   lab-procurement:
     owner: 'Dr. A. Muster, Head of Lab (fictional)'

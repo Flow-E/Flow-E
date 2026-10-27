@@ -836,6 +836,50 @@ export function DashboardBody({
         </Panel>
       </div>
 
+      <Panel
+        title="Fair price"
+        description={`Requests compared with the usual price of the item, ${periodText}`}
+      >
+        {dash.priceCheck.checked === 0 ? (
+          <p className="text-sm text-ink-2">
+            No request matched a usual price {periodText}. Add usual prices for the items your
+            agents buy on the Mandate page, and Flow-E flags offers far above or below them.
+          </p>
+        ) : (
+          <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div>
+              <dt className="text-xs text-ink-3">Checked</dt>
+              <dd className="text-2xl font-semibold text-ink">{dash.priceCheck.checked}</dd>
+              <dd className="text-xs text-ink-2">matched a usual price</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-ink-3">Above the usual price</dt>
+              <dd className="text-2xl font-semibold text-ink">{dash.priceCheck.above.count}</dd>
+              <dd className="text-xs text-ink-2">
+                {dash.priceCheck.above.count > 0
+                  ? `${fmt(dash.priceCheck.above.over)} more than usual`
+                  : 'None'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-ink-3">Overpayment avoided</dt>
+              <dd className="text-2xl font-semibold text-approve">
+                {fmt(dash.priceCheck.avoided.over)}
+              </dd>
+              <dd className="text-xs text-ink-2">
+                {dash.priceCheck.avoided.count}{' '}
+                {dash.priceCheck.avoided.count === 1 ? 'request' : 'requests'} not paid
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-ink-3">Suspiciously cheap</dt>
+              <dd className="text-2xl font-semibold text-ink">{dash.priceCheck.below}</dd>
+              <dd className="text-xs text-ink-2">checked by a person</dd>
+            </div>
+          </dl>
+        )}
+      </Panel>
+
       <Panel title="Recent activity" description="The latest decisions and human actions">
         {dash.recent.length === 0 ? (
           <p className="text-sm text-ink-2">Nothing happened in this period.</p>

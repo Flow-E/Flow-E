@@ -261,7 +261,7 @@ describe('payment decisions', () => {
       cancellable_until: null,
     });
     expect(r.entry.data.payment_id).toMatch(/^pay_/);
-    expect(r.entry.data.trace).toHaveLength(15);
+    expect(r.entry.data.trace).toHaveLength(16);
   });
 
   it('records the cooling-off window and leaves out a missing memo', () => {

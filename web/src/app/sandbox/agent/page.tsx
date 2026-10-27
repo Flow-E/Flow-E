@@ -27,7 +27,7 @@ export default async function AgentPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Fake agent</h1>
         <p className="mt-1 max-w-[70ch] text-ink-2">
           Act as the AI agent <span className="font-mono text-ink">lab-procurement</span>. Every
-          request goes through the same thirteen rules a real agent meets over MCP, and lands in
+          request goes through the same fourteen rules a real agent meets over MCP, and lands in
           your signed ledger. Watch the decision, the reason and the full trace.
         </p>
         <FictionalNote className="mt-2" />
@@ -35,7 +35,7 @@ export default async function AgentPage() {
 
       <Panel
         title="The demo story"
-        description="Seven requests in a row: a blocked supplier, an approval, a review, a limit, a split attempt, an unapproved supplier and a small purchase."
+        description="Eight requests in a row: a blocked supplier, an approval, a review, a limit, a split attempt, an unapproved supplier, a small purchase and an overpriced one."
       >
         <StoryButton action={storyAction} />
       </Panel>

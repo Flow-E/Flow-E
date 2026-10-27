@@ -72,6 +72,7 @@ describe('the demo story', () => {
       'declined SPLIT_DETECTION',
       'declined SUPPLIER',
       'approved',
+      'review FAIR_PRICE',
     ]);
 
     const dir = path.join(mkdtempSync(path.join(tmpdir(), 'flow-e-web-')), 'demo');
@@ -89,7 +90,7 @@ describe('the demo story', () => {
   it('keeps an intact, signed hash chain', async () => {
     await store.playStory(ALICE);
     const v = await store.view(ALICE);
-    expect(v.audit).toMatchObject({ ok: true, entries: 7 });
+    expect(v.audit).toMatchObject({ ok: true, entries: 8 });
     expect(v.entries[1]?.prev_hash).toBe(v.entries[0]?.hash);
   });
 });
@@ -100,7 +101,8 @@ describe('owner actions', () => {
     const centrifuge = story[2];
     await store.resolve(ALICE, centrifuge?.paymentId ?? '', 'approved', { ...by, note: 'ok' });
     const v = await store.view(ALICE);
-    expect(v.pending).toHaveLength(0);
+    // Only the overpriced pipette tips still wait.
+    expect(v.pending).toHaveLength(1);
     const p = v.payments.find((x) => x.paymentId === centrifuge?.paymentId);
     expect(p).toMatchObject({ status: 'approved', decidedBy: by.by, note: 'ok' });
   });
@@ -195,7 +197,7 @@ describe('isolation between users', () => {
     const alicePayment = story[2]?.paymentId ?? '';
     expect(await store.payment(BOB, alicePayment)).toBeNull();
     await expect(store.resolve(BOB, alicePayment, 'approved', by)).rejects.toThrow(/No payment/);
-    expect((await store.view(ALICE)).pending).toHaveLength(1);
+    expect((await store.view(ALICE)).pending).toHaveLength(2);
   });
 
   it('a user without a sandbox gets a clear error, not someone else’s', async () => {
@@ -227,7 +229,7 @@ describe('receipts', () => {
     );
     expect(out).toMatch(/issuer signature is valid/);
     expect(out.trim().endsWith('VALID')).toBe(true);
-    expect(detail?.trace).toHaveLength(15);
+    expect(detail?.trace).toHaveLength(16);
   });
 
   it('verifies in the sandbox, and catches an edited receipt', async () => {
@@ -294,13 +296,13 @@ describe('reset and export', () => {
     expect(after.issuer).not.toBe(before.issuer);
     expect(after.entries).toHaveLength(0);
     const rows = await db.query<{ n: number }>('select count(*)::int as n from ledger_entries');
-    expect(rows[0]?.n).toBe(7);
+    expect(rows[0]?.n).toBe(8);
   });
 
   it('exports formula-safe CSV', async () => {
     await store.playStory(ALICE);
     const lines = (await store.csv(ALICE)).trimEnd().split('\r\n');
-    expect(lines).toHaveLength(8);
+    expect(lines).toHaveLength(9);
     expect(lines[0]).toMatch(/^"seq","created_at","type"/);
   });
 });
@@ -358,12 +360,18 @@ describe('sample history (sandbox only)', () => {
     expect(d.approved.count).toBeGreaterThan(20);
     expect(d.approvals.decided).toBeGreaterThan(3);
     expect(d.activeAgents).toBe(2);
+    // Routine lab purchases stay near their usual prices; only the scripted episodes are flagged.
+    expect(d.priceCheck.checked).toBeGreaterThan(20);
+    expect(d.priceCheck.above.count).toBe(2);
+    expect(d.priceCheck.below).toBe(1);
+    // The pipette tips: CHF 520 asked, CHF 310 usual, declined by a person.
+    expect(d.priceCheck.avoided).toEqual({ count: 1, over: 21_000 });
   });
 
   it('refuses a sandbox that already has entries; Start over and fill again works', async () => {
     await store.playStory(ALICE);
     await expect(store.fillSampleHistory(ALICE, by)).rejects.toThrow(/empty sandbox/);
-    expect((await store.view(ALICE)).entries).toHaveLength(7);
+    expect((await store.view(ALICE)).entries).toHaveLength(8);
     await store.resetSandbox(ALICE);
     await store.fillSampleHistory(ALICE, by);
     const v = await store.view(ALICE);

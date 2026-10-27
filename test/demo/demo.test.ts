@@ -270,6 +270,11 @@ describe('the demo story, played through the MCP tools', () => {
     expect(await buy('Nitrile gloves, 10 boxes', 'Example Labware AG')).toMatchObject({
       decision: 'approved',
     });
+    // Overpriced: 55% above the usual CHF 310, so a person decides.
+    expect(await buy('Pipette tips, 20 racks', 'Example Labware AG')).toMatchObject({
+      decision: 'review',
+      rule: 'FAIR_PRICE',
+    });
 
     resolvePayment(server.ledger, centrifuge.payment_id, 'approved', {
       by: 'demo owner (panel)',

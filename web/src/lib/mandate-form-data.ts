@@ -15,6 +15,7 @@ const arr = (v: unknown) => (Array.isArray(v) ? v.map(str) : []);
 
 export function mandateFields(raw: Raw, baseCurrency: string): MandateFields {
   const hours = (raw.business_hours ?? {}) as Raw;
+  const check = (raw.price_check ?? {}) as Raw;
   const agents = (raw.agents ?? {}) as Record<string, Raw>;
   return {
     baseCurrency,
@@ -25,6 +26,16 @@ export function mandateFields(raw: Raw, baseCurrency: string): MandateFields {
     days: Array.isArray(hours.days) ? hours.days.map(Number) : [1, 2, 3, 4, 5],
     start: str(hours.start ?? '08:00'),
     end: str(hours.end ?? '18:00'),
+    prices: (Array.isArray(raw.reference_prices) ? (raw.reference_prices as Raw[]) : [])
+      .map((r) =>
+        [str(r.item), str(r.price), arr(r.match).join(', '), str(r.unit)]
+          .join(' | ')
+          .replace(/( \| )+$/, ''),
+      )
+      .join('\n'),
+    above_percent: str(check.above_percent ?? 20),
+    below_percent: check.below_percent === null ? '' : str(check.below_percent ?? 50),
+    price_action: str(check.above ?? 'review'),
     agents: Object.entries(agents).map(([id, a]) => {
       const suppliers = (a.suppliers ?? {}) as Raw;
       return {
@@ -68,6 +79,54 @@ function fxFromLines(value: string): Record<string, string> {
     fx[code.toUpperCase()] = rate;
   }
   return fx;
+}
+
+/** "Item | usual price | other words, comma-separated | unit" per line. */
+function pricesFromLines(value: string): Raw[] {
+  return lines(value).map((line) => {
+    const [item = '', price = '', match = '', unit = '', ...rest] = line
+      .split('|')
+      .map((p) => p.trim());
+    if (item === '' || price === '' || rest.length > 0) {
+      throw new FormProblem(
+        `Usual price "${line.slice(0, 60)}": write it as "Item | price | other words | unit".`,
+      );
+    }
+    return {
+      item,
+      price,
+      ...(match === '' ? {} : { match: list(match, /\s*,\s*/) }),
+      ...(unit === '' ? {} : { unit }),
+    };
+  });
+}
+
+/** The price-check fields, or what is stored when the form does not show them. */
+function pricesFromForm(form: FormData, current: Raw): Raw {
+  if (!form.has('prices')) {
+    return {
+      ...(current.reference_prices === undefined
+        ? {}
+        : { reference_prices: current.reference_prices }),
+      ...(current.price_check === undefined ? {} : { price_check: current.price_check }),
+    };
+  }
+  const below = text(form, 'below_percent').trim();
+  const prices = pricesFromLines(text(form, 'prices'));
+  const check = {
+    above_percent: Number(text(form, 'above_percent').trim()),
+    below_percent: below === '' ? null : Number(below),
+    above: text(form, 'price_action', 'review'),
+  };
+  // Never set and still the defaults: keep it unset, so saving an untouched page changes nothing.
+  const untouched =
+    prices.length === 0 &&
+    current.reference_prices === undefined &&
+    current.price_check === undefined &&
+    check.above_percent === 20 &&
+    check.below_percent === 50 &&
+    check.above === 'review';
+  return untouched ? {} : { reference_prices: prices, price_check: check };
 }
 
 export class FormProblem extends Error {
@@ -122,6 +181,7 @@ export function rawFromForm(form: FormData, current: Raw): Raw {
       start: text(form, 'start'),
       end: text(form, 'end'),
     },
+    ...pricesFromForm(form, current),
     agents,
   };
 }

@@ -37,6 +37,7 @@ describe('demo lab organisation', () => {
           currency: c.currency,
           category: c.category,
           country: c.country,
+          item: c.item,
         },
         ORIGIN,
       );
@@ -48,11 +49,12 @@ describe('demo lab organisation', () => {
     expect(await decide(4)).toBe('declined'); // CHF 9,000, above the per-payment limit
     expect(await decide(5)).toBe('declined'); // not an approved supplier
     expect(await decide(6)).toBe('approved');
+    expect(await decide(7)).toBe('review'); // pipette tips, 55% above the usual price
   });
 
   it('gives Claude a prompt with the whole catalog', () => {
     const prompt = demoLabPrompt();
-    expect(prompt).toContain('flow-e tools');
+    expect(prompt).toContain('"flow-e" tools');
     for (const c of CATALOG) expect(prompt).toContain(c.supplier);
   });
 });

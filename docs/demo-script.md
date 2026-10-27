@@ -44,15 +44,21 @@ say what to expect:
 | HPLC column set, CHF 9,000             | declines         | Above the CHF 8,000 per-payment limit; splitting it is caught too |
 | Glassware kit (Example Glass)          | declines         | Not an approved supplier                                          |
 | Nitrile gloves, CHF 240                | approves         | Small, routine                                                    |
+| Pipette tips, CHF 480                  | asks a person    | 55% above their usual price of CHF 310                            |
 
-"Claude chose the cheapest buffer first. Flow-E stopped it: price is not the only rule."
+"Claude chose the cheapest buffer first. Flow-E stopped it: price is not the only rule. And the
+pipette tips: Claude would have paid 55% more than usual. Flow-E noticed, because it knows what
+you normally pay."
 
 **4. The human stays in charge (60 s, demo lab tab).**
 
 - **Approvals**: approve the centrifuge. Ask Claude "what's the status of the centrifuge payment
   now?": it sees "approved, by you".
 - **Kill switch**: turn it on, ask Claude to buy gloves again: declined. Turn it off.
-- **Mandate**: show that limits, suppliers and categories are a page, not a contract. Changes
+- **Decline the pipette tips**, then open the **Dashboard → Fair price**: the CHF 170 appears as
+  overpayment avoided.
+- **Mandate**: show that limits, suppliers, categories and usual prices are a page, not a
+  contract. Changes
   apply to the next request and are themselves in the ledger.
 
 **5. Proof (30 s, demo lab tab).** Open the **Ledger**: every request, decision and approval is a

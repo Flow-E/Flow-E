@@ -9,6 +9,13 @@ changes.
 
 ### Added
 
+- **Fair-price check**, a new rule between split detection and business hours: the mandate can
+  hold usual prices per item (`reference_prices`), and a request more than `above_percent` above
+  the usual price goes to a human (or is declined), more than `below_percent` below it too.
+  `request_payment` takes optional `item` and `quantity`; the memo is used when there is no
+  item. The demo has usual prices for its items and an overpriced seventh catalog item.
+  On the website, usual prices are edited on the Mandate page, and the dashboard shows how many
+  requests were checked, flagged above or below, and the overpayment avoided.
 - `flow-e simulate`: a fake agent for the demo folder (`story`, `buy <n>`, `list`,
   `status <id>`, `mandate`). It talks to Flow-E over MCP stdio like Claude does, and refuses any
   folder not made by `flow-e demo`. `flow-e demo` now points to it.

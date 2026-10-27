@@ -8,6 +8,7 @@ import type {
   LedgerEntryView,
   Mandate,
   PaymentRequest,
+  ReferencePrice,
   RuleId,
   TraceEntry,
 } from './types.js';
@@ -298,7 +299,77 @@ const splitDetection: Rule = ({ mandate, ctx, facts, request }) => {
   return pass('No split pattern with this supplier in the last 10 minutes.', data);
 };
 
-// 11. Business hours (soft) ------------------------------------------------------------------
+// 11. Fair price -----------------------------------------------------------------------------
+
+/** The reference whose name or match words appear in the text; the longest match wins. */
+export function findReference(
+  refs: readonly ReferencePrice[],
+  text: string,
+): ReferencePrice | undefined {
+  const haystack = normalizeName(text);
+  if (haystack === '') return undefined;
+  let best: ReferencePrice | undefined;
+  let bestLength = 0;
+  for (const ref of refs) {
+    for (const word of [ref.item, ...ref.match]) {
+      const needle = normalizeName(word);
+      if (needle.length > bestLength && haystack.includes(needle)) {
+        best = ref;
+        bestLength = needle.length;
+      }
+    }
+  }
+  return best;
+}
+
+const fairPrice: Rule = ({ request, ctx, facts }) => {
+  const refs = ctx.policy.referencePrices ?? [];
+  const check = ctx.policy.priceCheck;
+  if (refs.length === 0 || !check) return pass('No reference prices are set.');
+  const quantity = request.quantity ?? 1;
+  if (!Number.isSafeInteger(quantity) || quantity < 1) {
+    return decline('Quantity must be a whole number of at least 1.', {
+      quantity: String(quantity),
+    });
+  }
+  const ref = findReference(refs, request.item ?? request.memo ?? '');
+  if (!ref) return pass('No reference price for this item.', { matched: false });
+
+  const amt = amountBase(facts);
+  const expected = ref.priceBase * quantity;
+  const percent = Math.round(((amt - expected) * 100) / expected);
+  const what = `${quantity === 1 ? '' : `${String(quantity)} × `}${ref.item}`;
+  const usual =
+    `the usual ${base(expected, ctx)}` +
+    (quantity === 1 ? '' : ` (${base(ref.priceBase, ctx)} each)`);
+  const data = {
+    matched: true,
+    item: ref.item,
+    quantity,
+    referenceBase: ref.priceBase,
+    expectedBase: expected,
+    differenceBase: amt - expected,
+    differencePercent: percent,
+  };
+  if (amt * 100 > expected * (100 + check.abovePercent)) {
+    const detail =
+      `${base(amt, ctx)} for ${what} is ${String(percent)}% above ${usual}` +
+      ` (tolerance ${String(check.abovePercent)}%)`;
+    return check.above === 'decline'
+      ? decline(`${detail}.`, data)
+      : review(`${detail}; a human must approve.`, data);
+  }
+  if (check.belowPercent !== null && amt * 100 < expected * (100 - check.belowPercent)) {
+    return review(
+      `${base(amt, ctx)} for ${what} is ${String(-percent)}% below ${usual}: unusually cheap, ` +
+        'a human must check it is the right product and supplier.',
+      data,
+    );
+  }
+  return pass(`${base(amt, ctx)} for ${what} is in line with ${usual}.`, data);
+};
+
+// 12. Business hours (soft) ------------------------------------------------------------------
 
 const businessHours: Rule = ({ mandate, ctx }) => {
   if (!mandate.businessHoursOnly) return pass('Business hours are not enforced for this agent.');
@@ -318,7 +389,7 @@ const businessHours: Rule = ({ mandate, ctx }) => {
       );
 };
 
-// 12. Human-approval threshold (soft) --------------------------------------------------------
+// 13. Human-approval threshold (soft) --------------------------------------------------------
 
 const approvalThreshold: Rule = ({ mandate, ctx, facts }) => {
   const amt = amountBase(facts);
@@ -333,7 +404,7 @@ const approvalThreshold: Rule = ({ mandate, ctx, facts }) => {
     : pass(`${base(amt, ctx)} is within the approval threshold.`, data);
 };
 
-// 13. Cooling-off (note only; the evaluator sets the cancellation window) --------------------
+// 14. Cooling-off (note only; the evaluator sets the cancellation window) --------------------
 
 const coolingOff: Rule = ({ ctx, facts }) => {
   const known = ctx.ledger.some(
@@ -357,6 +428,7 @@ export const RULES: readonly (readonly [RuleId, Rule])[] = [
   ['DAILY_BUDGET', dailyBudget],
   ['VELOCITY', velocity],
   ['SPLIT_DETECTION', splitDetection],
+  ['FAIR_PRICE', fairPrice],
   ['BUSINESS_HOURS', businessHours],
   ['APPROVAL_THRESHOLD', approvalThreshold],
   ['COOLING_OFF', coolingOff],

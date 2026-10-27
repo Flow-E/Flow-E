@@ -67,6 +67,7 @@ export const RULE_NAMES: Readonly<Record<string, string>> = {
   DAILY_BUDGET: 'Daily budget',
   VELOCITY: 'Velocity',
   SPLIT_DETECTION: 'Split detection',
+  FAIR_PRICE: 'Fair price',
   BUSINESS_HOURS: 'Business hours',
   APPROVAL_THRESHOLD: 'Approval threshold',
   COOLING_OFF: 'Cooling-off',
