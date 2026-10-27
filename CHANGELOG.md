@@ -22,6 +22,9 @@ changes.
   **getting-started checklist** for new organisations. **Price lists** can be imported from CSV,
   and usual prices are suggested from what was paid. A **what-if replay** shows how the last
   30 days would have been decided under a mandate change before it is saved.
+- Website: the preview password form posts to a route handler (`/api/gate`); the password page
+  and the public receipt page are exempt from the password only for reading, so no Server
+  Action can be reached without the preview password.
 - **Fair-price check**, a new rule between split detection and business hours: the mandate can
   hold usual prices per item (`reference_prices`), and a request more than `above_percent` above
   the usual price goes to a human (or is declined), more than `below_percent` below it too.

@@ -66,6 +66,13 @@ describe('paths that skip the site password', () => {
   it('never lets a Server Action through the public receipt check', () => {
     // A POST with Next-Action to an ungated page could name any action of the site.
     expect(gateExempt('/verify', 'POST', false)).toBe(false);
+    // The password page itself can no longer be used to reach a Server Action.
+    expect(gateExempt('/gate', 'POST', true)).toBe(false);
+    expect(gateExempt('/gate', 'POST', false)).toBe(false);
+    expect(gateExempt('/gate', 'GET', true)).toBe(false);
+    expect(gateExempt('/api/gate', 'POST', false)).toBe(true);
+    expect(gateExempt('/api/gate', 'POST', true)).toBe(false);
+    expect(gateExempt('/api/gate', 'GET', false)).toBe(false);
     expect(gateExempt('/verify', 'POST', true)).toBe(false);
     expect(gateExempt('/verify', 'GET', true)).toBe(false);
     expect(gateExempt('/api/verify', 'POST', true)).toBe(false);

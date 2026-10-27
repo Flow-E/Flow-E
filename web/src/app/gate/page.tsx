@@ -8,9 +8,9 @@ export const metadata: Metadata = { title: 'Private preview' };
 export default async function GatePage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; error?: string }>;
 }) {
-  const { next } = await searchParams;
+  const { next, error } = await searchParams;
   return (
     <main className="grid min-h-dvh place-items-center px-4">
       <div className="w-full max-w-sm">
@@ -19,7 +19,7 @@ export default async function GatePage({
         <p className="mt-2 text-ink-2">
           Flow-E is being tested. Enter the preview password you were given.
         </p>
-        <GateForm next={safeNext(next)} />
+        <GateForm next={safeNext(next)} error={error === '1'} />
       </div>
     </main>
   );

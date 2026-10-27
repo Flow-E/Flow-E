@@ -90,16 +90,23 @@ export const MCP_PATH = '/api/mcp';
 export const VERIFY_PATH = '/verify';
 /** Where the /verify page posts receipts (a route handler, not a Server Action). */
 export const VERIFY_API_PATH = '/api/verify';
+/** The password page, and where its form posts (a route handler, not a Server Action). */
+export const GATE_PATH = '/gate';
+export const GATE_API_PATH = '/api/gate';
 
 /**
  * Which requests skip the site password gate. Exact paths only: /api/mcp/x or /verify/x are
- * still gated. /verify is exempt for reading the page only: a POST there with a Next-Action
- * header could name any Server Action of the site, so the page has none and posts to
- * /api/verify (a route handler, which never dispatches Server Actions) instead.
+ * still gated. The public pages (/gate, /verify) are exempt for reading only: a POST there with
+ * a Next-Action header could name any Server Action of the site, so they have none and post to
+ * route handlers (/api/gate, /api/verify), which never dispatch Server Actions.
  */
 export function gateExempt(pathname: string, method: string, nextAction: boolean): boolean {
-  if (pathname === '/gate' || pathname === MCP_PATH) return true;
-  if (pathname === VERIFY_PATH) return (method === 'GET' || method === 'HEAD') && !nextAction;
-  if (pathname === VERIFY_API_PATH) return method === 'POST' && !nextAction;
+  if (pathname === MCP_PATH) return true;
+  if (pathname === GATE_PATH || pathname === VERIFY_PATH) {
+    return (method === 'GET' || method === 'HEAD') && !nextAction;
+  }
+  if (pathname === GATE_API_PATH || pathname === VERIFY_API_PATH) {
+    return method === 'POST' && !nextAction;
+  }
   return false;
 }
