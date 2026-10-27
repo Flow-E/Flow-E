@@ -27,6 +27,7 @@ import {
   entryHash,
   evaluate,
   foldControls,
+  foldInvoices,
   foldPayments,
   fromStored,
   generateKeyPair,
@@ -40,6 +41,8 @@ import {
   planCancel,
   planFreeze,
   planInvoice,
+  planInvoiceRecord,
+  planInvoiceResolve,
   planKillSwitch,
   planOrder,
   planResolve,
@@ -53,6 +56,8 @@ import {
   type Controls,
   type CredentialFile,
   type EntryInput,
+  type InvoiceMatch,
+  type InvoiceRecord,
   type EvaluationResult,
   type MandateConfig,
   type PaymentRecord,
@@ -63,6 +68,7 @@ import {
   type JsonValue,
 } from '@flow-e/mcp/core';
 import type { Db, Sql } from './db';
+import { invoiceCsv, invoiceFormSchema, toInvoiceInput, type InvoiceFormInput } from './invoices';
 import { decryptSecret, encryptSecret } from './keys';
 import { SAMPLE_APPROVER, SAMPLE_DAYS, SAMPLE_HISTORY, samplePlan } from './sample-history';
 
@@ -558,6 +564,78 @@ export class SandboxStore {
         },
       });
     });
+  }
+
+  // Invoices -----------------------------------------------------------------------------------
+  // Supplier invoices against the sandbox's authorizations: typed in only (no files), fictional.
+
+  /** Record an invoice typed into the form. `amount` in normal units. */
+  async addInvoice(
+    ownerId: string,
+    input: InvoiceFormInput,
+    actor: ActorInput,
+  ): Promise<{ invoiceId: string; match: InvoiceMatch }> {
+    const form = invoiceFormSchema.parse({ ...input, source: 'manual', fileId: undefined });
+    const out: { result?: { invoiceId: string; match: InvoiceMatch } } = {};
+    await this.act(ownerId, (entries, config) => {
+      const plan = planInvoiceRecord({
+        invoice: toInvoiceInput(form, config.policy.currencyDecimals),
+        payments: foldPayments(entries),
+        invoices: foldInvoices(entries),
+        policy: config.policy,
+        actor: this.actor({ ...actor, note: form.note ?? actor.note }),
+      });
+      out.result = { invoiceId: plan.invoiceId, match: plan.match.match };
+      return plan.entry;
+    });
+    if (!out.result) throw new ActionError('The invoice was not recorded.');
+    return out.result;
+  }
+
+  /** Accept or reject an invoice that did not match. A rejection needs a reason. */
+  async resolveInvoice(
+    ownerId: string,
+    invoiceId: string,
+    outcome: 'accepted' | 'rejected',
+    actor: ActorInput,
+  ): Promise<void> {
+    await this.act(ownerId, (entries) =>
+      planInvoiceResolve(foldInvoices(entries), invoiceId, outcome, this.actor(actor)),
+    );
+  }
+
+  /** Every invoice, newest first. */
+  async invoices(ownerId: string): Promise<InvoiceRecord[]> {
+    const loaded = await this.load(this.db, ownerId);
+    return foldInvoices(await this.entries(this.db, loaded.row.id)).reverse();
+  }
+
+  /** One invoice with its payment and ledger entry number; null if unknown. */
+  async invoiceDetail(
+    ownerId: string,
+    invoiceId: string,
+  ): Promise<{ invoice: InvoiceRecord; payment: PaymentRecord | null; seq: number | null } | null> {
+    const loaded = await this.load(this.db, ownerId);
+    const entries = await this.entries(this.db, loaded.row.id);
+    const invoice = foldInvoices(entries).find((i) => i.invoiceId === invoiceId);
+    if (!invoice) return null;
+    const payment =
+      invoice.paymentId === null
+        ? null
+        : (foldPayments(entries).find((p) => p.paymentId === invoice.paymentId) ?? null);
+    const recorded = entries.find(
+      (e) =>
+        e.type === 'invoice.recorded' &&
+        (JSON.parse(e.data) as { invoice_id?: string }).invoice_id === invoiceId,
+    );
+    return { invoice, payment, seq: recorded?.seq ?? null };
+  }
+
+  /** Matched and accepted invoices as formula-safe CSV. */
+  async invoiceCsv(ownerId: string): Promise<string> {
+    const loaded = await this.load(this.db, ownerId);
+    const entries = await this.entries(this.db, loaded.row.id);
+    return invoiceCsv(foldInvoices(entries), loaded.config.policy.currencyDecimals);
   }
 
   // Internals ----------------------------------------------------------------------------------

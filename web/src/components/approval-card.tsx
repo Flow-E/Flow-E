@@ -6,13 +6,15 @@ import {
   approvalContextFor,
   type ApprovalContext,
   type ApprovalSource,
+  type SpendEffect,
 } from '@/server/approval-context';
 import type { TraceStep } from '@/server/store';
 import { DecisionButtons } from './approval-actions';
 import { StatusPill } from './ui';
 
 /**
- * The approval card: why Flow-E asked, the effect on the day's budget, the supplier's history,
+ * The approval card: why Flow-E asked, the effect on the day's, the month's and the project's
+ * budget, the supplier's history,
  * similar purchases and the usual price, then Approve / Decline. Mobile first. The numbers
  * come from src/server/approval-context.ts; the buttons use the existing resolve action, which
  * checks the person's role, so `canDecide` only decides what is shown.
@@ -51,7 +53,16 @@ function day(iso: string, timeZone: string): string {
   }).format(new Date(iso));
 }
 
-function BudgetBar({ b }: { b: NonNullable<ApprovalContext['budget']> }) {
+function monthName(month: string): string {
+  const [y = 1970, m = 1] = month.split('-').map(Number);
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(Date.UTC(y, m - 1, 1)));
+}
+
+function BudgetBar({ b }: { b: SpendEffect }) {
   const scale = Math.max(b.budget, b.total, 1);
   const pct = (n: number) => `${String(Math.min(100, (Math.max(0, n) * 100) / scale))}%`;
   return (
@@ -78,6 +89,41 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-3">{title}</h3>
       <div className="mt-1.5 text-sm text-ink-2">{children}</div>
     </section>
+  );
+}
+
+/** Total with this payment, the bar, the breakdown and what is left (or how much over). */
+function SpendLines({
+  e,
+  base,
+  over,
+  left,
+}: {
+  e: SpendEffect;
+  base: (n: number | null) => string;
+  over: string;
+  left: string;
+}) {
+  return (
+    <>
+      <p className="tabular">
+        <span className="font-mono text-ink">{base(e.total)}</span> of{' '}
+        <span className="font-mono">{base(e.budget)}</span> with this payment
+      </p>
+      <BudgetBar b={e} />
+      <p className="tabular mt-1.5 text-xs text-ink-3">
+        {base(e.approved)} approved · {base(e.pending)} other waiting · this {base(e.thisPayment)}
+      </p>
+      {e.overBy > 0 ? (
+        <p className="mt-1 text-sm font-medium text-decline">
+          {base(e.overBy)} {over}
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-ink-3">
+          {base(e.budget - e.total)} {left}
+        </p>
+      )}
+    </>
   );
 }
 
@@ -134,9 +180,60 @@ export function ApprovalFacts({
               )}
             </>
           ) : (
-            <p>This agent is no longer in the mandate, so it has no daily budget.</p>
+            <p>This agent is no longer in the mandate, so it has no budgets.</p>
           )}
         </Section>
+
+        {ctx.monthly ? (
+          <Section
+            title={
+              ctx.monthly.isThisMonth ? 'This month' : `Budget in ${monthName(ctx.monthly.month)}`
+            }
+          >
+            <SpendLines
+              e={ctx.monthly}
+              base={base}
+              over={`over ${payment.agentId}’s monthly budget.`}
+              left={`left for ${payment.agentId} that month.`}
+            />
+          </Section>
+        ) : null}
+
+        {ctx.project ? (
+          <Section title="Project">
+            {ctx.project.found ? (
+              <>
+                <p className="font-medium text-ink">
+                  {ctx.project.name}{' '}
+                  <span className="font-mono text-xs font-normal text-ink-3">{ctx.project.id}</span>
+                </p>
+                <SpendLines
+                  e={ctx.project}
+                  base={base}
+                  over={`over the project’s budget${ctx.project.period === 'month' ? ' this month' : ''}.`}
+                  left={
+                    ctx.project.period === 'month'
+                      ? `left in the project${ctx.project.month ? ` in ${monthName(ctx.project.month)}` : ''}.`
+                      : 'left in the project’s total budget.'
+                  }
+                />
+                {ctx.project.ends ? (
+                  <p
+                    className={`mt-1 text-xs ${ctx.project.ended ? 'font-medium text-decline' : 'text-ink-3'}`}
+                  >
+                    {ctx.project.ended ? 'Project ended on ' : 'Project ends on '}
+                    {day(`${ctx.project.ends}T12:00:00Z`, 'UTC')}.
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p>
+                Booked to “<span className="break-words">{ctx.project.named}</span>”, which is not a
+                project in the mandate.
+              </p>
+            )}
+          </Section>
+        ) : null}
 
         <Section title="This supplier">
           {ctx.supplier.approvedCount === 0 ? (
@@ -304,6 +401,19 @@ export function ApprovalQueue({ pending, ...common }: Common & { pending: Paymen
                 {ctx.supplier.approvedCount === 0
                   ? 'new supplier'
                   : `${String(ctx.supplier.approvedCount)} earlier approved ${ctx.supplier.approvedCount === 1 ? 'payment' : 'payments'} to this supplier`}
+              </p>
+            ) : null}
+            {ctx.monthly && ctx.monthly.overBy > 0 ? (
+              <p className="tabular text-xs font-medium text-decline">
+                Month: {money(ctx.monthly.overBy, ctx.baseCurrency, d)} over the monthly budget
+              </p>
+            ) : null}
+            {ctx.project?.found && (ctx.project.overBy > 0 || ctx.project.ended) ? (
+              <p className="tabular text-xs font-medium text-decline">
+                Project {ctx.project.name}:{' '}
+                {ctx.project.ended
+                  ? `ended on ${ctx.project.ends ?? ''}`
+                  : `${money(ctx.project.overBy, ctx.baseCurrency, d)} over budget`}
               </p>
             ) : null}
             <details className="group rounded-lg border border-rule">

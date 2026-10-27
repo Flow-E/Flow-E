@@ -3,30 +3,27 @@ import { Circle, CircleCheck } from 'lucide-react';
 import { Panel } from '@/components/ui';
 import type { Checklist, ChecklistStep } from '@/server/getting-started';
 
-/** The getting-started panel of a new organisation. Hidden once the first request arrived. */
-export function GettingStarted({ checklist }: { checklist: Checklist }) {
+/** The getting-started panel of a new organisation. Hidden once every step is done. */
+export function GettingStarted({
+  checklist,
+  readOnly,
+}: {
+  checklist: Checklist;
+  readOnly: boolean;
+}) {
   if (checklist.complete) return null;
-  const required = checklist.steps.filter((s) => !s.optional);
-  const optional = checklist.steps.filter((s) => s.optional);
-  const readOnly = checklist.steps.every((s) => s.href === null);
   return (
     <Panel
       title="Get started"
-      description={`${String(checklist.doneCount)} of ${String(checklist.required)} steps done. From an empty organisation to an agent that pays within its mandate.`}
+      description={`${String(checklist.doneCount)} of ${String(checklist.total)} steps done. Each step ticks itself off from what has happened in this organisation.`}
     >
       <ol className="space-y-3">
-        {required.map((s) => (
-          <Step key={s.id} step={s} />
+        {checklist.steps.map((s, i) => (
+          <Step key={s.id} step={s} n={i + 1} readOnly={readOnly} />
         ))}
       </ol>
-      <h3 className="mt-5 text-xs font-medium uppercase tracking-wide text-ink-3">Optional</h3>
-      <ul className="mt-2 space-y-3">
-        {optional.map((s) => (
-          <Step key={s.id} step={s} />
-        ))}
-      </ul>
       <p className="mt-5 border-t border-rule pt-3 text-sm text-ink-2">
-        {readOnly ? 'An owner sets this up. ' : null}
+        {readOnly ? 'An owner sets this up; you can follow along here. ' : null}
         Just trying it out? The{' '}
         <Link href="/app" className="text-accent underline">
           demo lab
@@ -37,7 +34,8 @@ export function GettingStarted({ checklist }: { checklist: Checklist }) {
   );
 }
 
-function Step({ step: s }: { step: ChecklistStep }) {
+function Step({ step: s, n, readOnly }: { step: ChecklistStep; n: number; readOnly: boolean }) {
+  const title = `${String(n)}. ${s.label}`;
   return (
     <li className="flex items-start gap-2.5 text-sm">
       {s.done ? (
@@ -46,16 +44,20 @@ function Step({ step: s }: { step: ChecklistStep }) {
         <Circle size={18} className="mt-px shrink-0 text-ink-3" aria-label="Not done yet" />
       )}
       <div className="min-w-0">
-        {s.done || s.href === null ? (
+        {s.done || s.href === null || readOnly ? (
           <span className={s.done ? 'text-ink-3 line-through' : 'font-medium text-ink'}>
-            {s.label}
+            {title}
           </span>
         ) : (
           <Link href={s.href} className="font-medium text-accent underline">
-            {s.label}
+            {title}
           </Link>
         )}
-        {s.done ? null : <p className="text-ink-3">{s.hint}</p>}
+        {s.done ? null : (
+          <p className="text-ink-3">
+            {s.hint} <span className="text-ink-3/80">{s.doneWhen}</span>
+          </p>
+        )}
       </div>
     </li>
   );

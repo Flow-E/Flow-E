@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { Panel } from '@/components/ui';
+import { MandateChanges } from '@/components/mandate-changes';
+import { recentChanges } from '@/lib/mandate-changes';
 import { mandateFields } from '@/lib/mandate-form-data';
 import { priceSuggestions } from '@/server/price-suggestions';
 import { sandboxView } from '@/server/view';
@@ -26,6 +28,11 @@ export default async function MandatePage() {
         action={updateMandateAction}
         suggestions={priceSuggestions(view)}
         preview={previewMandateAction}
+      />
+      <MandateChanges
+        changes={recentChanges(view.entries)}
+        timezone={view.timezone}
+        ledgerHref="/sandbox/ledger"
       />
       <Panel
         title="Start over"

@@ -4,6 +4,7 @@ import { Logo, StatusPill } from '@/components/ui';
 import { dateTime, money } from '@/lib/format';
 import { requireUser } from '@/server/org-view';
 import { getOrgStore } from '@/server/runtime';
+import { requireStrongSession } from '@/server/strong-session';
 import { confirmApprovalAction } from '../../app/actions';
 import { ConfirmForm } from '../../app/client';
 
@@ -17,7 +18,17 @@ export const metadata: Metadata = { title: 'Confirm', robots: { index: false } }
 export default async function ApprovePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const user = await requireUser(`/approve/${token}`);
-  const preview = await (await getOrgStore()).approvalPreview(token, user);
+  const store = await getOrgStore();
+  const preview = await store.approvalPreview(token, user);
+  // Owners and approvers need a second factor first (set it up, or enter a code), then back here.
+  if (!('error' in preview) && preview.payment.status === 'review') {
+    await requireStrongSession(
+      user,
+      await store.role(preview.orgId, user),
+      'payment.resolve',
+      `/approve/${token}`,
+    );
+  }
 
   let body: React.ReactNode;
   if ('error' in preview) {

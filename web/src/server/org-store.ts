@@ -23,6 +23,7 @@ import {
   entryHash,
   evaluate,
   foldControls,
+  foldInvoices,
   foldPayments,
   formatMoney,
   fromStored,
@@ -39,6 +40,8 @@ import {
   paymentAnswer,
   planCancel,
   planInvoice,
+  planInvoiceRecord,
+  planInvoiceResolve,
   planOrder,
   parseAmount,
   planFreeze,
@@ -56,6 +59,8 @@ import {
   type Controls,
   type CredentialFile,
   type EntryInput,
+  type InvoiceMatch,
+  type InvoiceRecord,
   type MandateConfig,
   type PaymentRecord,
   type Receipt,
@@ -65,6 +70,15 @@ import {
 } from '@flow-e/mcp/core';
 import type { Db, Sql } from './db';
 import { approvalEmail, invitationEmail, type EmailMessage, type Mailer } from './email';
+import type { ExtractedInvoice, Extractor } from './invoice-extract';
+import {
+  checkInvoiceFile,
+  invoiceCsv,
+  invoiceFormSchema,
+  safeFilename,
+  toInvoiceInput,
+  type InvoiceFormInput,
+} from './invoices';
 import { decryptSecret, encryptSecret } from './keys';
 import { ForbiddenError, assertCan, can, isRole, type Permission, type Role } from './permissions';
 import { looksLikeAgentKey, looksLikeToken, newAgentKey, newToken, sha256 } from './tokens';
@@ -1352,6 +1366,179 @@ export class OrgStore {
       .reverse()
       .slice(0, limit);
     return payments.map((p) => publicPayment(p, loaded.config.policy.currencyDecimals));
+  }
+
+  // Invoices -----------------------------------------------------------------------------------
+  // Supplier invoices, matched against the authorizations (src/control/invoices.ts in the core).
+  // Recording and deciding are signed ledger entries; an uploaded file is kept in
+  // org_invoice_files and its SHA-256 goes into the invoice's ledger entry.
+
+  /** Record an invoice a person typed in or confirmed. `amount` in normal units. */
+  async addInvoice(
+    orgId: string,
+    user: User,
+    input: InvoiceFormInput,
+  ): Promise<{ invoiceId: string; match: InvoiceMatch }> {
+    const form = invoiceFormSchema.parse(input);
+    if (form.source === 'extracted' && !form.fileId) {
+      throw new ActionError('An invoice read from a file needs that file.');
+    }
+    return this.db.transaction(async (tx) => {
+      await this.require(tx, orgId, user, 'invoice.record');
+      const loaded = await this.load(tx, orgId, true);
+      const entries = await this.entries(tx, orgId);
+      let file: { id: string; sha256: string } | null = null;
+      if (form.fileId) {
+        const rows = await tx.query<{ id: string; sha256: string; invoice_id: string | null }>(
+          `select id, sha256, invoice_id from org_invoice_files
+            where id = $1 and org_id = $2 for update`,
+          [form.fileId, orgId],
+        );
+        const row = rows[0];
+        if (!row) throw new ActionError('That file is not in this organisation.');
+        if (row.invoice_id !== null) throw new ActionError('That file already has an invoice.');
+        file = { id: row.id, sha256: row.sha256 };
+      }
+      const plan = planInvoiceRecord({
+        invoice: toInvoiceInput(form, loaded.config.policy.currencyDecimals),
+        payments: foldPayments(entries),
+        invoices: foldInvoices(entries),
+        policy: loaded.config.policy,
+        actor: this.actor(user, form.note),
+      });
+      const entry: EntryInput = file
+        ? {
+            ...plan.entry,
+            data: { ...plan.entry.data, file_id: file.id, file_sha256: file.sha256 },
+          }
+        : plan.entry;
+      await this.append(tx, loaded, entries, entry);
+      if (file) {
+        await tx.query('update org_invoice_files set invoice_id = $1 where id = $2', [
+          plan.invoiceId,
+          file.id,
+        ]);
+      }
+      return { invoiceId: plan.invoiceId, match: plan.match.match };
+    });
+  }
+
+  /** Accept or reject an invoice that did not match. A rejection needs a reason. */
+  async resolveInvoice(
+    orgId: string,
+    user: User,
+    invoiceId: string,
+    outcome: 'accepted' | 'rejected',
+    note?: string,
+  ): Promise<void> {
+    await this.act(orgId, user, 'invoice.record', (entries) =>
+      planInvoiceResolve(foldInvoices(entries), invoiceId, outcome, this.actor(user, note)),
+    );
+  }
+
+  /** Every invoice, newest first. */
+  async invoices(orgId: string, user: User): Promise<InvoiceRecord[]> {
+    await this.require(this.db, orgId, user, 'org.read');
+    return foldInvoices(await this.entries(this.db, orgId)).reverse();
+  }
+
+  /** One invoice with its payment, its file and its ledger entry number; null if unknown. */
+  async invoiceDetail(
+    orgId: string,
+    user: User,
+    invoiceId: string,
+  ): Promise<{
+    invoice: InvoiceRecord;
+    payment: PaymentRecord | null;
+    file: { id: string; filename: string; mime: string; size: number } | null;
+    seq: number | null;
+  } | null> {
+    await this.require(this.db, orgId, user, 'org.read');
+    const entries = await this.entries(this.db, orgId);
+    const invoice = foldInvoices(entries).find((i) => i.invoiceId === invoiceId);
+    if (!invoice) return null;
+    const payment =
+      invoice.paymentId === null
+        ? null
+        : (foldPayments(entries).find((p) => p.paymentId === invoice.paymentId) ?? null);
+    const files = await this.db.query<{ id: string; filename: string; mime: string; size: number }>(
+      `select id, filename, mime, size from org_invoice_files
+        where org_id = $1 and invoice_id = $2 order by created_at limit 1`,
+      [orgId, invoiceId],
+    );
+    const recorded = entries.find(
+      (e) =>
+        e.type === 'invoice.recorded' &&
+        (JSON.parse(e.data) as { invoice_id?: string }).invoice_id === invoiceId,
+    );
+    return { invoice, payment, file: files[0] ?? null, seq: recorded?.seq ?? null };
+  }
+
+  /**
+   * Keep an uploaded invoice file and, when `extract` is given, read its fields. Nothing is
+   * recorded in the ledger here: a person checks the fields and confirms with addInvoice().
+   */
+  async uploadInvoice(
+    orgId: string,
+    user: User,
+    upload: { filename: string; bytes: Uint8Array },
+    extract: Extractor | null,
+  ): Promise<{
+    fileId: string;
+    filename: string;
+    reading: 'off' | 'done' | 'failed';
+    fields: ExtractedInvoice | null;
+  }> {
+    await this.require(this.db, orgId, user, 'invoice.record');
+    const mime = checkInvoiceFile(upload.bytes);
+    const filename = safeFilename(upload.filename, mime);
+    const fileId = randomUUID();
+    const buffer = Buffer.from(upload.bytes);
+    await this.db.query(
+      `insert into org_invoice_files
+         (id, org_id, invoice_id, filename, mime, size, sha256, bytes, uploaded_by, created_at)
+       values ($1, $2, null, $3, $4, $5, $6, decode($7, 'base64'), $8, $9::timestamptz)`,
+      [
+        fileId,
+        orgId,
+        filename,
+        mime,
+        buffer.length,
+        createHash('sha256').update(buffer).digest('hex'),
+        buffer.toString('base64'),
+        by(user),
+        new Date(this.clock()).toISOString(),
+      ],
+    );
+    if (!extract) return { fileId, filename, reading: 'off', fields: null };
+    const fields = await extract(upload.bytes, mime);
+    return { fileId, filename, reading: fields ? 'done' : 'failed', fields };
+  }
+
+  /** A stored invoice file for download (any member); null if it is not this organisation's. */
+  async invoiceFile(
+    orgId: string,
+    user: User,
+    fileId: string,
+  ): Promise<{ filename: string; mime: string; bytes: Buffer } | null> {
+    await this.require(this.db, orgId, user, 'org.read');
+    if (!uuid.safeParse(fileId).success) return null;
+    const rows = await this.db.query<{ filename: string; mime: string; data: string }>(
+      `select filename, mime, encode(bytes, 'base64') as data from org_invoice_files
+        where id = $1 and org_id = $2`,
+      [fileId, orgId],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return { filename: row.filename, mime: row.mime, bytes: Buffer.from(row.data, 'base64') };
+  }
+
+  /** Matched and accepted invoices as formula-safe CSV for accounting. */
+  async invoiceCsv(orgId: string, user: User): Promise<string> {
+    await this.require(this.db, orgId, user, 'org.read');
+    const loaded = await this.load(this.db, orgId);
+    const entries = await this.entries(this.db, orgId);
+    return invoiceCsv(foldInvoices(entries), loaded.config.policy.currencyDecimals);
   }
 
   // Internals ----------------------------------------------------------------------------------

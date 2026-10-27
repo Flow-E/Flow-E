@@ -79,7 +79,7 @@ Numbered migrations; `001`–`003` are never edited.
 
 ## Open questions for you
 
-1. **Second factor for approvers.** It doesn't exist. Supabase Auth supports authenticator-app codes (TOTP). Proposal: require it for owners and approvers before they can approve or change a mandate; viewers without. Yes, or later?
+1. **Second factor for approvers.** Decided: own TOTP (RFC 6238 on `node:crypto`, not Supabase MFA), required for owners and approvers before they approve/decline, change a mandate, manage keys or members, or flip the kill switch; viewers and the sandbox exempt. Built in A6 (`web/src/server/totp.ts`, `mfa.ts`, `strong-session.ts`, `/account/security`, migration 005).
 2. **Claude API key** for invoice extraction (A7) and "Run reorder" (B4). You create the key at console.anthropic.com and set `ANTHROPIC_API_KEY` in Vercel. Proposal: a small model for extraction, a cap of 12 steps and about 20,000 tokens per reorder run, and a monthly spending limit set in the Anthropic console. OK?
 3. **Invoice files.** Keep the uploaded PDF (private Supabase Storage bucket in the Zurich project, deleted after N years), or extract the fields and discard the file? Keeping it is better for audits but means storing documents. Your choice, and if kept: how long?
 4. **Demo organisation with history (C1).** So far, real organisations never get backdated sample data, so nobody can mistake a demo for real history. Proposal: an admin-only seed (only for `FLOWE_ADMIN_EMAILS`) that creates "Lab Alpha (fictional)" with a permanent "Demo organisation, fictional data" banner and a ledger entry saying so. OK?

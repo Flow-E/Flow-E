@@ -6,11 +6,13 @@ import { usePathname } from 'next/navigation';
 const TABS = [
   { href: '/sandbox', label: 'Dashboard' },
   { href: '/sandbox/agent', label: 'Fake agent' },
+  { href: '/sandbox/invoices', label: 'Invoices' },
   { href: '/sandbox/ledger', label: 'Ledger' },
   { href: '/sandbox/mandate', label: 'Mandate' },
 ] as const;
 
-export function SandboxTabs() {
+/** `reviewCount`: invoices waiting for a person, shown on the Invoices tab. */
+export function SandboxTabs({ reviewCount = 0 }: { reviewCount?: number }) {
   const pathname = usePathname();
   return (
     <nav aria-label="Sandbox" className="-mb-px flex gap-1 overflow-x-auto">
@@ -27,6 +29,12 @@ export function SandboxTabs() {
             }`}
           >
             {t.label}
+            {t.href === '/sandbox/invoices' && reviewCount > 0 ? (
+              <span className="ml-1.5 rounded-full bg-review-soft px-1.5 text-xs text-review">
+                {reviewCount}
+                <span className="sr-only"> need review</span>
+              </span>
+            ) : null}
           </Link>
         );
       })}

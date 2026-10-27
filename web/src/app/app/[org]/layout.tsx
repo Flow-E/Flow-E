@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ChevronDown, Power } from 'lucide-react';
 import { Logo, Pill, buttonClass } from '@/components/ui';
+import { foldInvoices, needsReview } from '@flow-e/mcp/core';
 import { ROLE_LABEL } from '@/server/permissions';
 import { orgView } from '@/server/org-view';
 import { signOut } from '../../login/actions';
@@ -77,7 +78,10 @@ export default async function OrgLayout({
             </form>
           </div>
           <div className="w-full">
-            <OrgTabs base={`/app/${view.id}`} />
+            <OrgTabs
+              base={`/app/${view.id}`}
+              reviewCount={foldInvoices(view.entries).filter(needsReview).length}
+            />
           </div>
         </div>
       </header>

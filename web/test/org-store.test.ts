@@ -55,6 +55,14 @@ describe('every action × role, enforced by the store', () => {
           currency: 'CHF',
         });
       },
+      'invoice.record': (s, orgId, user) =>
+        s.addInvoice(orgId, user, {
+          supplier: `Fictional Supplier ${unique()}`,
+          number: `INV-${unique()}`,
+          invoiceDate: '2026-10-20',
+          amount: '10.00',
+          currency: 'CHF',
+        }),
       'agent.freeze': async (s, orgId, user) => {
         await s.setFrozen(orgId, user, 'buyer', true);
         await s.setFrozen(orgId, user, 'buyer', false);
@@ -91,6 +99,7 @@ describe('every action × role, enforced by the store', () => {
     'payment.resolve': [ALICE, BOB],
     'payment.cancel': [ALICE, BOB],
     'payment.fulfil': [ALICE, BOB],
+    'invoice.record': [ALICE, BOB],
     'agent.freeze': [ALICE, BOB],
     'killswitch.set': [ALICE, BOB],
     'mandate.update': [ALICE],

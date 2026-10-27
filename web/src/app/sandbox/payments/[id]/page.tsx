@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Download } from 'lucide-react';
+import { foldInvoices } from '@flow-e/mcp/core';
 import { ApprovalCard } from '@/components/approval-card';
 import { Fulfilment } from '@/components/fulfilment';
 import { ShareReceipt } from '@/components/share-receipt';
@@ -9,13 +10,7 @@ import { Panel, StatusPill, buttonClass } from '@/components/ui';
 import { dateTime, money, ruleName } from '@/lib/format';
 import { siteOrigin } from '@/server/origin';
 import { sandboxView } from '@/server/view';
-import {
-  cancelAction,
-  invoiceAction,
-  orderAction,
-  resolveAction,
-  verifyAction,
-} from '../../actions';
+import { cancelAction, orderAction, resolveAction, verifyAction } from '../../actions';
 import { ActionButton, Trace, VerifyForm } from '../../client';
 
 export const metadata: Metadata = { title: 'Payment' };
@@ -87,7 +82,11 @@ export default async function PaymentPage({ params }: { params: Promise<{ id: st
         canAct
         poHref={`/sandbox/payments/${p.paymentId}/po`}
         orderAction={orderAction}
-        invoiceAction={invoiceAction}
+        invoicesBase="/sandbox/invoices"
+        invoiceResolution={
+          foldInvoices(view.entries).find((i) => i.invoiceId === p.fulfilment?.invoice?.invoiceId)
+            ?.resolution?.outcome ?? null
+        }
         fields={{}}
       />
 

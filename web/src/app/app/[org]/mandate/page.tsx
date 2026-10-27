@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { MandateChanges } from '@/components/mandate-changes';
+import { recentChanges } from '@/lib/mandate-changes';
 import { mandateFields } from '@/lib/mandate-form-data';
 import { priceSuggestions } from '@/server/price-suggestions';
 import { can } from '@/server/permissions';
@@ -43,6 +45,11 @@ export default async function MandatePage({ params }: { params: Promise<{ org: s
         readOnly={!edit}
         fxAsText
         baseHint="Fixed for an organisation. Every limit is counted in it."
+      />
+      <MandateChanges
+        changes={recentChanges(view.entries)}
+        timezone={view.timezone}
+        ledgerHref={`/app/${view.id}/ledger`}
       />
     </div>
   );

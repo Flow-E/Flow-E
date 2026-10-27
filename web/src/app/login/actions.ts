@@ -4,6 +4,7 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { safeNext } from '@/lib/next-path';
+import { afterSignIn } from '@/server/strong-session';
 import { NEXT_COOKIE, authMode, devUserId, endSession, startSession } from '@/server/session';
 import {
   PKCE_COOKIE,
@@ -79,8 +80,9 @@ export async function devLogin(_prev: LoginState, form: FormData): Promise<Login
   const parsed = email.safeParse(form.get('email'));
   if (!parsed.success)
     return { error: parsed.error.issues[0]?.message ?? 'Enter an email address.' };
-  await startSession({ userId: devUserId(parsed.data), email: parsed.data });
-  redirect(safeNext(form.get('next')));
+  const userId = devUserId(parsed.data);
+  await startSession({ userId, email: parsed.data });
+  redirect(await afterSignIn(userId, safeNext(form.get('next'))));
 }
 
 export async function signOut(): Promise<void> {

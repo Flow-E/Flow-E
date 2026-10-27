@@ -21,6 +21,8 @@ export interface Session {
   /** Stable owner id for the sandbox, e.g. "dev:alice@example.com". */
   userId: string;
   email: string;
+  /** When this session last passed the second factor (ms); absent until it has. */
+  mfaAt?: number;
 }
 
 export type AuthMode = 'dev' | 'supabase' | 'none';
@@ -44,6 +46,7 @@ export function signSession(session: Session, expiresAtMs: number, key = secret(
       sub: session.userId,
       email: session.email,
       exp: Math.floor(expiresAtMs / 1000),
+      ...(session.mfaAt === undefined ? {} : { mfa: Math.floor(session.mfaAt / 1000) }),
     }),
   ).toString('base64url');
   const sig = createHmac('sha256', key).update(payload).digest('base64url');
@@ -55,6 +58,15 @@ export function readSession(
   nowMs: number,
   key = secret(),
 ): Session | null {
+  return readSessionWithExpiry(token, nowMs, key)?.session ?? null;
+}
+
+/** The session and when it ends (ms). */
+export function readSessionWithExpiry(
+  token: string | undefined,
+  nowMs: number,
+  key = secret(),
+): { session: Session; expiresAtMs: number } | null {
   if (!token) return null;
   const [payload, sig] = token.split('.');
   if (!payload || !sig) return null;
@@ -66,6 +78,7 @@ export function readSession(
       sub?: unknown;
       email?: unknown;
       exp?: unknown;
+      mfa?: unknown;
     };
     if (
       typeof data.sub !== 'string' ||
@@ -75,7 +88,14 @@ export function readSession(
       return null;
     }
     if (data.exp * 1000 <= nowMs) return null;
-    return { userId: data.sub, email: data.email };
+    return {
+      session: {
+        userId: data.sub,
+        email: data.email,
+        ...(typeof data.mfa === 'number' ? { mfaAt: data.mfa * 1000 } : {}),
+      },
+      expiresAtMs: data.exp * 1000,
+    };
   } catch {
     return null;
   }
@@ -93,6 +113,29 @@ export async function startSession(session: Session): Promise<void> {
     path: '/',
     maxAge: MAX_AGE_S,
   });
+}
+
+/**
+ * Record that this session just passed the second factor. Keeps the session's own expiry, so a
+ * verified session lasts exactly as long as the session (at most 12 hours).
+ */
+export async function markMfaVerified(nowMs = Date.now()): Promise<void> {
+  const jar = await cookies();
+  const current = readSessionWithExpiry(jar.get(SESSION_COOKIE)?.value, nowMs);
+  if (!current) return;
+  const { session, expiresAtMs } = current;
+  const maxAge = Math.max(1, Math.floor((expiresAtMs - nowMs) / 1000));
+  jar.set(
+    SESSION_COOKIE,
+    signSession({ userId: session.userId, email: session.email, mfaAt: nowMs }, expiresAtMs),
+    {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge,
+    },
+  );
 }
 
 export async function endSession(): Promise<void> {

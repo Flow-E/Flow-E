@@ -25,6 +25,9 @@ export default async function OrgsPage() {
           </Link>
           <div className="ml-auto flex items-center gap-2 text-sm">
             <span className="hidden max-w-[16rem] truncate text-ink-3 sm:inline">{user.email}</span>
+            <Link href="/account/security" className={buttonClass('quiet', 'sm')}>
+              Security
+            </Link>
             <form action={signOut}>
               <button type="submit" className={buttonClass('quiet', 'sm')}>
                 Sign out

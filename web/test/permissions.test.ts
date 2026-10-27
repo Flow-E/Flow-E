@@ -18,6 +18,7 @@ const EXPECTED: Record<Permission, string> = {
   'payment.resolve': 'oa',
   'payment.cancel': 'oa',
   'payment.fulfil': 'oa',
+  'invoice.record': 'oa',
   'agent.freeze': 'oa',
   'killswitch.set': 'oa',
   'mandate.update': 'o',

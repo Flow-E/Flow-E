@@ -60,6 +60,7 @@ export function evaluate(
           reason: result.detail,
           trace,
           amountBase: facts.amountBase,
+          ...(facts.projectId ? { projectId: facts.projectId } : {}),
           ...(hint ? { guidance: hint.text, howToComply: [hint.comply] } : {}),
         };
       }
@@ -79,6 +80,7 @@ export function evaluate(
         reason: reviews.map((r) => r.detail).join(' '),
         trace,
         amountBase: facts.amountBase,
+        ...(facts.projectId ? { projectId: facts.projectId } : {}),
         ...(given.length > 0
           ? {
               guidance: given.map((h) => h.text).join(' '),
@@ -94,6 +96,7 @@ export function evaluate(
       reason: 'All rules passed.',
       trace,
       amountBase: facts.amountBase,
+      ...(facts.projectId ? { projectId: facts.projectId } : {}),
     };
     if (newSupplier) {
       const until = context.now + COOLING_OFF_MS;

@@ -1,9 +1,11 @@
 import Link from 'next/link';
-import { Check, Circle, FileText, TriangleAlert } from 'lucide-react';
+import { Check, Circle, FilePlus, FileText, TriangleAlert } from 'lucide-react';
 import type { PaymentRecord } from '@flow-e/mcp/core';
-import { InvoiceForm, OrderForm } from '@/components/fulfilment-forms';
+import { OrderForm } from '@/components/fulfilment-forms';
+import { InvoiceStatusPill } from '@/components/invoices';
 import { Panel, buttonClass } from '@/components/ui';
 import { dateTime, money } from '@/lib/format';
+import { addInvoiceHref } from '@/lib/invoice-prefill';
 
 type Act = (
   prev: { ok?: string; error?: string },
@@ -12,11 +14,6 @@ type Act = (
   ok?: string;
   error?: string;
 }>;
-
-/** "1250.5" style: the approved amount as typed into a form. */
-function plain(minor: number, decimals: number): string {
-  return (minor / 10 ** decimals).toFixed(decimals);
-}
 
 function Step({ done, children }: { done: boolean; children: React.ReactNode }) {
   return (
@@ -44,7 +41,8 @@ export function Fulfilment({
   canAct,
   poHref,
   orderAction,
-  invoiceAction,
+  invoicesBase,
+  invoiceResolution = null,
   fields,
 }: {
   payment: PaymentRecord;
@@ -55,7 +53,10 @@ export function Fulfilment({
   canAct: boolean;
   poHref: string;
   orderAction: Act;
-  invoiceAction: Act;
+  /** Invoice pages live at `${invoicesBase}/${invoiceId}`; "Add invoice" at `${invoicesBase}/new`. */
+  invoicesBase: string;
+  /** A person's decision on the payment's invoice, if it did not match. */
+  invoiceResolution?: 'accepted' | 'rejected' | null;
   fields: Record<string, string>;
 }) {
   if (p.status !== 'approved') return null;
@@ -63,7 +64,8 @@ export function Fulfilment({
   const invoice = p.fulfilment?.invoice ?? null;
   const cooling = p.cancellableUntil !== null && Date.parse(p.cancellableUntil) > now;
   const fmt = (n: number) => money(n, p.request.currency, decimals);
-  const digits = decimals?.[p.request.currency] ?? (p.request.currency === 'JPY' ? 0 : 2);
+  const invoiceStatus = invoiceResolution ?? invoice?.match ?? null;
+  const invoiceOk = invoiceStatus === 'matched' || invoiceStatus === 'accepted';
 
   return (
     <Panel
@@ -117,12 +119,25 @@ export function Fulfilment({
             </div>
           )}
         </Step>
-        <Step done={invoice !== null}>
-          {invoice ? (
+        <Step done={invoiceOk}>
+          {invoice && invoiceStatus !== 'rejected' ? (
             <>
-              <p className="text-ink">
-                Invoice <span className="font-mono">{invoice.number}</span> matched ·{' '}
-                <span className="tabular font-mono">{fmt(invoice.amount)}</span>
+              <p className="flex flex-wrap items-center gap-2 text-ink">
+                <span>
+                  Invoice{' '}
+                  {invoice.invoiceId ? (
+                    <Link
+                      href={`${invoicesBase}/${invoice.invoiceId}`}
+                      className="font-mono hover:underline"
+                    >
+                      {invoice.number}
+                    </Link>
+                  ) : (
+                    <span className="font-mono">{invoice.number}</span>
+                  )}{' '}
+                  · <span className="tabular font-mono">{fmt(invoice.amount)}</span>
+                </span>
+                {invoiceStatus ? <InvoiceStatusPill status={invoiceStatus} /> : null}
               </p>
               {invoice.difference > 0 ? (
                 <p className="mt-1 inline-flex items-start gap-1.5 text-review">
@@ -140,14 +155,16 @@ export function Fulfilment({
             </>
           ) : (
             <div className="space-y-2">
-              <p className="text-ink">No invoice matched yet</p>
+              <p className="text-ink">
+                {invoiceStatus === 'rejected' ? 'The last invoice was rejected' : 'No invoice yet'}
+              </p>
               {canAct ? (
-                <InvoiceForm
-                  action={invoiceAction}
-                  fields={{ ...fields, id: p.paymentId }}
-                  currency={p.request.currency}
-                  suggested={plain(p.request.amount, digits)}
-                />
+                <Link
+                  href={addInvoiceHref(invoicesBase, p)}
+                  className={buttonClass('secondary', 'sm')}
+                >
+                  <FilePlus size={15} aria-hidden="true" /> Add invoice
+                </Link>
               ) : null}
             </div>
           )}

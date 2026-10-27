@@ -55,9 +55,10 @@ export default async function OrgDashboard({
     role: view.role,
     agents: view.agents,
     payments: view.payments.length,
+    entryTypes: view.entries.map((e) => e.type),
     referencePrices: view.raw.reference_prices,
-    members: view.members.length,
-    pendingInvitations: view.invitations.filter((i) => i.status === 'pending').length,
+    members: view.members,
+    invitations: view.invitations,
   });
 
   return (
@@ -70,7 +71,7 @@ export default async function OrgDashboard({
         </p>
       </div>
 
-      <GettingStarted checklist={checklist} />
+      <GettingStarted checklist={checklist} readOnly={!can(view.role, 'mandate.update')} />
 
       <section
         className={`flex flex-wrap items-center justify-between gap-4 rounded-xl border px-4 py-4 sm:px-5 ${

@@ -12,7 +12,7 @@ export interface MandateChange {
 
 function normalised(raw: Record<string, unknown>): Record<string, unknown> {
   const r = configSchema.safeParse(raw);
-  return r.success ? (r.data) : raw;
+  return r.success ? r.data : raw;
 }
 
 const asObject = (v: unknown): Record<string, unknown> =>

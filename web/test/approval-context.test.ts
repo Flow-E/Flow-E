@@ -283,3 +283,107 @@ describe('trace of a payment', () => {
     expect(traceOf(entries, 'nope')).toEqual([]);
   });
 });
+
+describe('monthly and project budget effects', () => {
+  const booked = (p: PaymentRecord, project: string): PaymentRecord => ({
+    ...p,
+    request: { ...p.request, project },
+  });
+  const PROJECTS = [
+    {
+      id: 'p-alpha',
+      name: 'Project Alpha',
+      budgetBase: 300000,
+      period: 'total' as const,
+      agents: [],
+      ends: '2026-12-31',
+    },
+    { id: 'p-beta', name: 'Beta', budgetBase: 100000, period: 'month' as const, agents: [] },
+  ];
+  const me = booked(pay({ status: 'review', engineDecision: 'review', amount: 80000 }), 'p-alpha');
+  const history = [
+    pay({ at: NOW - 2 * DAY, amount: 40000 }), // this month, approved
+    pay({ at: NOW - 3 * DAY, amount: 10000, status: 'review' }), // this month, waiting
+    pay({ at: NOW - 30 * DAY, amount: 70000 }), // September: not this month
+    pay({ at: NOW - DAY, amount: 99999, agentId: 'someone-else' }), // other agent
+    // Project Alpha, booked by name and by another agent: shared budget, any spelling.
+    booked(pay({ at: NOW - 40 * DAY, amount: 120000, agentId: 'someone-else' }), ' project ALPHA '),
+    booked(pay({ at: NOW - DAY, amount: 50000, status: 'review' }), 'p-alpha'),
+    booked(pay({ at: NOW - DAY, amount: 5000, status: 'declined' }), 'p-alpha'),
+    booked(pay({ at: NOW - DAY, amount: 7000 }), 'p-beta'),
+  ];
+  const input = {
+    payment: me,
+    payments: [me, ...history],
+    trace: [],
+    dailyBudget: 1000000,
+    monthlyBudget: 250000,
+    projects: PROJECTS,
+    timezone: TZ,
+    now: NOW,
+  };
+
+  it('shows the month: this agent’s approved + other waiting + this one', () => {
+    // Other agents and September do not count; this agent's project payments do.
+    expect(approvalContext(input).monthly).toEqual({
+      month: '2026-10',
+      isThisMonth: true,
+      budget: 250000,
+      approved: 47000,
+      pending: 60000,
+      thisPayment: 80000,
+      total: 187000,
+      overBy: 0,
+    });
+    const tight = approvalContext({ ...input, monthlyBudget: 150000, now: NOW + 20 * DAY });
+    expect(tight.monthly).toMatchObject({ overBy: 37000, isThisMonth: false });
+    expect(approvalContext({ ...input, monthlyBudget: null }).monthly).toBeNull();
+  });
+
+  it('shows the project: every agent’s payments to it, by id or name, over its whole life', () => {
+    expect(approvalContext(input).project).toEqual({
+      found: true,
+      id: 'p-alpha',
+      name: 'Project Alpha',
+      period: 'total',
+      month: null,
+      ends: '2026-12-31',
+      ended: false,
+      budget: 300000,
+      approved: 120000,
+      pending: 50000,
+      thisPayment: 80000,
+      total: 250000,
+      overBy: 0,
+    });
+  });
+
+  it('a monthly project counts this month only; over budget is flagged', () => {
+    const beta = booked(pay({ status: 'review', engineDecision: 'review', amount: 95000 }), 'beta');
+    const ctx = approvalContext({ ...input, payment: beta, payments: [beta, ...history] });
+    expect(ctx.project).toMatchObject({
+      found: true,
+      id: 'p-beta',
+      period: 'month',
+      month: '2026-10',
+      ends: null,
+      approved: 7000,
+      overBy: 2000,
+    });
+  });
+
+  it('says when the project had ended, and when the name is not a project', () => {
+    const late = { ...me, createdAt: '2027-01-02T10:00:00.000Z' };
+    expect(approvalContext({ ...input, payment: late }).project).toMatchObject({
+      ended: true,
+      ends: '2026-12-31',
+    });
+    const unknown = booked(me, 'Gamma');
+    expect(approvalContext({ ...input, payment: unknown }).project).toEqual({
+      found: false,
+      named: 'Gamma',
+    });
+    const none = { ...me, request: { ...me.request, project: undefined } };
+    expect(approvalContext({ ...input, payment: none }).project).toBeNull();
+  });
+});

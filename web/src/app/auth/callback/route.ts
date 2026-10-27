@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { safeNext } from '@/lib/next-path';
 import { NEXT_COOKIE, startSession } from '@/server/session';
+import { afterSignIn } from '@/server/strong-session';
 import {
   PKCE_COOKIE,
   SignInError,
@@ -37,14 +38,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  let userId: string;
   try {
     const user = await exchangeCode(code, verifier);
-    await startSession({ userId: supabaseUserId(user), email: user.email });
+    userId = supabaseUserId(user);
+    await startSession({ userId, email: user.email });
   } catch (err) {
     return fail(err instanceof SignInError ? err.message : 'Sign-in failed. Try again shortly.');
   }
 
-  const next = new URL(safeNext(request.cookies.get(NEXT_COOKIE)?.value), request.nextUrl);
+  // With an authenticator app set up, the code comes first (then on to `next`).
+  const target = await afterSignIn(userId, safeNext(request.cookies.get(NEXT_COOKIE)?.value));
+  const next = new URL(target, request.nextUrl);
   const url = request.nextUrl.clone();
   url.pathname = next.pathname;
   url.search = next.search;

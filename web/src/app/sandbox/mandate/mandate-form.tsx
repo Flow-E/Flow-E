@@ -1,46 +1,16 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useMemo } from 'react';
 import { CategoryPicker } from '@/components/category-picker';
+import { explainProblems, fieldKey, type MandateFields } from '@/lib/mandate-form-data';
 import { MandatePreview, type PreviewAction } from './preview';
 import { PricesField, type PriceSuggestion } from './prices-field';
+import { ProjectsField } from './projects-field';
 import { buttonClass } from '@/components/ui';
 import type { ActionResult } from '../actions';
 import { keepValues } from '../client';
 
-export interface AgentFields {
-  id: string;
-  owner: string;
-  status: string;
-  daily_budget: string;
-  per_payment_limit: string;
-  approval_above: string;
-  currencies: string;
-  categories: string;
-  supplier_mode: string;
-  allow: string;
-  block: string;
-  blocked_countries: string;
-  velocity_per_minute: string;
-  business_hours_only: boolean;
-}
-
-export interface MandateFields {
-  baseCurrency: string;
-  timezone: string;
-  fx: [string, string][];
-  blocked_countries: string;
-  blocked_suppliers: string;
-  days: number[];
-  start: string;
-  end: string;
-  /** "Item | price | other words | unit" per line. */
-  prices: string;
-  above_percent: string;
-  below_percent: string;
-  price_action: string;
-  agents: AgentFields[];
-}
+export type { AgentFields, MandateFields } from '@/lib/mandate-form-data';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const input = 'mt-1.5 h-10 w-full rounded-lg border border-rule-strong bg-surface px-3 text-ink';
@@ -55,6 +25,7 @@ function Field({
   help,
   mono,
   inputMode,
+  error,
 }: {
   name: string;
   title: string;
@@ -62,6 +33,8 @@ function Field({
   help?: string;
   mono?: boolean;
   inputMode?: 'decimal' | 'numeric' | 'text';
+  /** A problem with the saved value, in plain words. */
+  error?: string;
 }) {
   return (
     <label className={label}>
@@ -70,11 +43,19 @@ function Field({
         name={name}
         defaultValue={value}
         inputMode={inputMode}
-        className={`${input} ${mono ? 'tabular font-mono' : ''}`}
+        aria-invalid={error ? true : undefined}
+        className={`${input} ${mono ? 'tabular font-mono' : ''} ${error ? 'border-decline' : ''}`}
       />
       {help ? <span className={hint}>{help}</span> : null}
+      <FieldError error={error} />
     </label>
   );
+}
+
+function FieldError({ error }: { error?: string | undefined }) {
+  return error ? (
+    <span className="mt-1 block text-xs font-normal text-decline">{error}</span>
+  ) : null;
 }
 
 export function MandateForm({
@@ -99,6 +80,17 @@ export function MandateForm({
   preview?: PreviewAction;
 }) {
   const [state, run, pending] = useActionState<ActionResult, FormData>(action, {});
+  // The store's "Not saved" message, one plain problem per setting, placed at its field.
+  const problems = useMemo(() => (state.error ? explainProblems(state.error) : []), [state.error]);
+  const errors = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const p of problems) {
+      const key = fieldKey(p.path);
+      if (key !== null) out[key] = out[key] ? `${out[key]} ${p.message}` : p.message;
+    }
+    return out;
+  }, [problems]);
+  const rates = data.fx.map(([code]) => code);
   return (
     <form onSubmit={keepValues(run)} className="space-y-6">
       <fieldset disabled={readOnly} className="contents">
@@ -117,6 +109,7 @@ export function MandateForm({
             </label>
             <Field
               name="timezone"
+              error={errors['timezone']}
               title="Time zone"
               value={data.timezone}
               help="Defines “today” and business hours, e.g. Europe/Zurich."
@@ -129,8 +122,10 @@ export function MandateForm({
                   rows={2}
                   defaultValue={data.fx.map(([code, rate]) => `${code} ${rate}`).join('\n')}
                   placeholder="EUR 0.94"
+                  aria-invalid={errors.fx ? true : undefined}
                   className={`${area} tabular font-mono`}
                 />
+                <FieldError error={errors.fx} />
                 <span className={hint}>
                   One per line: code and {data.baseCurrency} per 1 unit. Needed for every other
                   currency an agent may use.
@@ -141,6 +136,7 @@ export function MandateForm({
               <Field
                 key={code}
                 name={`fx.${code}`}
+                error={errors.fx}
                 title={`Exchange rate ${code} → ${data.baseCurrency}`}
                 value={rate}
                 mono
@@ -150,6 +146,7 @@ export function MandateForm({
             ))}
             <Field
               name="blocked_countries"
+              error={errors['blocked_countries']}
               title="Always-blocked countries"
               value={data.blocked_countries}
               help="Two-letter codes, comma-separated. A demo list, not sanctions screening."
@@ -163,6 +160,7 @@ export function MandateForm({
                 className={area}
               />
               <span className={hint}>One per line. No agent may pay them.</span>
+              <FieldError error={errors.blocked_suppliers} />
             </label>
             <div className="sm:col-span-2">
               <span className={label}>Business hours</span>
@@ -196,6 +194,7 @@ export function MandateForm({
                   />
                 </label>
               </div>
+              <FieldError error={errors.start} />
             </div>
           </div>
         </fieldset>
@@ -212,12 +211,16 @@ export function MandateForm({
               <PricesField
                 value={data.prices}
                 baseCurrency={data.baseCurrency}
+                rates={rates}
+                decimals={data.currencyDecimals}
                 suggestions={suggestions}
                 disabled={readOnly}
+                errors={errors}
               />
             </div>
             <Field
               name="above_percent"
+              error={errors['above_percent']}
               title="Flag above the usual price by more than (%)"
               value={data.above_percent}
               mono
@@ -229,9 +232,11 @@ export function MandateForm({
                 <option value="review">A person decides</option>
                 <option value="decline">Decline</option>
               </select>
+              <FieldError error={errors.price_action} />
             </label>
             <Field
               name="below_percent"
+              error={errors['below_percent']}
               title="Flag below the usual price by more than (%)"
               value={data.below_percent}
               mono
@@ -239,6 +244,50 @@ export function MandateForm({
               help="Leave empty to never flag cheap offers."
             />
           </div>
+        </fieldset>
+
+        <fieldset className="rounded-xl border border-rule bg-surface px-4 py-5 sm:px-5">
+          <legend className="px-1 text-base font-semibold">Invoices</legend>
+          <p className="text-sm text-ink-2">
+            How far an invoice may differ from the approved amount before a person has to look at
+            it. The larger of the two counts: with 2% and {data.baseCurrency} 5, an invoice for an
+            approved {data.baseCurrency} 100 may be between {data.baseCurrency} 95 and 105.
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <Field
+              name="tolerance_percent"
+              error={errors.tolerance_percent}
+              title="Tolerance (%)"
+              value={data.tolerance_percent}
+              mono
+              inputMode="decimal"
+              help="From 0 to 50."
+            />
+            <Field
+              name="tolerance_min"
+              error={errors.tolerance_min}
+              title={`At least (${data.baseCurrency})`}
+              value={data.tolerance_min}
+              mono
+              inputMode="decimal"
+              help="So small invoices are not flagged for a few cents."
+            />
+          </div>
+        </fieldset>
+
+        <fieldset className="rounded-xl border border-rule bg-surface px-4 py-5 sm:px-5">
+          <legend className="px-1 text-base font-semibold">Projects</legend>
+          <p className="mb-4 text-sm text-ink-2">
+            A project has its own budget that purchases are booked to. An agent names the project
+            with each request; one that must name a project is declined without it.
+          </p>
+          <ProjectsField
+            value={data.projects}
+            agentIds={data.agents.map((a) => a.id)}
+            baseCurrency={data.baseCurrency}
+            disabled={readOnly}
+            errors={errors}
+          />
         </fieldset>
 
         {data.agents.map((a) => (
@@ -249,7 +298,12 @@ export function MandateForm({
             <legend className="px-1 font-mono text-base font-semibold">{a.id}</legend>
             <input type="hidden" name="agent" value={a.id} />
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Field name={`${a.id}.owner`} title="Responsible owner" value={a.owner} />
+              <Field
+                name={`${a.id}.owner`}
+                error={errors[`${a.id}.owner`]}
+                title="Responsible owner"
+                value={a.owner}
+              />
               <label className={label}>
                 Status
                 <select name={`${a.id}.status`} defaultValue={a.status} className={input}>
@@ -260,6 +314,7 @@ export function MandateForm({
               </label>
               <Field
                 name={`${a.id}.velocity_per_minute`}
+                error={errors[`${a.id}.velocity_per_minute`]}
                 title="Requests per minute"
                 value={a.velocity_per_minute}
                 mono
@@ -267,13 +322,24 @@ export function MandateForm({
               />
               <Field
                 name={`${a.id}.daily_budget`}
+                error={errors[`${a.id}.daily_budget`]}
                 title={`Daily budget (${data.baseCurrency})`}
                 value={a.daily_budget}
                 mono
                 inputMode="decimal"
               />
               <Field
+                name={`${a.id}.monthly_budget`}
+                error={errors[`${a.id}.monthly_budget`]}
+                title={`Monthly budget (${data.baseCurrency})`}
+                value={a.monthly_budget}
+                mono
+                inputMode="decimal"
+                help="Optional. Leave empty for no monthly limit."
+              />
+              <Field
                 name={`${a.id}.per_payment_limit`}
+                error={errors[`${a.id}.per_payment_limit`]}
                 title={`Per payment (${data.baseCurrency})`}
                 value={a.per_payment_limit}
                 mono
@@ -281,6 +347,7 @@ export function MandateForm({
               />
               <Field
                 name={`${a.id}.approval_above`}
+                error={errors[`${a.id}.approval_above`]}
                 title={`Human approval above (${data.baseCurrency})`}
                 value={a.approval_above}
                 mono
@@ -289,12 +356,14 @@ export function MandateForm({
               />
               <Field
                 name={`${a.id}.currencies`}
+                error={errors[`${a.id}.currencies`]}
                 title="Currencies"
                 value={a.currencies}
                 help="Comma-separated, e.g. CHF, EUR."
               />
               <Field
                 name={`${a.id}.blocked_countries`}
+                error={errors[`${a.id}.blocked_countries`]}
                 title="Blocked countries for this agent"
                 value={a.blocked_countries}
               />
@@ -308,11 +377,13 @@ export function MandateForm({
                   <option value="allowlist">Approved suppliers only</option>
                   <option value="any">Any supplier not blocked</option>
                 </select>
+                <FieldError error={errors[`${a.id}.supplier_mode`]} />
               </label>
               <label className={label}>
                 Approved suppliers
                 <textarea name={`${a.id}.allow`} rows={3} defaultValue={a.allow} className={area} />
                 <span className={hint}>One per line.</span>
+                <FieldError error={errors[`${a.id}.allow`]} />
               </label>
               <label className={label}>
                 Blocked suppliers
@@ -328,11 +399,25 @@ export function MandateForm({
                 Outside business hours, a human must approve
               </label>
               <div className="sm:col-span-2 lg:col-span-3">
+                <input type="hidden" name={`${a.id}.require_project.shown`} value="1" />
+                <label className="inline-flex items-center gap-2 text-sm font-medium text-ink">
+                  <input
+                    type="checkbox"
+                    name={`${a.id}.require_project`}
+                    defaultChecked={a.require_project}
+                    className="size-4 accent-[var(--accent)]"
+                  />
+                  Every purchase must name a project
+                </label>
+                <FieldError error={errors[`${a.id}.require_project`]} />
+              </div>
+              <div className="sm:col-span-2 lg:col-span-3">
                 <CategoryPicker
                   name={`${a.id}.categories`}
                   defaultValue={a.categories}
                   title="Categories"
                 />
+                <FieldError error={errors[`${a.id}.categories`]} />
               </div>
             </div>
           </fieldset>
@@ -360,12 +445,26 @@ export function MandateForm({
       )}
       <div aria-live="polite">
         {state.error ? (
-          <p
+          <div
             role="alert"
-            className="whitespace-pre-line rounded-lg border border-decline/30 bg-decline-soft px-4 py-3 text-sm text-decline"
+            className="rounded-lg border border-decline/30 bg-decline-soft px-4 py-3 text-sm text-decline"
           >
-            {state.error}
-          </p>
+            <p className="font-medium">
+              Not saved.{' '}
+              {problems.length === 1
+                ? 'One thing to fix'
+                : `${String(problems.length)} things to fix`}
+              {Object.keys(errors).length > 0 ? ', also shown at each field:' : ':'}
+            </p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+              {problems.map((p, i) => (
+                <li key={`${p.path}-${String(i)}`}>
+                  {p.label ? <span className="font-medium">{p.label}: </span> : null}
+                  {p.message}
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
         {state.ok ? (
           <p className="rounded-lg bg-approve-soft px-4 py-3 text-sm text-approve">{state.ok}</p>

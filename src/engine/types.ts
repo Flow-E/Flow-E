@@ -249,4 +249,6 @@ export interface EvaluationResult {
   guidance?: string;
   /** The same as data, one entry per reason. */
   howToComply?: Comply[];
+  /** The id of the project the request named, when it is a project of the mandate. */
+  projectId?: string;
 }

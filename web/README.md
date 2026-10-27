@@ -9,11 +9,15 @@ The public site and the sandbox for [Flow-E](https://github.com/Flow-E/Flow-E): 
 | `/docs`                   | The repository README, synced at build time                                              |
 | `/sandbox`                | Signed-in only. Your own fictional company: dashboard, approvals, agents, kill switch    |
 | `/app`                    | Signed-in only. Your organisations: real agents with API keys, members and roles         |
+| `/app/<org>/invoices`     | Supplier invoices: upload or type in, matched against the authorizations, CSV export     |
+| `/sandbox/invoices`       | The same for the sandbox, typed-in invoices only (fictional)                             |
 | `/api/mcp`                | The remote MCP endpoint for agents (Streamable HTTP, `Authorization: Bearer` agent key)  |
 | `/verify`                 | Public, no password: paste a receipt to check it was authorized (POSTs to `/api/verify`) |
 | `/api/pilot`              | The home page’s pilot form posts here (route handler, 303 back to `/#pilot`)             |
 | `/admin/pilots`           | Pilot requests; mark contacted or declined. Only `FLOWE_ADMIN_EMAILS`, others 404        |
 | `/invite/…`, `/approve/…` | One-time links from invitation and approval emails (sign-in, then confirm)               |
+| `/account/security`       | Signed-in only. Set up, check or turn off the authenticator app (second factor)          |
+| `/account/verify`         | Signed-in only. Enter a code from the authenticator app (or a recovery code), then on    |
 | `/dev/outbox`             | Development only: the emails Flow-E would have sent                                      |
 | `/gate`                   | The private-preview password page (only while `SITE_PASSWORD` is set)                    |
 
@@ -72,7 +76,7 @@ sandbox store has the method, and organisation timestamps always come from the c
 zone). Each organisation has its own issuer key pair, its own mandate (it starts empty and
 valid) and its own signed, hash-chained ledger. Pages under `/app/<org>`: Dashboard (see above, plus
 a getting-started checklist), Agents and each agent's page
-(keys, connection instructions), Mandate, Members, Ledger, Settings.
+(keys, connection instructions), Invoices (see below), Mandate, Members, Ledger, Settings.
 
 **Roles.** Written once in `src/server/permissions.ts` and checked by the store on every call,
 with the role read from the database:
@@ -84,6 +88,7 @@ with the role read from the database:
 | Cancel in cooling-off (`payment.cancel`)     |   ✔   |    ✔     |        |
 | Freeze / unfreeze an agent (`agent.freeze`)  |   ✔   |    ✔     |        |
 | Kill switch (`killswitch.set`)               |   ✔   |    ✔     |        |
+| Invoices: record, decide (`invoice.record`)  |   ✔   |    ✔     |        |
 | Change the mandate, pause (`mandate.update`) |   ✔   |          |        |
 | Create agents (`agent.create`)               |   ✔   |          |        |
 | Create, rotate, revoke keys (`agent.keys`)   |   ✔   |          |        |
@@ -123,6 +128,33 @@ changes nothing: it asks for a sign-in as that person, shows the payment and act
 confirm button (a POST), which re-checks the link, the person's current role and the payment's
 status. Once a payment is decided, all its links are spent.
 
+**Second factor (authenticator app).** Owners and approvers must have an authenticator app
+(TOTP: any app such as 1Password, Google Authenticator or Aegis) and have entered a code in
+this session before they approve or decline (also through an email link), change the mandate
+or create agents, create, rotate or revoke keys, invite or manage members, or use the kill
+switch. Viewers are never asked, and neither is the sandbox. The check is in one place,
+`requireStrongSession` in `src/server/strong-session.ts`, called by the organisation actions
+(`src/app/app/actions.ts`) and the `/approve/…` page and its confirm action. Without an app the
+person is sent to `/account/security` ("Set up an authenticator app before you approve
+payments"); with one, to `/account/verify` and then back to the page they were on. People with
+an app also enter a code right after signing in.
+
+- TOTP is our own implementation of RFC 6238 on `node:crypto` (`src/server/totp.ts`): SHA-1,
+  6 digits, 30 seconds, one step either side, tested against the RFC's vectors. A code works
+  once: the last accepted step is stored and the same or an older one is refused.
+- Set-up shows the key as text and as a QR code (the `qrcode` package, rendered on the server
+  to an SVG string: no script, CSP-safe), is confirmed with a first code, then shows 10
+  one-time recovery codes once. Turning it off (or moving to a new phone: off, then set up
+  again) needs a current code or a recovery code.
+- A passed code is stored in the signed session cookie (`mfaAt`). It lasts as long as the
+  session and at most 12 hours; a new sign-in asks again. At most 8 code attempts per person per
+  15 minutes (in memory, per instance).
+- Storage: `user_mfa` (`db/migrations/005_mfa.sql`): the secret encrypted with the
+  key-encryption key (AES-256-GCM, like issuer keys), the last used step, and SHA-256 hashes of
+  the unused recovery codes. Codes, secrets and recovery codes are never logged.
+- Lost phone and no recovery codes: for now someone with database access deletes the person's
+  `user_mfa` row; they then set it up again.
+
 **Email delivery** is an adapter (`src/server/email.ts`). In development emails go to the
 `email_outbox` table and `/dev/outbox` shows them (only with `NODE_ENV` not production and
 `FLOWE_DEV_LOGIN=1`); production refuses the outbox. With `RESEND_API_KEY` and `EMAIL_FROM`
@@ -131,6 +163,75 @@ no retries). Setting only one of the two makes every send fail on purpose. A fai
 fails the request: it is logged with the HTTP status and Resend's message, never the key or the
 body (bodies hold one-time links). Without either, production refuses to send. Plain text plus
 simple HTML, no tracking.
+
+## Invoices
+
+Supplier invoices are matched against what Flow-E authorized, with the core's
+`src/control/invoices.ts` (tolerance from the mandate's `invoice_check`). Pages:
+
+| Route                                  | What                                                                      |
+| -------------------------------------- | ------------------------------------------------------------------------- |
+| `/app/<org>/invoices`                  | List with filter: needs review, matched, all. Each row links its payment  |
+| `/app/<org>/invoices/new`              | Add invoice: upload a file or type it in. `?reference=&supplier=` prefill |
+| `/app/<org>/invoices/<id>`             | Match in plain words, the difference, request → … → status, accept/reject |
+| `/app/<org>/invoices/upload`           | `POST`, same-origin only: keeps the file, returns the read fields (JSON)  |
+| `/app/<org>/invoices/files/<file>`     | Download the stored file (members only, always as an attachment)          |
+| `/app/<org>/invoices/export`           | Matched and accepted invoices as formula-safe CSV for accounting          |
+| `/sandbox/invoices`, `…/new`, `…/<id>` | The same for the sandbox: typed in only, no files, fictional              |
+
+- **Recording** (`invoice.record`: owner, approver) appends a signed `invoice.recorded` entry;
+  accepting or rejecting one that did not match (rejecting needs a reason) appends
+  `invoice.resolved`. Viewers read. Statuses: matched, mismatch, unmatched, duplicate, then
+  accepted or rejected by a person. The payment page links "Add invoice" prefilled with the
+  payment id as reference and shows the invoice's status.
+- **Upload**: PDF, PNG or JPEG (checked by the file's first bytes), at most 4 MB (Vercel refuses request bodies above 4.5 MB). With
+  `ANTHROPIC_API_KEY` set, the server asks Claude (`claude-haiku-5-5`, Messages API, 30 s
+  timeout) for supplier, number, date, total, currency and reference, validates the answer and
+  shows it in the form. A person checks and confirms; nothing is recorded before that, and the
+  entry then says `source: extracted`. Without the key the file is still kept and the form is
+  empty ("Automatic reading is off"). The file, the key and the model's answer are never logged.
+- **Files** live in `org_invoice_files` (`db/migrations/004_invoice_files.sql`) with their
+  SHA-256, which also goes into the invoice's ledger entry. They are kept 10 years (Swiss
+  bookkeeping rules). Deleting them is not built yet, and files uploaded but never confirmed
+  stay too.
+- **Invoices by email** is a placeholder on the list page: not built.
+
+## Mandate page
+
+Sandbox and organisations share one form (`src/app/sandbox/mandate/mandate-form.tsx`), turned
+into `mandate.yaml` JSON by `src/lib/mandate-form-data.ts` and validated by the core schema in
+the store. Nobody edits YAML. It has:
+
+- **Organisation**: time zone, exchange rates, always-blocked countries and suppliers, business
+  hours.
+- **Fair price**: an editable table of usual prices (item, supplier, price, currency, unit,
+  other words; add and remove rows). A price in another currency needs an exchange rate. A CSV
+  price list can be imported: columns Supplier, Item, Unit, Price, Currency and optionally
+  Keywords, with English or German headers (Lieferant, Artikel, Einheit, Preis, Währung,
+  Stichworte), comma or semicolon separated. Currency defaults to the base currency; prices
+  become integer minor units with the core's `parseAmount` (so JPY takes no decimals). Every
+  line that cannot be imported is listed with its line number and reason. Template:
+  `public/price-list-template.csv` (fictional suppliers). Items bought from the same supplier at
+  least three times in 90 days are suggested with their median price and supplier; the owner
+  adds them to the table and can still change them.
+- **Invoices**: the tolerance before an invoice is flagged (percent and minimum amount; the
+  larger counts).
+- **Projects**: id, name, budget per month or in total, optional end date, and the agents that
+  may book to it (none ticked: every agent).
+- **Per agent**: everything in `agents.<id>` including the optional monthly budget and "every
+  purchase must name a project".
+
+Saving keeps stored values the form does not show, and an untouched form records nothing. A
+rejected save lists each problem in plain words and marks the field. Below the form,
+**Recent changes** shows the latest `config.updated` ledger entries: who, when, the note, and
+each setting's old → new value (older entries without values name the changed settings).
+
+The dashboard's **Get started** checklist (`src/server/getting-started.ts`) has six steps, each
+ticked from data: create an agent; set the mandate (a change saved on the Mandate page, i.e. a
+`config.updated` entry; creating an agent does not count); upload a price list (usual prices
+exist); connect the agent (a key was used or a request arrived); make a first test request (a
+payment exists); invite an approver (a second owner or approver, or a pending invitation for
+one). It disappears when all six are done; viewers and approvers see it without links.
 
 ## How it uses the core
 
@@ -161,6 +262,12 @@ Organisations live in `db/migrations/002_orgs.sql` (`src/server/org-store.ts`): 
 `org_members`, `org_invitations`, `org_agents`, `agent_keys`, `org_ledger_entries` (same
 append-only triggers as the sandbox ledger), `approval_tokens` and `email_outbox`. The sandbox
 tables are untouched. Every table has RLS enabled and no policies.
+
+Invoice files live in `db/migrations/004_invoice_files.sql` (`org_invoice_files`, RLS enabled
+and no policies); see Invoices above.
+
+The second factor lives in `db/migrations/005_mfa.sql` (`src/server/mfa.ts`): one `user_mfa`
+row per person, RLS enabled and no policies.
 
 Pilot requests from the home page live in `db/migrations/003_pilot_requests.sql`
 (`src/server/pilot.ts`): one row per request, `status` new, contacted or declined. The form posts
@@ -216,6 +323,7 @@ Checks: `npm run lint`, `npm run typecheck`, `npm test` (in-memory PGlite, no se
 | `FLOWE_SITE_URL`                       | production, opt | no     | The site's public origin for sign-in links, e.g. `https://flow-e.vercel.app`. Default: the request's host |
 | `FLOWE_LEADS_TO`                       | optional        | no     | One address that gets an email for each pilot request (through the mailer above; dev: outbox)             |
 | `FLOWE_ADMIN_EMAILS`                   | optional        | no     | Comma-separated emails that may open `/admin/pilots` after signing in. Unset: nobody                      |
+| `ANTHROPIC_API_KEY`                    | optional        | yes    | Reads uploaded invoices to fill the form (a person confirms). Unset: upload keeps the file, form empty    |
 
 Generate a sandbox key:
 
@@ -246,8 +354,10 @@ To move from `FLOWE_SANDBOX_KEY` to the new name, give `FLOWE_KEY_ENCRYPTION_KEY
   their SHA-256 is stored, and the ledger records key ids and prefixes, never keys. Errors are
   logged by name only. One-time links sit in URL paths, so they appear in access logs: they are
   single-use, short-lived and useless without signing in as their recipient.
-- After sign-in, `?next=` only accepts our own `/sandbox`, `/app`, `/invite` and `/approve`
-  paths.
+- Owners and approvers need an authenticator-app code per session for approvals, mandate,
+  keys, members and the kill switch (see "Second factor" above).
+- After sign-in, `?next=` only accepts our own `/sandbox`, `/app`, `/invite`, `/approve` and
+  `/account` paths.
 - The whole site is `noindex` during the preview.
 
 ## Deploy (not done yet)
@@ -258,7 +368,8 @@ Project `khxqgpbgijnhckwlkorg` (Zurich), URL `https://khxqgpbgijnhckwlkorg.supab
 publishable key `sb_publishable__LHTIX5Dmr0Fg1ctdUztJA_Ak2sFoKm` (public).
 
 1. SQL editor: run `db/migrations/001_init.sql`, then `002_orgs.sql`, then
-   `003_pilot_requests.sql`. All are idempotent.
+   `003_pilot_requests.sql`, then every later file in number order: `004_invoice_files.sql`
+   (invoice files), `005_mfa.sql` (second factor). All are idempotent.
 2. Project Settings → Database → Connection string → **Transaction pooler** (port 6543). That
    is `DATABASE_URL`, with the database password filled in. The client uses
    `prepare: false`, which the pooler needs.

@@ -114,6 +114,13 @@ export function PurchaseOrder({
         </p>
       </section>
 
+      {p.fulfilment?.invoice ? (
+        <p className="text-sm text-ink-2 print:hidden">
+          Invoice <span className="font-mono">{p.fulfilment.invoice.number}</span> recorded:{' '}
+          {p.fulfilment.invoice.match}.
+        </p>
+      ) : null}
+
       <div className="print:hidden">
         <PrintButton />
       </div>

@@ -14,11 +14,12 @@ import { text } from '@/lib/form';
 import { FormProblem, codes, rawFromForm } from '@/lib/mandate-form-data';
 import { createDemoLab, DEMO_LAB_AGENT } from '@/server/demo-lab';
 import { siteOrigin } from '@/server/origin';
-import type { User } from '@/server/org-store';
-import { ForbiddenError, can } from '@/server/permissions';
+import type { OrgStore, User } from '@/server/org-store';
+import { ForbiddenError, can, type Permission } from '@/server/permissions';
 import { replay, type ReplayResult } from '@/server/replay';
 import { getOrgStore } from '@/server/runtime';
 import { getSession } from '@/server/session';
+import { requireStrongSession, returnPath } from '@/server/strong-session';
 
 /**
  * Organisation actions. Each reads the signed-in user from the session cookie and passes the
@@ -54,6 +55,17 @@ async function context(form?: FormData) {
   if (!session) redirect('/login?next=/app');
   const user: User = { userId: session.userId, email: session.email };
   return { store: await getOrgStore(), user, orgId: form ? text(form, 'org') : '' };
+}
+
+/**
+ * Owners and approvers need a passed second factor for the actions in STRONG_PERMISSIONS
+ * (src/server/strong-session.ts): this redirects to set one up or to enter a code, then back
+ * to the page the form was on. Outside any try/catch, so the redirect is not swallowed.
+ */
+async function strong(store: OrgStore, user: User, orgId: string, permission: Permission) {
+  if (!z.uuid().safeParse(orgId).success) return; // the store refuses it anyway
+  const role = await store.role(orgId, user);
+  await requireStrongSession(user, role, permission, await returnPath(`/app/${orgId}`));
 }
 
 function problem(err: unknown): string {
@@ -126,6 +138,7 @@ export async function renameAction(_prev: ActionResult, form: FormData): Promise
 
 export async function resolveAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
   const { store, user, orgId } = await context(form);
+  await strong(store, user, orgId, 'payment.resolve');
   const status = form.get('status') === 'approved' ? 'approved' : 'declined';
   // A decline always carries a short reason for the ledger (an approval note is optional).
   if (status === 'declined' && !note(form)) return { error: 'Give a short reason for declining.' };
@@ -163,22 +176,6 @@ export async function orderAction(_prev: ActionResult, form: FormData): Promise<
   return { ok: 'Recorded as ordered.' };
 }
 
-export async function invoiceAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
-  const { store, user, orgId } = await context(form);
-  try {
-    await store.recordInvoice(orgId, user, text(form, 'id'), {
-      number: text(form, 'number'),
-      amount: text(form, 'amount'),
-      currency: text(form, 'currency'),
-      ...(note(form) ? { note: note(form) } : {}),
-    });
-  } catch (err) {
-    return { error: problem(err) };
-  }
-  refresh(orgId);
-  return { ok: 'Invoice matched.' };
-}
-
 export async function freezeAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
   const { store, user, orgId } = await context(form);
   const frozen = form.get('frozen') === 'true';
@@ -193,6 +190,7 @@ export async function freezeAction(_prev: ActionResult, form: FormData): Promise
 
 export async function killSwitchAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
   const { store, user, orgId } = await context(form);
+  await strong(store, user, orgId, 'killswitch.set');
   const on = form.get('on') === 'true';
   try {
     await store.setKillSwitch(orgId, user, on, note(form));
@@ -229,6 +227,7 @@ export async function updateMandateAction(
   form: FormData,
 ): Promise<ActionResult> {
   const { store, user } = await context();
+  await strong(store, user, orgId, 'mandate.update');
   try {
     const current = (await store.view(orgId, user)).raw;
     await store.updateConfig(orgId, user, rawFromForm(form, current), note(form));
@@ -266,6 +265,7 @@ export async function createAgentAction(
   form: FormData,
 ): Promise<ActionResult> {
   const { store, user, orgId } = await context(form);
+  await strong(store, user, orgId, 'agent.create');
   let agentId: string;
   try {
     const approval = text(form, 'approvalAbove').trim();
@@ -301,6 +301,7 @@ const expiry = z.enum(['never', '30', '90', '365']);
 
 export async function createKeyAction(_prev: SecretResult, form: FormData): Promise<SecretResult> {
   const { store, user, orgId } = await context(form);
+  await strong(store, user, orgId, 'agent.keys');
   try {
     const e = expiry.parse(text(form, 'expires', 'never'));
     const k = await store.createKey(orgId, user, text(form, 'agentId'), {
@@ -315,6 +316,7 @@ export async function createKeyAction(_prev: SecretResult, form: FormData): Prom
 
 export async function rotateKeyAction(_prev: SecretResult, form: FormData): Promise<SecretResult> {
   const { store, user, orgId } = await context(form);
+  await strong(store, user, orgId, 'agent.keys');
   try {
     const k = await store.rotateKey(orgId, user, text(form, 'keyId'));
     refresh(orgId);
@@ -326,6 +328,7 @@ export async function rotateKeyAction(_prev: SecretResult, form: FormData): Prom
 
 export async function revokeKeyAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
   const { store, user, orgId } = await context(form);
+  await strong(store, user, orgId, 'agent.keys');
   try {
     await store.revokeKey(orgId, user, text(form, 'keyId'));
   } catch (err) {
@@ -339,6 +342,7 @@ export async function revokeKeyAction(_prev: ActionResult, form: FormData): Prom
 
 export async function inviteAction(_prev: SecretResult, form: FormData): Promise<SecretResult> {
   const { store, user, orgId } = await context(form);
+  await strong(store, user, orgId, 'member.invite');
   try {
     const r = await store.invite(
       orgId,
@@ -364,6 +368,7 @@ export async function revokeInvitationAction(
   form: FormData,
 ): Promise<ActionResult> {
   const { store, user, orgId } = await context(form);
+  await strong(store, user, orgId, 'member.invite');
   try {
     await store.revokeInvitation(orgId, user, text(form, 'invitationId'));
   } catch (err) {
@@ -375,6 +380,7 @@ export async function revokeInvitationAction(
 
 export async function changeRoleAction(_prev: ActionResult, form: FormData): Promise<ActionResult> {
   const { store, user, orgId } = await context(form);
+  await strong(store, user, orgId, 'member.manage');
   try {
     await store.changeRole(orgId, user, text(form, 'memberId'), text(form, 'role'));
   } catch (err) {
@@ -389,6 +395,7 @@ export async function removeMemberAction(
   form: FormData,
 ): Promise<ActionResult> {
   const { store, user, orgId } = await context(form);
+  await strong(store, user, orgId, 'member.manage');
   const self = text(form, 'memberId') === user.userId;
   try {
     await store.removeMember(orgId, user, text(form, 'memberId'));
@@ -422,9 +429,19 @@ export async function confirmApprovalAction(
   form: FormData,
 ): Promise<ActionResult> {
   const { store, user } = await context();
+  const token = text(form, 'token');
+  // The second factor first: the link's organisation and this person's role there decide.
+  const preview = await store.approvalPreview(token, user);
+  if ('error' in preview) return { error: preview.error };
+  await requireStrongSession(
+    user,
+    await store.role(preview.orgId, user),
+    'payment.resolve',
+    `/approve/${token}`,
+  );
   let r: { orgId: string; paymentId: string };
   try {
-    r = await store.confirmApproval(text(form, 'token'), user, note(form));
+    r = await store.confirmApproval(token, user, note(form));
   } catch (err) {
     return { error: problem(err) };
   }

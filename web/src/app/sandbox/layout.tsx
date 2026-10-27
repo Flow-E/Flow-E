@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Power } from 'lucide-react';
 import { Logo, Pill, buttonClass } from '@/components/ui';
+import { foldInvoices, needsReview } from '@flow-e/mcp/core';
 import { sandboxView } from '@/server/view';
 import { signOut } from '../login/actions';
 import { SandboxTabs } from './nav';
@@ -39,7 +40,7 @@ export default async function SandboxLayout({ children }: { children: React.Reac
             </form>
           </div>
           <div className="w-full">
-            <SandboxTabs />
+            <SandboxTabs reviewCount={foldInvoices(view.entries).filter(needsReview).length} />
           </div>
         </div>
       </header>

@@ -25,6 +25,8 @@ export interface Facts {
   country: string;
   merchantKey: string;
   amountBase: number | null;
+  /** The id of the project the request named, once PROJECT_BUDGET recognised it. */
+  projectId?: string;
 }
 
 export interface RuleInput {
@@ -564,6 +566,7 @@ const projectBudget: Rule = ({ agent, mandate, request, ctx, facts }) => {
       choose,
     );
   }
+  facts.projectId = project.id;
   const amt = amountBase(facts);
   const spend = projectSpend(
     project,

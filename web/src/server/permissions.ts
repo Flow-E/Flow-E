@@ -16,6 +16,8 @@ export const PERMISSIONS = {
   'payment.cancel': ['owner', 'approver'],
   /** Record that an approved payment was ordered, and match the supplier's invoice. */
   'payment.fulfil': ['owner', 'approver'],
+  /** Record supplier invoices (typed or uploaded) and accept or reject those that did not match. */
+  'invoice.record': ['owner', 'approver'],
   /** Freeze or unfreeze one agent. */
   'agent.freeze': ['owner', 'approver'],
   /** Turn the organisation's kill switch on or off. */

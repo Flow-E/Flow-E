@@ -17,6 +17,8 @@ const TYPE_LABEL: Record<string, string> = {
   'control.kill_switch': 'Kill switch',
   'config.updated': 'Mandate changed',
   'sandbox.sample_history': 'Sample history',
+  'invoice.recorded': 'Invoice',
+  'invoice.resolved': 'Invoice decision',
 };
 
 function describe(type: string, data: Record<string, unknown>): string {
@@ -30,6 +32,10 @@ function describe(type: string, data: Record<string, unknown>): string {
     return `${data.frozen ? 'frozen' : 'unfrozen'} by ${String(data.by)}`;
   if (type === 'control.kill_switch') return `${data.on ? 'on' : 'off'}, by ${String(data.by)}`;
   if (type === 'config.updated') return `by ${String(data.by)}`;
+  if (type === 'invoice.recorded') {
+    return `${String(data.number)} from ${String(data.supplier)}: ${String(data.match)}, by ${String(data.by)}`;
+  }
+  if (type === 'invoice.resolved') return `${String(data.outcome)} by ${String(data.by)}`;
   if (type === 'sandbox.sample_history') {
     return `fictional, backdated entries follow (generated ${String(data.generated_at)})`;
   }

@@ -9,6 +9,26 @@ changes.
 
 ### Added
 
+- Website: the **mandate editor is complete**: monthly budget and "every purchase must name a
+  project" per agent, organisation-wide projects (budget per month or in total, end date,
+  agents), invoice tolerance, a usual-price table with supplier and currency, a CSV price list
+  import (English or German headers, other currencies via the exchange rates, every bad line
+  reported) with a template, plain-word errors at each field, and **Recent changes** with old
+  and new values. The getting-started checklist now has six required steps, each from data.
+- Website: **invoice matching** (`/app/<org>/invoices`, `/sandbox/invoices`). Supplier invoices
+  are uploaded (PDF, PNG, JPEG up to 5 MB; read with Claude when `ANTHROPIC_API_KEY` is set, and
+  recorded only after a person confirms the fields) or typed in, matched against the
+  authorizations, and accepted or rejected (with a reason) when they do not match; every step is
+  a signed ledger entry. Each invoice shows request → authorization → order → invoice → status;
+  matched and accepted invoices export as formula-safe CSV. New permission `invoice.record`
+  (owner, approver); files kept in `org_invoice_files` (migration `004_invoice_files.sql`). The
+  payment page now links "Add invoice" instead of its own invoice form.
+- Website: a **second factor for owners and approvers** (authenticator-app codes, our own
+  RFC 6238 TOTP). Required once per session (at most 12 hours) before approving or declining
+  (also through email links), changing the mandate, managing keys or members, or using the kill
+  switch; viewers and the sandbox are exempt. Set-up at `/account/security` with a QR code and
+  10 one-time recovery codes; migration `005_mfa.sql`. The approval card now also shows the
+  **monthly and project budget effects** (incl. a project's end date).
 - **Orders and invoices after approval.** A fifth agent tool, `record_order`, records the
   supplier's order number for an approved payment (after cooling-off). On the website each
   approved payment has a printable purchase order (save as PDF) and an "Order and invoice" panel

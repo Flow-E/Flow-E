@@ -124,7 +124,8 @@ export function decisionData(input: {
   if (r.memo !== undefined) request.memo = r.memo;
   if (r.item !== undefined) request.item = r.item;
   if (r.quantity !== undefined) request.quantity = r.quantity;
-  if (r.project !== undefined) request.project = r.project;
+  // Recorded as the project's id once the engine recognised it, so budgets add up by id.
+  if (r.project !== undefined) request.project = result.projectId ?? r.project;
   return {
     payment_id: input.paymentId,
     request,

@@ -28,6 +28,8 @@ const TYPE_LABEL: Record<string, string> = {
   'agent.resumed': 'Agent resumed',
   'agent.key_created': 'Key created',
   'agent.key_revoked': 'Key revoked',
+  'invoice.recorded': 'Invoice',
+  'invoice.resolved': 'Invoice decision',
 };
 
 const s = (v: unknown) => (typeof v === 'string' || typeof v === 'number' ? String(v) : '');
@@ -65,6 +67,10 @@ function describe(
       return `${s(data.email)}: ${s(data.from)} → ${s(data.to)}, by ${s(data.by)}`;
     case 'member.removed':
       return `${s(data.email)}, by ${s(data.by)}`;
+    case 'invoice.recorded':
+      return `${s(data.number)} from ${s(data.supplier)}: ${s(data.match)}, by ${s(data.by)}`;
+    case 'invoice.resolved':
+      return `${s(data.outcome)} by ${s(data.by)}`;
     case 'agent.key_created':
     case 'agent.key_revoked':
       return `${s(data.prefix)}…, by ${s(data.by)}`;

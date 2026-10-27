@@ -196,3 +196,24 @@ describe('usual prices per supplier and currency', () => {
     expect(r.decision).toBe('approved');
   });
 });
+
+describe('project ids', () => {
+  it('reports the id of a project named by its name, so the ledger can count by id', () => {
+    const r = run({
+      policy: {
+        projects: [
+          {
+            id: 'snf-123',
+            name: 'Grant SNF-123',
+            budgetBase: 5_000_000,
+            period: 'total',
+            agents: [],
+          },
+        ],
+      },
+      request: { project: ' grant  SNF-123' },
+      context: { ledger: [entry()] },
+    });
+    expect(r).toMatchObject({ decision: 'approved', projectId: 'snf-123' });
+  });
+});

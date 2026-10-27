@@ -1,11 +1,16 @@
 import {
   PAYMENT_DECISION,
   dailySpend,
+  findProject,
   localTime,
+  monthlySpend,
   normalizeName,
+  projectSpend,
   toEngineViews,
+  type LedgerEntryView,
   type MandateConfig,
   type PaymentRecord,
+  type Project,
   type StoredEntry,
 } from '@flow-e/mcp/core';
 import { ruleName } from '@/lib/format';
@@ -40,6 +45,38 @@ export interface BudgetEffect {
   overBy: number;
 }
 
+/** The same numbers for a month or a project: committed spend with this payment added. */
+export interface SpendEffect {
+  budget: number;
+  approved: number;
+  /** Other payments still waiting in the period (not this one). */
+  pending: number;
+  thisPayment: number | null;
+  total: number;
+  overBy: number;
+}
+
+export interface MonthlyEffect extends SpendEffect {
+  /** YYYY-MM (mandate time zone) the payment counts against. */
+  month: string;
+  isThisMonth: boolean;
+}
+
+export type ProjectEffect =
+  | (SpendEffect & {
+      found: true;
+      id: string;
+      name: string;
+      period: 'month' | 'total';
+      /** YYYY-MM for a monthly project budget; null for a total budget. */
+      month: string | null;
+      /** Last day purchases may be booked to it (YYYY-MM-DD), if any. */
+      ends: string | null;
+      /** The request was made after that day. */
+      ended: boolean;
+    })
+  | { found: false; named: string };
+
 export interface SupplierHistory {
   approvedCount: number;
   approvedTotal: number;
@@ -69,6 +106,10 @@ export interface FairPrice {
 export interface ApprovalContext {
   reasons: ApprovalReason[];
   budget: BudgetEffect | null;
+  /** Null when the agent has no monthly budget. */
+  monthly: MonthlyEffect | null;
+  /** Null when the request named no project. */
+  project: ProjectEffect | null;
   supplier: SupplierHistory;
   similar: SimilarPurchase[];
   fairPrice: FairPrice | null;
@@ -82,6 +123,10 @@ export interface ApprovalInput {
   trace: readonly TraceStep[];
   /** The agent's daily budget in base minor units; null when the agent is no longer in the mandate. */
   dailyBudget: number | null;
+  /** The agent's monthly budget in base minor units, if it has one. */
+  monthlyBudget?: number | null;
+  /** The organisation's projects (mandate policy). */
+  projects?: readonly Project[];
   timezone: string;
   now: number;
 }
@@ -141,6 +186,55 @@ function whatOf(p: PaymentRecord): string | null {
   return w === '' ? null : w;
 }
 
+function effect(
+  budget: number,
+  spend: { approved: number; pending: number },
+  thisPayment: number | null,
+): SpendEffect {
+  const total = spend.approved + spend.pending + (thisPayment ?? 0);
+  return {
+    budget,
+    approved: spend.approved,
+    pending: spend.pending,
+    thisPayment,
+    total,
+    overBy: Math.max(0, total - budget),
+  };
+}
+
+/**
+ * The project budget a payment counts against. Other payments may name the project by id or
+ * by name, so each is resolved to the project's id first (the engine's own sum matches ids).
+ */
+export function projectEffect(
+  payment: PaymentRecord,
+  others: readonly PaymentRecord[],
+  projects: readonly Project[],
+  timezone: string,
+): ProjectEffect | null {
+  const named = payment.request.project?.trim() ?? '';
+  if (named === '') return null;
+  const project = findProject(projects, named);
+  if (!project) return { found: false, named };
+  const at = Date.parse(payment.createdAt);
+  const views: LedgerEntryView[] = toEngineViews(others).map((v) => {
+    const { project: p, ...rest } = v;
+    const id = p === undefined ? undefined : findProject(projects, p)?.id;
+    return id === undefined ? rest : { ...rest, project: id };
+  });
+  const spend = projectSpend(project, views, at, timezone);
+  return {
+    ...effect(project.budgetBase, spend, payment.amountBase),
+    found: true,
+    id: project.id,
+    name: project.name,
+    period: project.period,
+    month: spend.month,
+    ends: project.ends ?? null,
+    ended: project.ends !== undefined && localTime(at, timezone).date > project.ends,
+  };
+}
+
 export function approvalContext(input: ApprovalInput): ApprovalContext {
   const { payment, payments, trace, dailyBudget, timezone, now } = input;
   const others = payments.filter((p) => p.paymentId !== payment.paymentId);
@@ -169,6 +263,25 @@ export function approvalContext(input: ApprovalInput): ApprovalContext {
       overBy: Math.max(0, total - dailyBudget),
     };
   }
+
+  let monthly: MonthlyEffect | null = null;
+  const monthlyBudget = input.monthlyBudget ?? null;
+  if (monthlyBudget !== null) {
+    const spend = monthlySpend(
+      toEngineViews(others.filter((p) => p.agentId === payment.agentId)),
+      Date.parse(payment.createdAt),
+      timezone,
+      monthlyBudget,
+    );
+    monthly = {
+      ...effect(monthlyBudget, spend, payment.amountBase),
+      month: spend.month,
+      isThisMonth: localTime(now, timezone).date.slice(0, 7) === spend.month,
+    };
+  }
+
+  // Project budgets are shared by every agent that may book to them.
+  const project = projectEffect(payment, others, input.projects ?? [], timezone);
 
   const sameSupplier = (p: PaymentRecord) => normalizeName(p.request.merchant) === supplierKey;
   const paid = others.filter((p) => p.status === 'approved' && sameSupplier(p));
@@ -213,6 +326,8 @@ export function approvalContext(input: ApprovalInput): ApprovalContext {
   return {
     reasons: reviewReasons(trace, payment.reason),
     budget,
+    monthly,
+    project,
     supplier,
     similar,
     fairPrice,
@@ -252,6 +367,8 @@ export function approvalContextFor(
     payments: view.payments,
     trace: trace ?? traceOf(view.entries, payment.receiptId),
     dailyBudget: view.config.agents[payment.agentId]?.mandate.dailyBudget ?? null,
+    monthlyBudget: view.config.agents[payment.agentId]?.mandate.monthlyBudget ?? null,
+    projects: view.config.policy.projects ?? [],
     timezone: view.timezone,
     now: view.now,
   });
