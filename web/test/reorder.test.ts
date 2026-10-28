@@ -169,6 +169,7 @@ describe('Run reorder, simulated (no API key)', () => {
     ]);
     expect(await reorder.items(w.orgId, CAROL)).toEqual([
       {
+        id: expect.any(String) as string,
         item: 'Tips',
         supplier: null,
         quantity: 4,

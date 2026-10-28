@@ -36,6 +36,8 @@ export const PERMISSIONS = {
   'member.invite': ['owner'],
   /** Change roles and remove members. */
   'member.manage': ['owner'],
+  /** Create and revoke organisation API keys and webhooks; change integration settings. */
+  'integrations.manage': ['owner'],
   /** Rename the organisation. */
   'org.settings': ['owner'],
 } as const satisfies Record<string, readonly Role[]>;

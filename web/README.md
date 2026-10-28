@@ -19,6 +19,10 @@ The public site and the sandbox for [Flow-E](https://github.com/Flow-E/Flow-E): 
 | `/api/pilot`              | The home page’s pilot form posts here (route handler, 303 back to `/#pilot`)              |
 | `/admin/pilots`           | Pilot requests; mark contacted or declined. Only `FLOWE_ADMIN_EMAILS`, others 404         |
 | `/admin/demo`             | Build or reset "Lab Alpha (fictional)" with 60 days of history. Only `FLOWE_ADMIN_EMAILS` |
+| `/app/<org>/integrations` | Organisation API keys, webhooks, delivery log and API access log (owners manage)          |
+| `/developers`             | "Connect your systems": keys, reorder signals, webhooks, receipts, with tested examples   |
+| `/api/v1/…`               | API for other systems (organisation key, not the site password); see `/developers`        |
+| `/api/cron/webhooks`      | Vercel Cron, every minute (`vercel.json`): sends webhook deliveries; needs `CRON_SECRET`  |
 | `/security`               | Security in plain words: what is stored, where, what is signed, what isn't done yet       |
 | `/legal/…`                | Imprint, privacy, terms and data processing agreement: drafts marked `[TO CONFIRM]`       |
 | `/invite/…`, `/approve/…` | One-time links from invitation and approval emails (sign-in, then confirm)                |
@@ -387,6 +391,7 @@ Checks: `npm run lint`, `npm run typecheck`, `npm test` (in-memory PGlite, no se
 | `NEXT_PUBLIC_SUPABASE_URL`             | production      | no     | Supabase project URL, for the email sign-in link                                                                     |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | production      | no     | Supabase publishable key (public by design)                                                                          |
 | `FLOWE_SITE_URL`                       | production, opt | no     | The site's public origin for sign-in links, e.g. `https://flow-e.vercel.app`. Default: the request's host            |
+| `CRON_SECRET`                          | for webhooks    | yes    | Random secret; Vercel Cron sends it to `/api/cron/webhooks`. Unset: webhooks are queued but never sent               |
 | `FLOWE_LEADS_TO`                       | optional        | no     | One address that gets an email for each pilot request (through the mailer above; dev: outbox)                        |
 | `FLOWE_ADMIN_EMAILS`                   | optional        | no     | Comma-separated emails that may open `/admin/pilots` after signing in. Unset: nobody                                 |
 | `ANTHROPIC_API_KEY`                    | optional        | yes    | Reads uploaded invoices (a person confirms) and runs "Run reorder" with Claude. Unset: form empty, reorder simulated |
@@ -435,8 +440,9 @@ publishable key `sb_publishable__LHTIX5Dmr0Fg1ctdUztJA_Ak2sFoKm` (public).
 
 1. SQL editor: run `db/migrations/001_init.sql`, then `002_orgs.sql`, then
    `003_pilot_requests.sql`, then every later file in number order: `004_invoice_files.sql`
-   (invoice files), `005_mfa.sql` (second factor), `006_reorder.sql` (reorder list and runs).
-   All are idempotent.
+   (invoice files), `005_mfa.sql` (second factor), `006_reorder.sql` (reorder list and runs),
+   `007_org_api_keys.sql` (API keys, access log), `008_reorder_signals.sql` (suggestions,
+   signals, settings), `009_webhooks.sql` (webhooks, deliveries). All are idempotent.
 2. Project Settings → Database → Connection string → **Transaction pooler** (port 6543). That
    is `DATABASE_URL`, with the database password filled in. The client uses
    `prepare: false`, which the pooler needs.

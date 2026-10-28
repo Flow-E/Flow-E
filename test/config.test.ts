@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { ConfigError, parseConfig } from '../src/config/schema.js';
+import { ConfigError, parseConfig, priceListId } from '../src/config/schema.js';
 import { buildProgram } from '../src/cli/program.js';
 
 const example = readFileSync(new URL('../mandate.example.yaml', import.meta.url), 'utf8');
@@ -123,12 +123,20 @@ agents: {}
 `);
     expect(policy.referencePrices).toEqual([
       {
+        id: 'phosphate-buffer-solution-10-l',
         item: 'Phosphate buffer solution, 10 L',
         match: ['phosphate buffer'],
         priceMinor: 48_000,
         currency: 'CHF',
       },
-      { item: 'Nitrile gloves', match: [], priceMinor: 2_450, currency: 'CHF', unit: 'box' },
+      {
+        id: 'nitrile-gloves',
+        item: 'Nitrile gloves',
+        match: [],
+        priceMinor: 2_450,
+        currency: 'CHF',
+        unit: 'box',
+      },
     ]);
     expect(policy.priceCheck).toEqual({ abovePercent: 20, belowPercent: 50, above: 'review' });
   });
@@ -208,5 +216,33 @@ describe('CLI', () => {
     ]) {
       expect(help).toContain(cmd);
     }
+  });
+});
+
+describe('price-list ids', () => {
+  const base = (prices: string) =>
+    `base_currency: CHF\nreference_prices: ${prices}\nagents:\n  a: { owner: A, daily_budget: 10, per_payment_limit: 5, currencies: [CHF], categories: ['5169'] }\n`;
+
+  it('gives each price a stable id from its name and supplier, or keeps the one given', () => {
+    const { policy } = parseConfig(
+      base(
+        "[{ item: 'Pipette tips, 20 racks', price: 1 }, { item: 'Pipette tips, 20 racks', supplier: 'Example Labware AG', price: 2 }, { id: tips-b, item: 'Tips B', price: 3 }]",
+      ),
+    );
+    expect(policy.referencePrices?.map((r) => r.id)).toEqual([
+      'pipette-tips-20-racks',
+      'pipette-tips-20-racks--example-labware-ag',
+      'tips-b',
+    ]);
+    expect(priceListId('Phosphatpuffer Lösung, 10 L')).toBe('phosphatpuffer-losung-10-l');
+  });
+
+  it('refuses the same id twice and ids with other characters', () => {
+    expect(() =>
+      parseConfig(base('[{ id: x, item: A, price: 1 }, { id: x, item: B, price: 1 }]')),
+    ).toThrow(/"x" is used twice/);
+    expect(() => parseConfig(base('[{ id: "Has Space", item: A, price: 1 }]'))).toThrow(
+      /price-list id/,
+    );
   });
 });

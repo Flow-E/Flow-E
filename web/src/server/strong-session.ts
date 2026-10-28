@@ -25,6 +25,7 @@ export const STRONG_PERMISSIONS: readonly Permission[] = [
   'member.invite',
   'member.manage',
   'killswitch.set',
+  'integrations.manage',
 ];
 
 /** A passed second factor counts for this long (sessions last 12 hours too). */

@@ -70,6 +70,11 @@ export const configSchema = z.strictObject({
   reference_prices: z
     .array(
       z.strictObject({
+        /** Stable id; default: a slug of the item name (and the supplier, when set). */
+        id: z
+          .string()
+          .regex(/^[a-z0-9][a-z0-9-]{0,99}$/, 'Use a-z, 0-9 and "-" for a price-list id')
+          .optional(),
         item: z.string().trim().min(1).max(200),
         match: z.array(z.string().trim().min(2).max(100)).max(20).default([]),
         price: money,
@@ -249,6 +254,7 @@ function toEngine(raw: RawConfig): MandateConfig {
 
   const referencePrices: ReferencePrice[] = [];
   const seen = new Set<string>();
+  const ids = new Set<string>();
   for (const [i, r] of raw.reference_prices.entries()) {
     const path = `reference_prices[${String(i)}]`;
     const key = `${normalizeName(r.item)}\u0000${normalizeName(r.supplier ?? '')}`;
@@ -269,7 +275,10 @@ function toEngine(raw: RawConfig): MandateConfig {
       problems.push(`${path}.price: ${(err as AmountError).message}`);
     }
     if (priceMinor === 0) problems.push(`${path}.price: must be above 0`);
-    const ref: ReferencePrice = { item: r.item, match: r.match, priceMinor, currency };
+    const id = r.id ?? priceListId(r.item, r.supplier);
+    if (ids.has(id)) problems.push(`${path}.id: "${id}" is used twice`);
+    ids.add(id);
+    const ref: ReferencePrice = { id, item: r.item, match: r.match, priceMinor, currency };
     if (r.supplier !== undefined) ref.supplier = r.supplier;
     if (r.unit !== undefined) ref.unit = r.unit;
     referencePrices.push(ref);
@@ -300,4 +309,17 @@ function toEngine(raw: RawConfig): MandateConfig {
   };
   if (decimals) policy.currencyDecimals = decimals;
   return raw.organisation ? { organisation: raw.organisation, policy, agents } : { policy, agents };
+}
+
+/** "Pipette tips, 20 racks" from "Example Labware AG" → "pipette-tips-20-racks--example-labware-ag". */
+export function priceListId(item: string, supplier?: string): string {
+  const slug = (t: string) =>
+    t
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'item';
+  return supplier ? `${slug(item)}--${slug(supplier)}`.slice(0, 100) : slug(item);
 }

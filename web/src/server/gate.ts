@@ -94,6 +94,10 @@ export const VERIFY_API_PATH = '/api/verify';
 export const GATE_PATH = '/gate';
 /** Published issuer public keys, one file each: /keys/<issuer>.pub and .json. */
 export const KEYS_PREFIX = '/keys/';
+/** The API for other systems: authenticated by an organisation API key, never by the password. */
+export const API_V1_PREFIX = '/api/v1/';
+/** Called by Vercel Cron with CRON_SECRET; it sends webhook deliveries. */
+export const CRON_WEBHOOKS_PATH = '/api/cron/webhooks';
 export const GATE_API_PATH = '/api/gate';
 
 /**
@@ -110,6 +114,8 @@ export function gateExempt(pathname: string, method: string, nextAction: boolean
   if (pathname.startsWith(KEYS_PREFIX) && !pathname.slice(KEYS_PREFIX.length).includes('/')) {
     return (method === 'GET' || method === 'HEAD') && !nextAction;
   }
+  if (pathname.startsWith(API_V1_PREFIX)) return !nextAction;
+  if (pathname === CRON_WEBHOOKS_PATH) return method === 'GET' && !nextAction;
   if (pathname === GATE_API_PATH || pathname === VERIFY_API_PATH) {
     return method === 'POST' && !nextAction;
   }

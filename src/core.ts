@@ -21,6 +21,7 @@ export {
   configSchema,
   parseConfig,
   parseConfigObject,
+  priceListId,
   type AgentConfig,
   type MandateConfig,
   type RawConfig,

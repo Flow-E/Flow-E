@@ -1,7 +1,8 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { ActionError } from '@flow-e/mcp/core';
+import { ActionError, canonicalJson, normalizeName, type ReferencePrice } from '@flow-e/mcp/core';
+import type { ApiCaller } from './api-keys';
 import type { Db } from './db';
 import type { OrgStore, User } from './org-store';
 import { assertCan } from './permissions';
@@ -93,13 +94,15 @@ export class ReorderStore {
     this.clock = opts.clock ?? Date.now;
   }
 
+  /** The list as people keep it (typed in, or accepted suggestions). */
   async items(orgId: string, user: User): Promise<ReorderItem[]> {
     assertCan(await this.orgs.role(orgId, user), 'org.read');
     return this.itemsOf(orgId);
   }
 
-  private async itemsOf(orgId: string): Promise<ReorderItem[]> {
+  private async itemsOf(orgId: string, withSuggested = false): Promise<ReorderItem[]> {
     const rows = await this.db.query<{
+      id: string;
       item: string;
       supplier: string | null;
       quantity: number;
@@ -108,11 +111,14 @@ export class ReorderStore {
       category: string | null;
       country: string | null;
     }>(
-      `select item, supplier, quantity, stock, min_stock, category, country
-         from org_reorder_items where org_id = $1 order by position`,
-      [orgId],
+      `select id, item, supplier, quantity, stock, min_stock, category, country
+         from org_reorder_items
+        where org_id = $1 and (status = 'active' or ($2 and status = 'suggested'))
+        order by position, created_at`,
+      [orgId, withSuggested],
     );
     return rows.map((r) => ({
+      id: r.id,
       item: r.item,
       supplier: r.supplier,
       quantity: r.quantity,
@@ -140,7 +146,10 @@ export class ReorderStore {
     });
     const now = new Date(this.clock()).toISOString();
     await this.db.transaction(async (tx) => {
-      await tx.query('delete from org_reorder_items where org_id = $1', [orgId]);
+      // Suggestions from other systems stay; only the list people keep is replaced.
+      await tx.query("delete from org_reorder_items where org_id = $1 and status = 'active'", [
+        orgId,
+      ]);
       for (const [i, it] of items.entries()) {
         await tx.query(
           `insert into org_reorder_items
@@ -204,7 +213,8 @@ export class ReorderStore {
     assertCan(await this.orgs.role(orgId, user), 'reorder.run');
     const view = await this.orgs.view(orgId, user);
     if (!view.config.agents[input.agentId]) throw new ActionError('Choose one of your agents.');
-    const items = await this.itemsOf(orgId);
+    const auto = (await this.settingsOf(orgId)).autoIncludeSuggested;
+    const items = await this.itemsOf(orgId, auto);
     if (items.length === 0) throw new ActionError('Add items to the reorder list first.');
 
     const id = randomUUID();
@@ -269,6 +279,15 @@ export class ReorderStore {
     } finally {
       await tools.close();
     }
+    // Suggestions join one run, then they are used.
+    const used = items.filter((i) => i.id !== undefined).map((i) => i.id as string);
+    if (auto && used.length > 0) {
+      await this.db.query(
+        `update org_reorder_items set status = 'used', updated_at = $3::timestamptz
+          where org_id = $1 and status = 'suggested' and id = any($2::uuid[])`,
+        [orgId, `{${used.join(',')}}`, new Date(this.clock()).toISOString()],
+      );
+    }
     await this.db.query(
       `update org_agent_runs
           set status = $3, finished_at = $4::timestamptz, steps = $5, tokens = $6, log = $7::jsonb
@@ -291,4 +310,274 @@ export class ReorderStore {
     if (!row) throw new Error('run row missing');
     return this.record(row);
   }
+
+  // Suggestions from other systems --------------------------------------------------------------
+
+  async suggestions(orgId: string, user: User): Promise<Suggestion[]> {
+    assertCan(await this.orgs.role(orgId, user), 'org.read');
+    const rows = await this.db.query<SuggestionRow>(
+      `select id, item, supplier, quantity, unit, reason, to_char(needed_by, 'YYYY-MM-DD') as needed_by,
+              price_item, source, status, ${iso('created_at')} as created_at
+         from org_reorder_items
+        where org_id = $1 and status in ('suggested', 'needs_matching')
+        order by created_at desc`,
+      [orgId],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      item: r.item,
+      supplier: r.supplier,
+      quantity: r.quantity,
+      unit: r.unit,
+      reason: r.reason,
+      neededBy: r.needed_by,
+      priceItem: r.price_item,
+      source: r.source ?? '',
+      status: r.status,
+      createdAt: r.created_at,
+    }));
+  }
+
+  /** Add a suggestion to the list people keep (then it is edited like any row), or dismiss it. */
+  async decideSuggestion(
+    orgId: string,
+    user: User,
+    id: string,
+    decision: 'accept' | 'dismiss',
+  ): Promise<void> {
+    assertCan(await this.orgs.role(orgId, user), 'reorder.manage');
+    if (!z.uuid().safeParse(id).success) throw new ActionError('No such suggestion.');
+    const rows = await this.db.query<{ id: string }>(
+      `update org_reorder_items
+          set status = $3, updated_by = $4, updated_at = $5::timestamptz
+        where id = $1 and org_id = $2
+          and status in ('suggested', 'needs_matching')
+          and ($3 = 'dismissed' or status = 'suggested')
+        returning id`,
+      [
+        id,
+        orgId,
+        decision === 'accept' ? 'active' : 'dismissed',
+        user.email.trim().toLowerCase().slice(0, 100),
+        new Date(this.clock()).toISOString(),
+      ],
+    );
+    if (rows.length === 0) {
+      throw new ActionError(
+        decision === 'accept'
+          ? 'Link it to the price list first, or it was already handled.'
+          : 'No such suggestion, or it was already handled.',
+      );
+    }
+  }
+
+  /** A person links a "needs matching" suggestion to a price-list item; it becomes suggested. */
+  async linkSuggestion(orgId: string, user: User, id: string, priceItem: string): Promise<void> {
+    assertCan(await this.orgs.role(orgId, user), 'reorder.manage');
+    if (!z.uuid().safeParse(id).success) throw new ActionError('No such suggestion.');
+    const view = await this.orgs.view(orgId, user);
+    const ref = (view.config.policy.referencePrices ?? []).find((r) => r.id === priceItem);
+    if (!ref) throw new ActionError('Choose an item from the price list.');
+    const rows = await this.db.query<{ id: string }>(
+      `update org_reorder_items
+          set status = 'suggested', item = $3, supplier = coalesce($4, supplier), price_item = $5,
+              updated_by = $6, updated_at = $7::timestamptz
+        where id = $1 and org_id = $2 and status = 'needs_matching'
+        returning id`,
+      [
+        id,
+        orgId,
+        ref.item,
+        ref.supplier ?? null,
+        ref.id,
+        user.email.trim().toLowerCase().slice(0, 100),
+        new Date(this.clock()).toISOString(),
+      ],
+    );
+    if (rows.length === 0) throw new ActionError('No such suggestion, or it was already handled.');
+  }
+
+  async settings(orgId: string, user: User): Promise<{ autoIncludeSuggested: boolean }> {
+    assertCan(await this.orgs.role(orgId, user), 'org.read');
+    return this.settingsOf(orgId);
+  }
+
+  private async settingsOf(orgId: string): Promise<{ autoIncludeSuggested: boolean }> {
+    const rows = await this.db.query<{ auto_include_suggested: boolean }>(
+      'select auto_include_suggested from org_integration_settings where org_id = $1',
+      [orgId],
+    );
+    return { autoIncludeSuggested: rows[0]?.auto_include_suggested === true };
+  }
+
+  async setAutoInclude(orgId: string, user: User, on: boolean): Promise<void> {
+    assertCan(await this.orgs.role(orgId, user), 'reorder.manage');
+    await this.db.query(
+      `insert into org_integration_settings (org_id, auto_include_suggested, updated_by, updated_at)
+       values ($1, $2, $3, $4::timestamptz)
+       on conflict (org_id) do update
+         set auto_include_suggested = excluded.auto_include_suggested,
+             updated_by = excluded.updated_by, updated_at = excluded.updated_at`,
+      [
+        orgId,
+        on,
+        user.email.trim().toLowerCase().slice(0, 100),
+        new Date(this.clock()).toISOString(),
+      ],
+    );
+  }
+
+  /**
+   * A reorder signal from another system (POST /api/v1/reorder-signals). It only adds a
+   * suggestion to the list; it never buys. Matched by price-list id, or by exact item name (and
+   * supplier, when given); anything else is kept as "needs matching", never guessed. The same
+   * idempotency key gives the same answer and adds nothing; reused with a different request, it
+   * is refused.
+   */
+  async receiveSignal(
+    caller: ApiCaller,
+    input: unknown,
+    prices: readonly ReferencePrice[],
+  ): Promise<{ status: 200 | 201 | 409; body: unknown }> {
+    const signal = signalSchema.parse(input);
+    const request = canonicalJson(signal);
+    return this.db.transaction(async (tx) => {
+      // Two signals with the same key at once: the second waits here, then sees the first.
+      await tx.query('select id from orgs where id = $1 for update', [caller.orgId]);
+      const earlier = await tx.query<{ request: unknown; result: unknown }>(
+        `select request, result from org_reorder_signals where org_id = $1 and idempotency_key = $2`,
+        [caller.orgId, signal.idempotency_key],
+      );
+      const prior = earlier[0];
+      if (prior) {
+        const same =
+          canonicalJson(
+            (typeof prior.request === 'string'
+              ? JSON.parse(prior.request)
+              : prior.request) as never,
+          ) === request;
+        if (!same) {
+          return {
+            status: 409,
+            body: { error: 'This idempotency key was already used for a different signal.' },
+          };
+        }
+        return {
+          status: 200,
+          body:
+            typeof prior.result === 'string' ? (JSON.parse(prior.result) as unknown) : prior.result,
+        };
+      }
+      const ref = matchPriceItem(prices, signal);
+      const id = randomUUID();
+      const now = new Date(this.clock()).toISOString();
+      const item = ref?.item ?? signal.item ?? signal.item_id ?? '';
+      const supplier = ref?.supplier ?? signal.supplier ?? null;
+      await tx.query(
+        `insert into org_reorder_items
+           (id, org_id, position, item, supplier, quantity, unit, reason, needed_by, price_item,
+            source, status, updated_by, updated_at, created_at)
+         values ($1, $2, 999, $3, $4, $5, $6, $7, $8::date, $9, $10, $11, $10, $12::timestamptz, $12::timestamptz)`,
+        [
+          id,
+          caller.orgId,
+          item.slice(0, 200),
+          supplier,
+          signal.quantity,
+          signal.unit ?? null,
+          signal.reason ?? null,
+          signal.needed_by ?? null,
+          ref?.id ?? null,
+          caller.name,
+          ref ? 'suggested' : 'needs_matching',
+          now,
+        ],
+      );
+      const result = {
+        suggestion_id: id,
+        status: ref ? 'suggested' : 'needs_matching',
+        item,
+        price_item: ref?.id ?? null,
+        supplier,
+        quantity: signal.quantity,
+        message: ref
+          ? 'Added to the reorder list as a suggestion. Nothing is bought until a run asks Flow-E for it.'
+          : 'Kept as "needs matching": no price-list item has this id or name. A person will link it.',
+      };
+      await tx.query(
+        `insert into org_reorder_signals (org_id, idempotency_key, key_id, request, result, created_at)
+         values ($1, $2, $3, $4::jsonb, $5::jsonb, $6::timestamptz)`,
+        [caller.orgId, signal.idempotency_key, caller.keyId, request, JSON.stringify(result), now],
+      );
+      return { status: 201, body: result };
+    });
+  }
+}
+
+export const signalSchema = z
+  .strictObject({
+    /** A price-list id, e.g. "pipette-tips-20-racks". */
+    item_id: z.string().trim().min(1).max(100).optional(),
+    /** Or the item's name as in the price list. */
+    item: z.string().trim().min(1).max(200).optional(),
+    supplier: z.string().trim().min(1).max(200).optional(),
+    quantity: z.number().int().min(1).max(100_000),
+    unit: z.string().trim().min(1).max(40).optional(),
+    reason: z.string().trim().min(1).max(300).optional(),
+    needed_by: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a date like 2026-11-30')
+      .refine((d) => !Number.isNaN(Date.parse(`${d}T00:00:00Z`)), 'Not a real date')
+      .optional(),
+    idempotency_key: z.string().trim().min(1).max(200),
+  })
+  .refine((s) => s.item_id !== undefined || s.item !== undefined, {
+    message: 'Name the item: "item_id" (from the price list) or "item".',
+    path: ['item'],
+  });
+export type ReorderSignal = z.infer<typeof signalSchema>;
+
+/** Exact match only: by id, or by the item's name (and supplier when given). Never a guess. */
+export function matchPriceItem(
+  prices: readonly ReferencePrice[],
+  s: Pick<ReorderSignal, 'item_id' | 'item' | 'supplier'>,
+): ReferencePrice | null {
+  if (s.item_id !== undefined) return prices.find((p) => p.id === s.item_id) ?? null;
+  const name = normalizeName(s.item ?? '');
+  const supplier = s.supplier === undefined ? null : normalizeName(s.supplier);
+  const same = prices.filter((p) => normalizeName(p.item) === name);
+  if (supplier === null) return same.length === 1 ? (same[0] ?? null) : null;
+  return (
+    same.find((p) => p.supplier !== undefined && normalizeName(p.supplier) === supplier) ??
+    same.find((p) => p.supplier === undefined) ??
+    null
+  );
+}
+
+export interface Suggestion {
+  id: string;
+  item: string;
+  supplier: string | null;
+  quantity: number;
+  unit: string | null;
+  reason: string | null;
+  neededBy: string | null;
+  priceItem: string | null;
+  source: string;
+  status: 'suggested' | 'needs_matching';
+  createdAt: string;
+}
+
+interface SuggestionRow {
+  id: string;
+  item: string;
+  supplier: string | null;
+  quantity: number;
+  unit: string | null;
+  reason: string | null;
+  needed_by: string | null;
+  price_item: string | null;
+  source: string | null;
+  status: 'suggested' | 'needs_matching';
+  created_at: string;
 }

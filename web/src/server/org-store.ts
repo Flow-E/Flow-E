@@ -1823,6 +1823,24 @@ export class OrgStore {
     );
   }
 
+  /**
+   * The organisation's mandate, ledger and issuer, without a person. Only for server code that
+   * already proved who may see them: an organisation API key (scoped to this organisation) or
+   * the webhook dispatcher. Never reachable from a form or a URL parameter alone.
+   */
+  async systemView(orgId: string): Promise<{
+    issuer: string;
+    config: MandateConfig;
+    entries: StoredEntry[];
+  }> {
+    const loaded = await this.load(this.db, orgId);
+    return {
+      issuer: loaded.row.issuer,
+      config: loaded.config,
+      entries: await this.entries(this.db, orgId),
+    };
+  }
+
   private async load(sql: Sql, orgId: string, forUpdate = false): Promise<Loaded> {
     if (!uuid.safeParse(orgId).success) throw new ForbiddenError('No such organisation.');
     const rows = await sql.query<OrgRow>(

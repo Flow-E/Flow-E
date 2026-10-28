@@ -112,6 +112,11 @@ export interface BusinessHours {
 
 /** The usual price of one unit of an item. */
 export interface ReferencePrice {
+  /**
+   * Stable id, so other systems can name the item (e.g. a reorder signal). Set by the config
+   * parser: given, or a slug of the item (and supplier) name.
+   */
+  id?: string;
   item: string;
   /** Extra words that identify the item in a request, e.g. "phosphate buffer". */
   match: readonly string[];

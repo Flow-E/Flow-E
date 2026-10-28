@@ -65,7 +65,13 @@ export function CopyBlock({ title, value }: { title: string; value: string }) {
 }
 
 /** A secret shown exactly once, with a warning and a copy button. */
-function SecretOnce({ state, kind }: { state: SecretResult; kind: 'key' | 'link' }) {
+export function SecretOnce({
+  state,
+  kind,
+}: {
+  state: SecretResult;
+  kind: 'key' | 'link' | 'secret';
+}) {
   if (!state.secret) return null;
   return (
     <div
@@ -73,8 +79,8 @@ function SecretOnce({ state, kind }: { state: SecretResult; kind: 'key' | 'link'
       className="space-y-2 rounded-lg border border-review/40 bg-review-soft px-4 py-3 text-sm"
     >
       <p className="font-medium text-ink">
-        {kind === 'key'
-          ? 'Copy this key now. It is shown once and cannot be recovered.'
+        {kind === 'key' || kind === 'secret'
+          ? `Copy this ${kind === 'key' ? 'key' : 'signing secret'} now. It is shown once and cannot be recovered.`
           : `Invitation link for ${state.label ?? ''}. It is shown once.`}
       </p>
       <div className="flex flex-wrap items-center gap-2">

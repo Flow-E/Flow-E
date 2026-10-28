@@ -25,6 +25,8 @@ const API_URL = 'https://api.anthropic.com/v1/messages';
 const TIMEOUT_MS = 60_000;
 
 export interface ReorderItem {
+  /** The list row, when it comes from the database. */
+  id?: string;
   item: string;
   supplier: string | null;
   quantity: number;

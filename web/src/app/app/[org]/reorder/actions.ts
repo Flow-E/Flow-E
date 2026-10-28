@@ -108,3 +108,51 @@ export async function runReorderAction(
     return { error: problem(err) };
   }
 }
+
+export async function decideSuggestionAction(
+  _prev: ReorderResult,
+  form: FormData,
+): Promise<ReorderResult> {
+  const { store, user, orgId } = await context(form);
+  const decision = text(form, 'decision') === 'accept' ? 'accept' : 'dismiss';
+  try {
+    await store.decideSuggestion(orgId, user, text(form, 'id'), decision);
+    refresh(orgId);
+    return { ok: decision === 'accept' ? 'Added to the reorder list.' : 'Dismissed.' };
+  } catch (err) {
+    return { error: problem(err) };
+  }
+}
+
+export async function linkSuggestionAction(
+  _prev: ReorderResult,
+  form: FormData,
+): Promise<ReorderResult> {
+  const { store, user, orgId } = await context(form);
+  try {
+    await store.linkSuggestion(orgId, user, text(form, 'id'), text(form, 'price_item'));
+    refresh(orgId);
+    return { ok: 'Linked to the price list.' };
+  } catch (err) {
+    return { error: problem(err) };
+  }
+}
+
+export async function autoIncludeAction(
+  _prev: ReorderResult,
+  form: FormData,
+): Promise<ReorderResult> {
+  const { store, user, orgId } = await context(form);
+  const on = text(form, 'on') === 'true';
+  try {
+    await store.setAutoInclude(orgId, user, on);
+    refresh(orgId);
+    return {
+      ok: on
+        ? 'Suggestions join the next run automatically.'
+        : 'Suggestions wait for a person again.',
+    };
+  } catch (err) {
+    return { error: problem(err) };
+  }
+}

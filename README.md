@@ -284,6 +284,7 @@ price_check: { above_percent: 20, below_percent: 50, above: review } # above: re
 reference_prices:
   - { item: 'Phosphate buffer solution, 10 L', match: ['phosphate buffer'], price: 1150 }
   - { item: 'Nitrile gloves', price: 22, unit: box }
+  # Each item has an id other systems can name (default: a slug, e.g. nitrile-gloves).
 agents:
   lab-procurement:
     owner: 'Dr. A. Muster, Head of Lab (fictional)'
@@ -303,6 +304,25 @@ projects: # optional; budgets shared by the agents that may book to them
   snf-123: { name: 'Grant SNF-123', budget: 50000, period: total, agents: [lab-procurement] }
   lab-ops: { name: 'Lab operations', budget: 8000, period: month } # every agent
 ```
+
+## Integrations
+
+The hosted website lets the systems around Flow-E connect, without anything from outside being
+able to approve a purchase. Full guide with examples: `/developers` ("Connect your systems").
+
+- **Organisation API keys** (`flowe_ok_…`), separate from agent keys, created by an owner, with
+  scopes `reorder:write` and `read`. Stored as a hash, revocable at once, rate-limited, and every
+  call is logged (method, path, status) for 90 days.
+- **Reorder signals in:** `POST /api/v1/reorder-signals` with an item (price-list id or exact
+  name), quantity, reason, optional needed-by date and an idempotency key. A signal only adds a
+  suggestion to the reorder list; an unknown item waits as "needs matching". Every purchase
+  still goes through the agent, the engine and, where required, a person.
+- **Webhooks out:** `payment.approved`, `payment.declined`, `payment.review`, `order.recorded`,
+  `invoice.matched`, `invoice.mismatch`, sent from the ledger after the fact (so they can never
+  block a decision), signed with `Flow-E-Signature: t=…,v1=<HMAC-SHA256>`, retried with backoff
+  for a day, to public https addresses only.
+- **Read API:** `GET /api/v1/orders` (paginated), `/api/v1/payments/{id}`,
+  `/api/v1/receipts/{id}`, each limited to the key's organisation.
 
 ## Roadmap
 

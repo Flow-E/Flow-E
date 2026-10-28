@@ -29,6 +29,7 @@ const EXPECTED: Record<Permission, string> = {
   'member.invite': 'o',
   'member.manage': 'o',
   'org.settings': 'o',
+  'integrations.manage': 'o',
 };
 
 const letter: Record<Role, string> = { owner: 'o', approver: 'a', viewer: 'v' };

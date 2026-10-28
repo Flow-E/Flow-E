@@ -226,6 +226,8 @@ function pricesFromForm(form: FormData, current: Raw, problems: Problems): Raw {
     if (row.price === '') problems.add(`${path}.price`, 'Enter the usual price.');
     const match = list(row.keywords, /\s*,\s*/);
     prices.push({
+      // An id set outside the form (YAML, an import) stays with its row.
+      ...(typeof before?.id === 'string' ? { id: before.id } : {}),
       item: row.item,
       ...(match.length === 0 ? {} : { match }),
       price: keep(before?.price, row.price),

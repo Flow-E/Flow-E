@@ -53,6 +53,9 @@ export function SiteFooter() {
             <Link href="/security" className="hover:text-ink">
               Security
             </Link>
+            <Link href="/developers" className="hover:text-ink">
+              Connect your systems
+            </Link>
             <Link href="/legal/privacy" className="hover:text-ink">
               Privacy (draft)
             </Link>

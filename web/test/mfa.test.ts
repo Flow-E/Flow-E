@@ -166,6 +166,7 @@ describe('who needs a second factor', () => {
       [
         'agent.create',
         'agent.keys',
+        'integrations.manage',
         'killswitch.set',
         'mandate.update',
         'member.invite',

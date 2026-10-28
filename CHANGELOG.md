@@ -9,6 +9,16 @@ changes.
 
 ### Added
 
+- Website, **connections in and out** (Part D): organisation API keys with scopes
+  `reorder:write` and `read` (owner-only, second factor, hash only, access log kept 90 days);
+  `POST /api/v1/reorder-signals` that adds suggestions to the reorder list (idempotent, unknown
+  items kept as "needs matching", optional auto-include in the next Run reorder); signed webhooks
+  for payment, order and invoice events, sent from the ledger by a cron with retries and an SSRF
+  guard, with a delivery log and test events; `GET /api/v1/orders`, `/payments/{id}`,
+  `/receipts/{id}`; and a "Connect your systems" page whose examples are run by the tests.
+  Migrations `007` to `009`.
+- Core: every price-list item has a stable `id` (given, or a slug of its name and supplier).
+
 - Website: **Lab Alpha (fictional)**, a demo organisation with two agents, 60 days of signed
   history, invoice mismatches and requests waiting for a person, built and reset by admins at
   `/admin/demo`; a permanent "fictional data" banner from its first ledger entry. `DEMO.md`: the

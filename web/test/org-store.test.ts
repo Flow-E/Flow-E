@@ -4,6 +4,7 @@ import { MailerConfigError, OutboxMailer, mailerFromEnv } from '@/server/email';
 import type { OrgStore, User } from '@/server/org-store';
 import { ForbiddenError, type Permission } from '@/server/permissions';
 import { ReorderStore } from '@/server/reorder';
+import { ApiKeyStore } from '@/server/api-keys';
 import { sha256 } from '@/server/tokens';
 import {
   ALICE,
@@ -95,6 +96,8 @@ describe('every action × role, enforced by the store', () => {
       'org.settings': (s, orgId, user) => s.rename(orgId, user, 'Example Labs AG (fictional)'),
       'reorder.manage': (s, orgId, user) =>
         new ReorderStore(w.db, s).saveItems(orgId, user, [{ item: 'Glassware', quantity: 1 }]),
+      'integrations.manage': (s, orgId, user) =>
+        new ApiKeyStore(w.db, s).create(orgId, user, { name: unique(), scopes: ['read'] }),
       'reorder.run': async (s, orgId, user) => {
         const r = new ReorderStore(w.db, s);
         await r.saveItems(orgId, ALICE, [{ item: 'Glassware', quantity: 1 }]);
@@ -118,6 +121,7 @@ describe('every action × role, enforced by the store', () => {
     'member.invite': [ALICE],
     'member.manage': [ALICE],
     'org.settings': [ALICE],
+    'integrations.manage': [ALICE],
   };
 
   const label: Record<string, string> = {

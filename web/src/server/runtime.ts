@@ -4,7 +4,9 @@ import { migrate, openPglite, openPostgres, type Db } from './db';
 import { mailerFromEnv } from './email';
 import { encryptionKeyFromEnv } from './keys';
 import { OrgStore } from './org-store';
+import { ApiKeyStore } from './api-keys';
 import { ReorderStore } from './reorder';
+import { WebhookStore } from './webhooks';
 import { SandboxStore } from './store';
 
 /**
@@ -66,4 +68,20 @@ export async function getDb(): Promise<Db> {
 export async function getReorderStore(): Promise<ReorderStore> {
   const { db, orgs } = await stores();
   return new ReorderStore(db, orgs);
+}
+
+export async function getApiKeyStore(): Promise<ApiKeyStore> {
+  const { db, orgs } = await stores();
+  return new ApiKeyStore(db, orgs);
+}
+
+export async function getWebhookStore(): Promise<WebhookStore> {
+  const { db, orgs } = await stores();
+  return new WebhookStore(db, orgs, encryptionKeyFromEnv());
+}
+
+/** Everything the /api/v1 routes need; the rate limiter lives in each route module. */
+export async function getV1Stores() {
+  const { db, orgs } = await stores();
+  return { keys: new ApiKeyStore(db, orgs), orgs, reorder: new ReorderStore(db, orgs) };
 }

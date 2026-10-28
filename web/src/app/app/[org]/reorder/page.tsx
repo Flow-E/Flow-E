@@ -6,7 +6,14 @@ import { can } from '@/server/permissions';
 import { MAX_STEPS, MAX_TOKENS, REORDER_MODEL, modelFromEnv } from '@/server/reorder-agent';
 import type { RunRecord } from '@/server/reorder';
 import { getReorderStore } from '@/server/runtime';
-import { runReorderAction, saveReorderAction } from './actions';
+import {
+  autoIncludeAction,
+  decideSuggestionAction,
+  linkSuggestionAction,
+  runReorderAction,
+  saveReorderAction,
+} from './actions';
+import { LinkForm, SmallAction } from './suggestions';
 import { ReorderListForm, RunReorderForm, type Row } from './reorder-forms';
 
 export const metadata: Metadata = { title: 'Reorder' };
@@ -31,10 +38,16 @@ export default async function ReorderPage({ params }: { params: Promise<{ org: s
   const { org } = await params;
   const { user, view } = await orgView(org);
   const reorder = await getReorderStore();
-  const [items, runs] = await Promise.all([
+  const [items, runs, suggestions, settings] = await Promise.all([
     reorder.items(view.id, user),
     reorder.runs(view.id, user, 10),
+    reorder.suggestions(view.id, user),
+    reorder.settings(view.id, user),
   ]);
+  const priceItems = (view.config.policy.referencePrices ?? []).map((r) => ({
+    id: r.id ?? '',
+    label: r.supplier ? `${r.item} (${r.supplier})` : r.item,
+  }));
   const mode = modelFromEnv() ? 'claude' : 'simulated';
   const editable = can(view.role, 'reorder.manage');
   const rows: Row[] = items.map((i) => ({
@@ -57,6 +70,89 @@ export default async function ReorderPage({ params }: { params: Promise<{ org: s
           change the mandate or unfreeze anything.
         </p>
       </div>
+
+      <Panel
+        title="Suggested by other systems"
+        description={
+          settings.autoIncludeSuggested
+            ? 'Suggestions join the next run automatically, once. Nothing is bought without the agent asking Flow-E.'
+            : 'An inventory system can suggest items through the API. Add them to the list, or dismiss them. Nothing is bought from a suggestion alone.'
+        }
+        action={
+          editable ? (
+            <SmallAction
+              action={autoIncludeAction}
+              fields={{ org: view.id, on: settings.autoIncludeSuggested ? 'false' : 'true' }}
+              label={
+                settings.autoIncludeSuggested
+                  ? 'Turn off auto-include'
+                  : 'Include in the next run automatically'
+              }
+              variant="quiet"
+            />
+          ) : undefined
+        }
+      >
+        {suggestions.length === 0 ? (
+          <p className="text-sm text-ink-2">
+            No suggestions. Connect a system under{' '}
+            <a href={`/app/${view.id}/integrations`} className="text-accent underline">
+              Integrations
+            </a>
+            .
+          </p>
+        ) : (
+          <ul className="divide-y divide-rule">
+            {suggestions.map((s) => (
+              <li key={s.id} className="space-y-2 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-ink">
+                      {s.quantity}
+                      {s.unit ? ` ${s.unit}` : ''} × {s.item}
+                      {s.supplier ? (
+                        <span className="font-normal text-ink-2"> · {s.supplier}</span>
+                      ) : null}
+                    </p>
+                    <p className="text-xs text-ink-3">
+                      suggested by {s.source} · {dateTime(s.createdAt, view.timezone)}
+                      {s.reason ? ` · ${s.reason}` : ''}
+                      {s.neededBy ? ` · needed by ${s.neededBy}` : ''}
+                    </p>
+                  </div>
+                  <Pill tone={s.status === 'suggested' ? 'accent' : 'review'}>
+                    {s.status === 'suggested' ? 'suggested' : 'needs matching'}
+                  </Pill>
+                </div>
+                {editable ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {s.status === 'needs_matching' ? (
+                      <LinkForm
+                        action={linkSuggestionAction}
+                        org={view.id}
+                        id={s.id}
+                        items={priceItems}
+                      />
+                    ) : (
+                      <SmallAction
+                        action={decideSuggestionAction}
+                        fields={{ org: view.id, id: s.id, decision: 'accept' }}
+                        label="Add to the list"
+                      />
+                    )}
+                    <SmallAction
+                      action={decideSuggestionAction}
+                      fields={{ org: view.id, id: s.id, decision: 'dismiss' }}
+                      label="Dismiss"
+                      variant="quiet"
+                    />
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
 
       <Panel
         title="Reorder list"
