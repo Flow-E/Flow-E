@@ -9,6 +9,16 @@ changes.
 
 ### Added
 
+- Website: **Lab Alpha (fictional)**, a demo organisation with two agents, 60 days of signed
+  history, invoice mismatches and requests waiting for a person, built and reset by admins at
+  `/admin/demo`; a permanent "fictional data" banner from its first ledger entry. `DEMO.md`: the
+  10-minute demo, click by click, with reset steps.
+- Website: `/security` (what is stored, where, what is signed, what isn't done yet) and legal
+  drafts for a lawyer (`/legal/imprint`, `privacy`, `terms`, `dpa`), marked `[TO CONFIRM]`,
+  linked from the footer.
+- Run reorder: when the preferred supplier has no price of its own, the agent asks it at the
+  price-list price, so Flow-E can steer it to an approved supplier.
+
 - Website: **Run reorder** (`/app/<org>/reorder`): a reorder list per organisation and Flow-E's
   own purchasing agent. It uses the same MCP tools as any external agent (no special access),
   follows smart-decline hints and records orders; with `ANTHROPIC_API_KEY` Claude decides

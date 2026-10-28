@@ -85,7 +85,19 @@ export default async function OrgLayout({
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+        {view.demo ? (
+          <p
+            role="note"
+            className="mb-6 rounded-lg border border-review/40 bg-review-soft px-4 py-2.5 text-sm text-ink"
+          >
+            <strong className="font-semibold">Demo organisation, fictional data.</strong> The
+            company, people, suppliers and amounts are invented to show how Flow-E works. No real
+            purchase was made.
+          </p>
+        ) : null}
+        {children}
+      </main>
       <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-ink-3 sm:px-6">
         {view.name} · issuer <span className="font-mono">{view.issuer}</span> · Flow-E authorizes
         payments; it never moves money.

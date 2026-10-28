@@ -43,11 +43,30 @@ export function SiteFooter() {
           <Logo className="text-sm" />
           <span>Open source, MIT licence.</span>
         </div>
-        <p className="max-w-xl">
-          Flow-E authorizes payments; it never holds or moves money. The sandbox uses a fictional
-          company, fictional suppliers and fictional money. Not legal advice and not a compliance
-          product.
-        </p>
+        <div className="max-w-xl space-y-2">
+          <p>
+            Flow-E authorizes payments; it never holds or moves money. The sandbox uses a fictional
+            company, fictional suppliers and fictional money. Not legal advice and not a compliance
+            product.
+          </p>
+          <nav aria-label="Legal" className="flex flex-wrap gap-x-4 gap-y-1">
+            <Link href="/security" className="hover:text-ink">
+              Security
+            </Link>
+            <Link href="/legal/privacy" className="hover:text-ink">
+              Privacy (draft)
+            </Link>
+            <Link href="/legal/terms" className="hover:text-ink">
+              Terms (draft)
+            </Link>
+            <Link href="/legal/dpa" className="hover:text-ink">
+              Data processing (draft)
+            </Link>
+            <Link href="/legal/imprint" className="hover:text-ink">
+              Imprint (draft)
+            </Link>
+          </nav>
+        </div>
       </div>
     </footer>
   );

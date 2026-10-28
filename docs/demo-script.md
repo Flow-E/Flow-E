@@ -1,5 +1,8 @@
 # Flow-E demo script (5 minutes)
 
+The full 10-minute customer demo with the demo organisation is in [`DEMO.md`](../DEMO.md).
+This shorter script shows a real Claude buying through Flow-E.
+
 For showing Flow-E to a lab: a head of lab, a lab manager or someone in finance. Everything in the
 demo is fictional: the company, the suppliers, the prices and the money. Flow-E never moves money.
 

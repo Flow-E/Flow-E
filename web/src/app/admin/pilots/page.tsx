@@ -40,6 +40,11 @@ export default async function PilotsPage() {
         Flow-E
       </Link>
       <h1 className="mt-2 font-serif text-3xl tracking-[-0.015em] sm:text-4xl">Pilot requests</h1>
+      <p className="mt-1 text-sm">
+        <Link href="/admin/demo" className="text-accent underline">
+          Demo organisation (Lab Alpha, fictional)
+        </Link>
+      </p>
       <p className="mt-2 text-ink-2">
         {requests.length === 0
           ? 'No requests yet.'

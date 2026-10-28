@@ -41,7 +41,7 @@ export default async function OrgReportPage({
       currency={view.config.policy.baseCurrency}
       decimals={view.currencyDecimals}
       basePath={`/app/${view.id}/report`}
-      fictional={false}
+      fictional={view.demo}
     />
   );
 }

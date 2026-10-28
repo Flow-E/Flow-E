@@ -213,7 +213,16 @@ export async function simulatedRun(input: {
   for (const it of due) {
     if (steps >= MAX_STEPS)
       return stop(`Stopped after ${String(MAX_STEPS)} tool calls, the cap per run.`);
-    const ref = findReference(input.prices, it.item, it.supplier ?? undefined);
+    // The preferred supplier's own price first; otherwise the list price of that item from any
+    // supplier, asked from the preferred one (Flow-E then judges supplier and price).
+    const ref =
+      findReference(input.prices, it.item, it.supplier ?? undefined) ??
+      (it.supplier
+        ? findReference(
+            input.prices.map(({ supplier: _s, ...p }) => p),
+            it.item,
+          )
+        : null);
     const supplier = it.supplier ?? ref?.supplier ?? null;
     if (!ref || !supplier) {
       log.push({

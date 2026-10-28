@@ -3,26 +3,29 @@
 The public site and the sandbox for [Flow-E](https://github.com/Flow-E/Flow-E): a Next.js 16 app
 (App Router, TypeScript strict, Tailwind 4).
 
-| Route                     | What it is                                                                               |
-| ------------------------- | ---------------------------------------------------------------------------------------- |
-| `/`                       | For companies: the problem, how it works, a lab example, trust, rules, FAQ, pilot form   |
-| `/docs`                   | The repository README, synced at build time                                              |
-| `/sandbox`                | Signed-in only. Your own fictional company: dashboard, approvals, agents, kill switch    |
-| `/app`                    | Signed-in only. Your organisations: real agents with API keys, members and roles         |
-| `/app/<org>/invoices`     | Supplier invoices: upload or type in, matched against the authorizations, CSV export     |
-| `/sandbox/invoices`       | The same for the sandbox, typed-in invoices only (fictional)                             |
-| `/app/<org>/report`       | Printable value report (also `/sandbox/report`): every number with its method            |
-| `/app/<org>/reorder`      | "Run reorder": the reorder list and Flow-E's own purchasing agent, with each run's log   |
-| `/api/mcp`                | The remote MCP endpoint for agents (Streamable HTTP, `Authorization: Bearer` agent key)  |
-| `/verify`                 | Public, no password: paste a receipt to check it was authorized (POSTs to `/api/verify`) |
-| `/keys/<issuer>.pub`      | Public, no password: an issuer's published public key (PEM; `.json` adds its name)       |
-| `/api/pilot`              | The home page’s pilot form posts here (route handler, 303 back to `/#pilot`)             |
-| `/admin/pilots`           | Pilot requests; mark contacted or declined. Only `FLOWE_ADMIN_EMAILS`, others 404        |
-| `/invite/…`, `/approve/…` | One-time links from invitation and approval emails (sign-in, then confirm)               |
-| `/account/security`       | Signed-in only. Set up, check or turn off the authenticator app (second factor)          |
-| `/account/verify`         | Signed-in only. Enter a code from the authenticator app (or a recovery code), then on    |
-| `/dev/outbox`             | Development only: the emails Flow-E would have sent                                      |
-| `/gate`                   | The private-preview password page (only while `SITE_PASSWORD` is set)                    |
+| Route                     | What it is                                                                                |
+| ------------------------- | ----------------------------------------------------------------------------------------- |
+| `/`                       | For companies: the problem, how it works, a lab example, trust, rules, FAQ, pilot form    |
+| `/docs`                   | The repository README, synced at build time                                               |
+| `/sandbox`                | Signed-in only. Your own fictional company: dashboard, approvals, agents, kill switch     |
+| `/app`                    | Signed-in only. Your organisations: real agents with API keys, members and roles          |
+| `/app/<org>/invoices`     | Supplier invoices: upload or type in, matched against the authorizations, CSV export      |
+| `/sandbox/invoices`       | The same for the sandbox, typed-in invoices only (fictional)                              |
+| `/app/<org>/report`       | Printable value report (also `/sandbox/report`): every number with its method             |
+| `/app/<org>/reorder`      | "Run reorder": the reorder list and Flow-E's own purchasing agent, with each run's log    |
+| `/api/mcp`                | The remote MCP endpoint for agents (Streamable HTTP, `Authorization: Bearer` agent key)   |
+| `/verify`                 | Public, no password: paste a receipt to check it was authorized (POSTs to `/api/verify`)  |
+| `/keys/<issuer>.pub`      | Public, no password: an issuer's published public key (PEM; `.json` adds its name)        |
+| `/api/pilot`              | The home page’s pilot form posts here (route handler, 303 back to `/#pilot`)              |
+| `/admin/pilots`           | Pilot requests; mark contacted or declined. Only `FLOWE_ADMIN_EMAILS`, others 404         |
+| `/admin/demo`             | Build or reset "Lab Alpha (fictional)" with 60 days of history. Only `FLOWE_ADMIN_EMAILS` |
+| `/security`               | Security in plain words: what is stored, where, what is signed, what isn't done yet       |
+| `/legal/…`                | Imprint, privacy, terms and data processing agreement: drafts marked `[TO CONFIRM]`       |
+| `/invite/…`, `/approve/…` | One-time links from invitation and approval emails (sign-in, then confirm)                |
+| `/account/security`       | Signed-in only. Set up, check or turn off the authenticator app (second factor)           |
+| `/account/verify`         | Signed-in only. Enter a code from the authenticator app (or a recovery code), then on     |
+| `/dev/outbox`             | Development only: the emails Flow-E would have sent                                       |
+| `/gate`                   | The private-preview password page (only while `SITE_PASSWORD` is set)                     |
 
 Sandbox pages: Dashboard, Fake agent (catalog, demo story, custom request, full rule trace),
 Ledger (integrity check, CSV, issuer public key, receipt verify), Payment detail (trace,
@@ -232,6 +235,18 @@ the key, agent, amount, currency and date as signed, and whether the entry's **l
 is consistent (the first entry starts from the genesis hash and no other does, it does not link
 to itself, it is not dated in the future), plus what a receipt proves and what it doesn't.
 Rate-limited per address and per instance; 32 KB per receipt, 4 KB per key.
+
+## Demo organisation
+
+`/admin/demo` (`src/server/demo-org.ts`, admins only) builds **Lab Alpha (fictional)**: two
+agents, a price list from Example Labware AG and Example Reagents AG, a grant project, a
+reorder list, and 60 days of history made through the real store with a clock that walks
+through the past (every request, approval, order and invoice is a signed entry; a few invoice
+mismatches, one without authorization, one duplicate, two requests waiting). Nobody is emailed
+while it is built. Its first ledger entry (`org.created`) carries `demo: true`, so every page of
+it shows a "Demo organisation, fictional data" banner that cannot be removed. Reset leaves the
+old one (its ledger is kept) and builds a fresh one up to today. The click-by-click demo is in
+[`DEMO.md`](../DEMO.md).
 
 ## Run reorder
 

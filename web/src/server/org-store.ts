@@ -251,6 +251,8 @@ export interface OrgAgentView {
 export interface OrgView {
   /** The store's clock when the view was read; budgets and the dashboard use it. */
   now: number;
+  /** A fictional demonstration organisation (its first ledger entry says so). */
+  demo: boolean;
   id: string;
   name: string;
   role: Role;
@@ -358,7 +360,15 @@ export class OrgStore {
 
   // Organisations ------------------------------------------------------------------------------
 
-  async createOrg(user: User, input: CreateOrgInput): Promise<string> {
+  /**
+   * `demo`: a fictional demonstration organisation. Recorded in its first ledger entry, so the
+   * "fictional data" banner can never be removed (only the admin demo seed sets it).
+   */
+  async createOrg(
+    user: User,
+    input: CreateOrgInput,
+    opts: { demo?: boolean } = {},
+  ): Promise<string> {
     const o = createOrgSchema.parse(input);
     const raw: Record<string, unknown> = {
       organisation: o.name,
@@ -403,6 +413,7 @@ export class OrgStore {
           base_currency: o.baseCurrency,
           timezone: o.timezone,
           config_sha256: configHash(raw),
+          ...(opts.demo === true ? { demo: true } : {}),
         },
       });
       await this.append(tx, loaded, entries, {
@@ -550,6 +561,7 @@ export class OrgStore {
       timezone: config.policy.timezone,
       config,
       raw: loaded.raw,
+      demo: isDemoLedger(entries),
       agents,
       controls,
       payments: newestFirst,
@@ -1882,6 +1894,17 @@ export class OrgStore {
 }
 
 // Helpers ---------------------------------------------------------------------------------------
+
+/** The organisation's first entry marks it as a fictional demo. */
+export function isDemoLedger(entries: readonly StoredEntry[]): boolean {
+  const first = entries.find((e) => e.type === ORG_CREATED);
+  if (!first) return false;
+  try {
+    return (JSON.parse(first.data) as { demo?: unknown }).demo === true;
+  } catch {
+    return false;
+  }
+}
 
 function by(user: User): string {
   return normalEmail(user.email).slice(0, 100);
