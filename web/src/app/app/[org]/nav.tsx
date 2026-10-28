@@ -7,6 +7,8 @@ const TABS = [
   { path: '', label: 'Dashboard' },
   { path: '/agents', label: 'Agents' },
   { path: '/invoices', label: 'Invoices' },
+  { path: '/report', label: 'Report' },
+  { path: '/reorder', label: 'Reorder' },
   { path: '/mandate', label: 'Mandate' },
   { path: '/members', label: 'Members' },
   { path: '/ledger', label: 'Ledger' },

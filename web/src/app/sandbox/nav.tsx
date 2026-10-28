@@ -7,6 +7,7 @@ const TABS = [
   { href: '/sandbox', label: 'Dashboard' },
   { href: '/sandbox/agent', label: 'Fake agent' },
   { href: '/sandbox/invoices', label: 'Invoices' },
+  { href: '/sandbox/report', label: 'Report' },
   { href: '/sandbox/ledger', label: 'Ledger' },
   { href: '/sandbox/mandate', label: 'Mandate' },
 ] as const;

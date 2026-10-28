@@ -4,6 +4,7 @@ import { migrate, openPglite, openPostgres, type Db } from './db';
 import { mailerFromEnv } from './email';
 import { encryptionKeyFromEnv } from './keys';
 import { OrgStore } from './org-store';
+import { ReorderStore } from './reorder';
 import { SandboxStore } from './store';
 
 /**
@@ -60,4 +61,9 @@ export async function getOrgStore(): Promise<OrgStore> {
 
 export async function getDb(): Promise<Db> {
   return (await stores()).db;
+}
+
+export async function getReorderStore(): Promise<ReorderStore> {
+  const { db, orgs } = await stores();
+  return new ReorderStore(db, orgs);
 }

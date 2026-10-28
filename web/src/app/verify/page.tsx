@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { SiteFooter } from '@/components/site-chrome';
 import { Logo } from '@/components/ui';
-import { OfflineSteps, PublicVerifyForm } from './verify-form';
+import { OfflineSteps, PublicVerifyForm, WhatItProves } from './verify-form';
 
 export const metadata: Metadata = {
   title: 'Check a receipt',
@@ -42,12 +42,18 @@ export default function VerifyPage() {
         <PublicVerifyForm />
 
         <section className="space-y-3 border-t border-rule pt-6">
+          <h2 className="text-base font-semibold text-ink">What a receipt proves, and what not</h2>
+          <WhatItProves />
+        </section>
+
+        <section className="space-y-3 border-t border-rule pt-6">
           <h2 className="text-base font-semibold text-ink">What this check uses</h2>
           <p className="text-sm text-ink-2">
-            Only the receipt you paste. This site confirms whether the receipt’s issuer is a Flow-E
-            organisation here, shows that organisation’s name, and checks the signature with its
-            public key. It shows nothing else about the organisation, and it does not keep your
-            receipt.
+            Only the receipt you paste and the organisation’s public key: the one it published on
+            this site at <span className="font-mono text-xs">/keys/&lt;issuer id&gt;.pub</span>, or
+            one you paste. The name shown is the one published with that key. No account data is
+            looked up, nothing is searched, and your receipt is not kept. Checks are limited per
+            minute.
           </p>
           <details className="rounded-lg border border-rule bg-surface px-4 py-3">
             <summary className="cursor-pointer text-sm font-medium text-ink">

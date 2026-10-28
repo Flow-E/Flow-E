@@ -21,6 +21,8 @@ const EXPECTED: Record<Permission, string> = {
   'invoice.record': 'oa',
   'agent.freeze': 'oa',
   'killswitch.set': 'oa',
+  'reorder.manage': 'oa',
+  'reorder.run': 'oa',
   'mandate.update': 'o',
   'agent.create': 'o',
   'agent.keys': 'o',

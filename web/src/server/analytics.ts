@@ -5,6 +5,7 @@ import {
   PAYMENT_DECISION,
   PAYMENT_RESOLVED,
   dailySpend,
+  foldInvoices,
   foldPayments,
   localTime,
   toBaseMinor,
@@ -604,9 +605,71 @@ export function periodEntries(
 
 /**
  * Minutes a person would spend on one manual approval: reading the request, checking the
- * supplier and the price, deciding. An assumption, shown next to every figure built on it.
+ * supplier and the price, deciding. An assumption, shown next to every figure built on it, and
+ * editable on the report page.
  */
-export const MINUTES_PER_APPROVAL = 4;
+export const MINUTES_PER_APPROVAL = 5;
+export const MAX_MINUTES_PER_APPROVAL = 120;
+
+/** The `minutes` query value as a whole number of minutes from 0 to 120; the default otherwise. */
+export function parseMinutes(value: unknown): number {
+  const v = Array.isArray(value) ? (value[0] as unknown) : value;
+  if (typeof v !== 'string' || !/^\d{1,3}$/.test(v.trim())) return MINUTES_PER_APPROVAL;
+  const n = Number(v.trim());
+  return n <= MAX_MINUTES_PER_APPROVAL ? n : MINUTES_PER_APPROVAL;
+}
+
+/** Invoices recorded in a period that did not match what Flow-E authorized. */
+export interface InvoiceStats {
+  /** Invoices recorded in the period. */
+  recorded: number;
+  matched: number;
+  /** Amount differs from the authorization by more than the tolerance. */
+  mismatch: number;
+  /** No authorization found. */
+  unmatched: number;
+  duplicate: number;
+  /**
+   * Billed above the authorization, summed per currency (minor units), for mismatches a person
+   * rejected or has not decided yet: the extra that was not paid without a look.
+   */
+  overBilled: { currency: string; amount: number }[];
+}
+
+export function invoiceStats(input: {
+  entries: readonly StoredEntry[];
+  timezone: string;
+  from: string;
+  to: string;
+}): InvoiceStats {
+  const out: InvoiceStats = {
+    recorded: 0,
+    matched: 0,
+    mismatch: 0,
+    unmatched: 0,
+    duplicate: 0,
+    overBilled: [],
+  };
+  const over = new Map<string, number>();
+  for (const i of foldInvoices(input.entries)) {
+    const day = localDate(i.recordedAt, input.timezone);
+    if (day < input.from || day > input.to) continue;
+    out.recorded += 1;
+    out[i.match] += 1;
+    if (
+      i.match === 'mismatch' &&
+      i.difference !== null &&
+      i.difference > 0 &&
+      i.resolution?.outcome !== 'accepted'
+    ) {
+      over.set(i.currency, (over.get(i.currency) ?? 0) + i.difference);
+    }
+  }
+  out.overBilled = [...over.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([currency, amount]) => ({ currency, amount }));
+  return out;
+}
 
 /** Above this share of its daily budget, an agent's average day counts as near its budget. */
 export const NEAR_BUDGET_SHARE = 0.8;
@@ -689,6 +752,8 @@ export interface ValueReport {
   overpaymentAvoided: { count: number; over: number };
   workingDays: number;
   agents: AgentOutlook[];
+  /** Only when the caller passed the ledger's invoices for the period. */
+  invoices: InvoiceStats | null;
 }
 
 /** Monday to Friday between two calendar days, inclusive; at least 1. */
@@ -705,7 +770,11 @@ export function workingDays(from: string, to: string): number {
  * "What Flow-E did for you", derived from a built dashboard (so it follows its period and
  * agent filter). Pure; no second ledger read.
  */
-export function buildValueReport(dash: Dashboard): ValueReport {
+export function buildValueReport(
+  dash: Dashboard,
+  options: { minutesPerApproval?: number; invoices?: InvoiceStats } = {},
+): ValueReport {
+  const minutes = options.minutesPerApproval ?? MINUTES_PER_APPROVAL;
   const sentToHuman = dash.days.reduce((s, p) => s + p.review, 0);
   const autoDecided = Math.max(dash.requests - sentToHuman, 0);
 
@@ -745,8 +814,8 @@ export function buildValueReport(dash: Dashboard): ValueReport {
     requests: dash.requests,
     autoDecided,
     sentToHuman,
-    minutesPerApproval: MINUTES_PER_APPROVAL,
-    minutesSaved: autoDecided * MINUTES_PER_APPROVAL,
+    minutesPerApproval: minutes,
+    minutesSaved: autoDecided * minutes,
     stopped: {
       ...dash.declined,
       byCategory: [...cats.values()].sort(
@@ -758,6 +827,7 @@ export function buildValueReport(dash: Dashboard): ValueReport {
     overpaymentAvoided: { ...dash.priceCheck.avoided },
     workingDays: days,
     agents,
+    invoices: options.invoices ?? null,
   };
 }
 

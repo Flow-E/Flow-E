@@ -11,8 +11,11 @@ The public site and the sandbox for [Flow-E](https://github.com/Flow-E/Flow-E): 
 | `/app`                    | Signed-in only. Your organisations: real agents with API keys, members and roles         |
 | `/app/<org>/invoices`     | Supplier invoices: upload or type in, matched against the authorizations, CSV export     |
 | `/sandbox/invoices`       | The same for the sandbox, typed-in invoices only (fictional)                             |
+| `/app/<org>/report`       | Printable value report (also `/sandbox/report`): every number with its method            |
+| `/app/<org>/reorder`      | "Run reorder": the reorder list and Flow-E's own purchasing agent, with each run's log   |
 | `/api/mcp`                | The remote MCP endpoint for agents (Streamable HTTP, `Authorization: Bearer` agent key)  |
 | `/verify`                 | Public, no password: paste a receipt to check it was authorized (POSTs to `/api/verify`) |
+| `/keys/<issuer>.pub`      | Public, no password: an issuer's published public key (PEM; `.json` adds its name)       |
 | `/api/pilot`              | The home page’s pilot form posts here (route handler, 303 back to `/#pilot`)             |
 | `/admin/pilots`           | Pilot requests; mark contacted or declined. Only `FLOWE_ADMIN_EMAILS`, others 404        |
 | `/invite/…`, `/approve/…` | One-time links from invitation and approval emails (sign-in, then confirm)               |
@@ -196,6 +199,54 @@ Supplier invoices are matched against what Flow-E authorized, with the core's
   stay too.
 - **Invoices by email** is a placeholder on the list page: not built.
 
+## Value report
+
+`/app/<org>/report` and `/sandbox/report` (`src/server/value-report.ts`, `budget-outlook.ts`):
+computed from the ledger and the mandate only, for the last 7, 30 or 90 days, with a print
+stylesheet ("Print or save as PDF"). Every number shows how it is counted. Decided
+automatically and sent to a person; approval work saved, only next to its editable assumption
+(`?minutes=`, default 5 minutes per manual approval); declines by reason; overpayment avoided
+(flagged above the usual price, then declined or cancelled); invoice problems caught and the
+amount billed above the authorization; daily budget pace; and for each monthly and project
+budget the pace per day and the **projected run-out day** (approved plus waiting, as the engine
+counts it; monthly budgets paced on this month so far, total project budgets on the last 30
+days). Tested on a fixed ledger with known numbers (`test/value-report.test.ts`).
+
+## What-if replay
+
+The Mandate page's "Test against the last 30 days" (`src/server/replay.ts`) replays every
+request of the period through the same engine with the rules as typed, before saving. It reads
+the ledger only and writes nothing (tested on frozen entries). Two limits are shown with the
+result: requests stopped by the kill switch, a frozen agent or a credential problem keep their
+decision; and requests decided before Flow-E recorded the item and project with each request
+(before 27 Oct 2026; told apart by the rules in their recorded trace) can't be checked against
+usual prices or project budgets, so they are counted as "inexact".
+
+## Public receipt check
+
+`/verify` uses only the pasted receipt and the issuer's **published** public key
+(`/keys/<issuer>.pub`, served by `src/app/keys/[file]/route.ts`; only keys whose issuer id
+matches the key itself are published), or a key the person pastes. No lookups by payment id,
+no search, nothing else from the account. It shows valid or forged, the name published with
+the key, agent, amount, currency and date as signed, and whether the entry's **ledger position**
+is consistent (the first entry starts from the genesis hash and no other does, it does not link
+to itself, it is not dated in the future), plus what a receipt proves and what it doesn't.
+Rate-limited per address and per instance; 32 KB per receipt, 4 KB per key.
+
+## Run reorder
+
+`/app/<org>/reorder` (`src/server/reorder.ts`, `reorder-agent.ts`, migration `006_reorder.sql`):
+a reorder list per organisation (item, preferred supplier, quantity, optional stock and
+minimum, category, country) and a **Run reorder** button (owners and approvers:
+`reorder.manage`, `reorder.run`). The agent connects in memory to the very same MCP server an
+external agent uses, as the chosen agent, so it can only check its mandate, ask for payments,
+read its own payments and record orders. It never approves, changes a mandate or unfreezes
+(tested). With `ANTHROPIC_API_KEY` set, Claude (`claude-opus-5-5`, effort low) decides, capped at
+12 tool calls and 20,000 tokens per run; without it, a deterministic **simulated** run asks for
+the usual price times the quantity for each due item, follows one supplier or project hint, and
+records the order when approved. Each run keeps a short plain-language log; one run per
+organisation at a time.
+
 ## Mandate page
 
 Sandbox and organisations share one form (`src/app/sandbox/mandate/mandate-form.tsx`), turned
@@ -307,23 +358,23 @@ Checks: `npm run lint`, `npm run typecheck`, `npm test` (in-memory PGlite, no se
 
 ## Environment variables
 
-| Name                                   | Where           | Secret | Purpose                                                                                                   |
-| -------------------------------------- | --------------- | ------ | --------------------------------------------------------------------------------------------------------- |
-| `FLOWE_KEY_ENCRYPTION_KEY`             | everywhere      | yes    | 32 random bytes, base64. Encrypts every issuer private key (sandboxes and organisations)                  |
-| `FLOWE_SANDBOX_KEY`                    | older name      | yes    | Same key under its old name; still read when `FLOWE_KEY_ENCRYPTION_KEY` is not set. Set only one          |
-| `RESEND_API_KEY`                       | production      | yes    | Resend API key (sending access is enough). With `EMAIL_FROM`, sends invitation and approval emails        |
-| `EMAIL_FROM`                           | production      | no     | Sender, e.g. `Flow-E <approvals@yourdomain>`. The domain must be verified in Resend                       |
-| `FLOWE_SESSION_SECRET`                 | everywhere      | yes    | 32+ random characters. Signs the session cookie                                                           |
-| `SITE_PASSWORD`                        | optional        | yes    | Private-preview gate for every page. Remove to make the site public                                       |
-| `DATABASE_URL`                         | production      | yes    | Postgres connection string (Supabase transaction pooler)                                                  |
-| `FLOWE_PGLITE_DIR`                     | local, optional | no     | PGlite folder. Default `web/.data/pglite`                                                                 |
-| `FLOWE_DEV_LOGIN`                      | local only      | no     | `1` = sign in with any email. Ignored when `NODE_ENV=production`                                          |
-| `NEXT_PUBLIC_SUPABASE_URL`             | production      | no     | Supabase project URL, for the email sign-in link                                                          |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | production      | no     | Supabase publishable key (public by design)                                                               |
-| `FLOWE_SITE_URL`                       | production, opt | no     | The site's public origin for sign-in links, e.g. `https://flow-e.vercel.app`. Default: the request's host |
-| `FLOWE_LEADS_TO`                       | optional        | no     | One address that gets an email for each pilot request (through the mailer above; dev: outbox)             |
-| `FLOWE_ADMIN_EMAILS`                   | optional        | no     | Comma-separated emails that may open `/admin/pilots` after signing in. Unset: nobody                      |
-| `ANTHROPIC_API_KEY`                    | optional        | yes    | Reads uploaded invoices to fill the form (a person confirms). Unset: upload keeps the file, form empty    |
+| Name                                   | Where           | Secret | Purpose                                                                                                              |
+| -------------------------------------- | --------------- | ------ | -------------------------------------------------------------------------------------------------------------------- |
+| `FLOWE_KEY_ENCRYPTION_KEY`             | everywhere      | yes    | 32 random bytes, base64. Encrypts every issuer private key (sandboxes and organisations)                             |
+| `FLOWE_SANDBOX_KEY`                    | older name      | yes    | Same key under its old name; still read when `FLOWE_KEY_ENCRYPTION_KEY` is not set. Set only one                     |
+| `RESEND_API_KEY`                       | production      | yes    | Resend API key (sending access is enough). With `EMAIL_FROM`, sends invitation and approval emails                   |
+| `EMAIL_FROM`                           | production      | no     | Sender, e.g. `Flow-E <approvals@yourdomain>`. The domain must be verified in Resend                                  |
+| `FLOWE_SESSION_SECRET`                 | everywhere      | yes    | 32+ random characters. Signs the session cookie                                                                      |
+| `SITE_PASSWORD`                        | optional        | yes    | Private-preview gate for every page. Remove to make the site public                                                  |
+| `DATABASE_URL`                         | production      | yes    | Postgres connection string (Supabase transaction pooler)                                                             |
+| `FLOWE_PGLITE_DIR`                     | local, optional | no     | PGlite folder. Default `web/.data/pglite`                                                                            |
+| `FLOWE_DEV_LOGIN`                      | local only      | no     | `1` = sign in with any email. Ignored when `NODE_ENV=production`                                                     |
+| `NEXT_PUBLIC_SUPABASE_URL`             | production      | no     | Supabase project URL, for the email sign-in link                                                                     |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | production      | no     | Supabase publishable key (public by design)                                                                          |
+| `FLOWE_SITE_URL`                       | production, opt | no     | The site's public origin for sign-in links, e.g. `https://flow-e.vercel.app`. Default: the request's host            |
+| `FLOWE_LEADS_TO`                       | optional        | no     | One address that gets an email for each pilot request (through the mailer above; dev: outbox)                        |
+| `FLOWE_ADMIN_EMAILS`                   | optional        | no     | Comma-separated emails that may open `/admin/pilots` after signing in. Unset: nobody                                 |
+| `ANTHROPIC_API_KEY`                    | optional        | yes    | Reads uploaded invoices (a person confirms) and runs "Run reorder" with Claude. Unset: form empty, reorder simulated |
 
 Generate a sandbox key:
 
@@ -369,7 +420,8 @@ publishable key `sb_publishable__LHTIX5Dmr0Fg1ctdUztJA_Ak2sFoKm` (public).
 
 1. SQL editor: run `db/migrations/001_init.sql`, then `002_orgs.sql`, then
    `003_pilot_requests.sql`, then every later file in number order: `004_invoice_files.sql`
-   (invoice files), `005_mfa.sql` (second factor). All are idempotent.
+   (invoice files), `005_mfa.sql` (second factor), `006_reorder.sql` (reorder list and runs).
+   All are idempotent.
 2. Project Settings → Database → Connection string → **Transaction pooler** (port 6543). That
    is `DATABASE_URL`, with the database password filled in. The client uses
    `prepare: false`, which the pooler needs.

@@ -3,6 +3,7 @@ import { ActionError, ConfigError } from '@flow-e/mcp/core';
 import { MailerConfigError, OutboxMailer, mailerFromEnv } from '@/server/email';
 import type { OrgStore, User } from '@/server/org-store';
 import { ForbiddenError, type Permission } from '@/server/permissions';
+import { ReorderStore } from '@/server/reorder';
 import { sha256 } from '@/server/tokens';
 import {
   ALICE,
@@ -92,6 +93,13 @@ describe('every action × role, enforced by the store', () => {
         s.invite(orgId, user, { email: `${unique()}@example.com`, role: 'viewer' }, ORIGIN),
       'member.manage': (s, orgId, user) => s.changeRole(orgId, user, CAROL.userId, 'viewer'),
       'org.settings': (s, orgId, user) => s.rename(orgId, user, 'Example Labs AG (fictional)'),
+      'reorder.manage': (s, orgId, user) =>
+        new ReorderStore(w.db, s).saveItems(orgId, user, [{ item: 'Glassware', quantity: 1 }]),
+      'reorder.run': async (s, orgId, user) => {
+        const r = new ReorderStore(w.db, s);
+        await r.saveItems(orgId, ALICE, [{ item: 'Glassware', quantity: 1 }]);
+        await r.run(orgId, user, { agentId: 'buyer', origin: ORIGIN, callModel: null });
+      },
     };
 
   const EXPECTED: Record<Permission, User[]> = {
@@ -102,6 +110,8 @@ describe('every action × role, enforced by the store', () => {
     'invoice.record': [ALICE, BOB],
     'agent.freeze': [ALICE, BOB],
     'killswitch.set': [ALICE, BOB],
+    'reorder.manage': [ALICE, BOB],
+    'reorder.run': [ALICE, BOB],
     'mandate.update': [ALICE],
     'agent.create': [ALICE],
     'agent.keys': [ALICE],

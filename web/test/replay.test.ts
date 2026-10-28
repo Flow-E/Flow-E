@@ -19,13 +19,23 @@ describe('what-if replay', () => {
     await w.close();
   });
 
-  async function proposed(edit: (agent: Record<string, unknown>) => void) {
+  async function proposed(
+    edit: (agent: Record<string, unknown>, raw: Record<string, unknown>) => void,
+  ) {
     const view = await w.store.view(w.orgId, ALICE);
     const raw = structuredClone(view.raw) as { agents: Record<string, Record<string, unknown>> };
     const agent = raw.agents.buyer;
     if (!agent) throw new Error('no buyer');
-    edit(agent);
+    edit(agent, raw);
     return { view, config: parseConfigObject(raw) };
+  }
+
+  function deepFreeze<T>(x: T): T {
+    if (x && typeof x === 'object') {
+      for (const v of Object.values(x)) deepFreeze(v);
+      Object.freeze(x);
+    }
+    return x;
   }
 
   it('decides everything the same way with unchanged rules', async () => {
@@ -67,5 +77,51 @@ describe('what-if replay', () => {
       replay({ entries: view.entries, proposed: config, now: w.clock.now + 40 * 24 * HOUR })
         .requests,
     ).toBe(0);
+  });
+
+  it('never writes: the ledger is unchanged and its entries are not touched', async () => {
+    const { view, config } = await proposed((a) => {
+      a.approval_above = '50';
+      a.daily_budget = '150';
+    });
+    const before = await w.store.view(w.orgId, ALICE);
+    const entries = deepFreeze(structuredClone(view.entries));
+    const r = replay({ entries, proposed: config, now: w.clock.now });
+    expect(r.changes.length).toBeGreaterThan(0);
+    const after = await w.store.view(w.orgId, ALICE);
+    expect(after.entries).toEqual(before.entries);
+    expect(after.raw).toEqual(before.raw);
+  });
+
+  it('counts requests decided before the fair-price check as inexact, only when prices are set', async () => {
+    const { view, config } = await proposed((_a, raw) => {
+      raw.reference_prices = [{ item: 'Pipette tips', match: ['tips'], price: '50' }];
+    });
+    // Pretend the first request was decided before the fair-price check existed.
+    let first = true;
+    const entries = view.entries.map((e) => {
+      if (e.type !== 'payment.decision' || !first) return e;
+      first = false;
+      const data = JSON.parse(e.data) as { trace: { rule: string }[] };
+      data.trace = data.trace.filter((t) => t.rule !== 'FAIR_PRICE');
+      return { ...e, data: JSON.stringify(data) };
+    });
+    expect(replay({ entries, proposed: config, now: w.clock.now }).inexact).toBe(1);
+    const plain = (await proposed(() => undefined)).config;
+    expect(replay({ entries, proposed: plain, now: w.clock.now })).toMatchObject({
+      inexact: 0,
+      kept: 0,
+    });
+  });
+
+  it('keeps decisions no mandate can change, such as the kill switch, and counts them', async () => {
+    await w.store.setKillSwitch(w.orgId, ALICE, true);
+    await w.store.requestPayment(w.auth, request('100'), ORIGIN).catch(() => undefined);
+    const { view, config } = await proposed((a) => {
+      a.approval_above = '10';
+    });
+    const r = replay({ entries: view.entries, proposed: config, now: w.clock.now + HOUR });
+    expect(r.kept).toBe(1);
+    expect(r.changes.every((c) => c.before !== 'declined')).toBe(true);
   });
 });

@@ -1,4 +1,5 @@
 import {
+  PAYMENT_DECISION,
   evaluate,
   foldPayments,
   type Credential,
@@ -19,6 +20,9 @@ import {
  * - A request the new rules send to a person counts as approved only if a person approved it
  *   at the time, and as waiting otherwise; budgets count it either way, as they do live.
  * - Agents ask the same things in the same order; in reality an agent would adapt.
+ * - Requests decided before the fair-price check or project budgets existed (27 Oct 2026) were
+ *   recorded without an item or a project, so those rules can't judge them; they are counted
+ *   as `inexact`. A decision's recorded trace tells which rules existed when it was made.
  */
 
 export const REPLAY_DAYS = 30;
@@ -54,6 +58,13 @@ export interface ReplayResult {
   changes: ReplayChange[];
   /** More changes than listed. */
   more: number;
+  /** Requests that kept their decision because no mandate can change it (kill switch, frozen agent, credential). */
+  kept: number;
+  /**
+   * Requests replayed without everything the new rules look at: no item while usual prices are
+   * set, or no project while projects are set. Their result may differ from a live decision.
+   */
+  inexact: number;
 }
 
 function credentialFor(config: MandateConfig, agentId: string, issuer: string): Credential {
@@ -102,6 +113,13 @@ export function replay(input: {
   const before: { decision: Decision; counted: boolean; amount: number }[] = [];
   const after: { decision: Decision; counted: boolean; amount: number }[] = [];
   const changes: ReplayChange[] = [];
+  const checksItems = (input.proposed.policy.referencePrices ?? []).length > 0;
+  const checksProjects =
+    (input.proposed.policy.projects ?? []).length > 0 ||
+    Object.values(input.proposed.agents).some((a) => a.mandate.requireProject === true);
+  const rulesAtTheTime = tracedRules(input.entries);
+  let kept = 0;
+  let inexact = 0;
 
   for (const p of window) {
     const amount = p.amountBase ?? 0;
@@ -110,7 +128,17 @@ export function replay(input: {
     let decision: Decision = p.engineDecision;
     let reason: string | null = p.engineDecision === 'approved' ? null : p.reason;
     let amountBase = p.amountBase;
-    if (agent && !(p.rule !== null && KEEP_RULES.has(p.rule))) {
+    const keep = p.rule !== null && KEEP_RULES.has(p.rule);
+    if (keep) kept += 1;
+    else if (agent) {
+      const had = rulesAtTheTime.get(p.paymentId);
+      if (
+        had !== undefined &&
+        ((checksItems && !had.has('FAIR_PRICE')) || (checksProjects && !had.has('PROJECT_BUDGET')))
+      )
+        inexact += 1;
+    }
+    if (agent && !keep) {
       const at = Date.parse(p.createdAt);
       const result = evaluate(
         {
@@ -172,7 +200,32 @@ export function replay(input: {
     after: count(after),
     changes: newest.slice(0, limit),
     more: Math.max(0, newest.length - limit),
+    kept,
+    inexact,
   };
+}
+
+/** The rules each decision was checked against, from its recorded trace. */
+function tracedRules(entries: readonly StoredEntry[]): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const e of entries) {
+    if (e.type !== PAYMENT_DECISION) continue;
+    try {
+      const d = JSON.parse(e.data) as { payment_id?: unknown; trace?: unknown };
+      if (typeof d.payment_id !== 'string' || !Array.isArray(d.trace)) continue;
+      out.set(
+        d.payment_id,
+        new Set(
+          d.trace
+            .map((t: unknown) => (t as { rule?: unknown } | null)?.rule)
+            .filter((r): r is string => typeof r === 'string'),
+        ),
+      );
+    } catch {
+      // An unreadable entry is folded (or skipped) elsewhere; it can't be judged here.
+    }
+  }
+  return out;
 }
 
 function view(p: PaymentRecord, status: LedgerEntryView['status'], amountBase: number) {

@@ -538,16 +538,29 @@ export function ValueReportPanel({
   periodText,
   fmt,
   agents,
+  reportHref,
 }: {
   report: ValueReport;
   periodText: string;
   fmt: (minor: number) => string;
   agents: readonly DashboardAgentRef[];
+  /** The printable report page, with its methods and budget forecasts. */
+  reportHref?: string;
 }) {
   const stopped = report.stopped;
   const near = report.agents.filter((a) => a.oftenNearDaily);
   return (
-    <Panel title="What Flow-E did for you" description={valueSummary(report, periodText, fmt)}>
+    <Panel
+      title="What Flow-E did for you"
+      description={valueSummary(report, periodText, fmt)}
+      action={
+        reportHref ? (
+          <Link href={reportHref} className="text-sm text-accent underline">
+            Full report
+          </Link>
+        ) : undefined
+      }
+    >
       <dl className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
         <div className="min-w-0">
           <dt className="text-xs text-ink-3">Overpayment avoided</dt>
@@ -690,6 +703,7 @@ export function DashboardBody({
   paymentHref,
   empty,
   afterKpis,
+  reportHref,
 }: {
   dash: Dashboard;
   agents: readonly DashboardAgentRef[];
@@ -700,6 +714,7 @@ export function DashboardBody({
   empty: ReactNode;
   /** Controls shown right below the key figures (approvals, cooling-off). */
   afterKpis?: ReactNode;
+  reportHref?: string;
 }) {
   const fmt = (minor: number) => money(minor, m.currency, m.decimals);
   const tick = (minor: number) => compact(minor, m);
@@ -803,6 +818,7 @@ export function DashboardBody({
           periodText={periodText}
           fmt={fmt}
           agents={agents}
+          reportHref={reportHref}
         />
       ) : null}
 

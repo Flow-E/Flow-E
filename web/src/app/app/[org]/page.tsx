@@ -121,6 +121,7 @@ export default async function OrgDashboard({
       <DashboardBody
         dash={dash}
         agents={agents}
+        reportHref={`${base}/report?period=${period === 'today' ? '30d' : period}`}
         money={{ currency: view.baseCurrency, decimals: view.currencyDecimals }}
         timezone={view.timezone}
         paymentHref={(id) => `${base}/payments/${id}`}

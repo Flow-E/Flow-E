@@ -28,7 +28,7 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
+@media screen and (prefers-color-scheme: dark) {
   :root {
     --paper: #111315;
     --surface: #181b1e;
@@ -75,7 +75,7 @@
   --viz-axis: #cfc8ba;
 }
 
-@media (prefers-color-scheme: dark) {
+@media screen and (prefers-color-scheme: dark) {
   :root {
     --viz-1: #3987e5;
     --viz-2: #d95926;

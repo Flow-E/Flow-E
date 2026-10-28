@@ -87,7 +87,7 @@ export function MandatePreview({
           }}
         >
           <History size={14} aria-hidden="true" />
-          {pending ? 'Replaying…' : 'Preview against the last 30 days'}
+          {pending ? 'Replaying…' : 'Test against the last 30 days'}
         </button>
       </div>
 
@@ -160,10 +160,19 @@ export function MandatePreview({
               ) : null}
               <p className="text-xs text-ink-3">
                 Assumes agents ask the same things in the same order. Requests stopped by the kill
-                switch, a frozen agent or a credential problem keep their decision. A request the
-                new rules send to a person counts as approved only if a person approved it at the
-                time.
+                switch, a frozen agent or a credential problem keep their decision
+                {r.kept > 0 ? ` (${String(r.kept)} here)` : ''}. A request the new rules send to a
+                person counts as approved only if a person approved it at the time. Nothing is saved
+                or recorded.
               </p>
+              {r.inexact > 0 ? (
+                <p className="text-xs text-ink-2">
+                  {r.inexact === 1 ? '1 request was' : `${String(r.inexact)} requests were`} decided
+                  before Flow-E recorded the item and project with each request, so usual prices and
+                  project budgets could not be checked for {r.inexact === 1 ? 'it' : 'them'}. Their
+                  result here may differ from a live decision.
+                </p>
+              ) : null}
             </>
           )}
         </div>

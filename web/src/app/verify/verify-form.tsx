@@ -6,8 +6,9 @@ import { buttonClass } from '@/components/ui';
 import { money } from '@/lib/format';
 import type { PublicVerifyResult, VerifiedPayment } from '@/server/public-verify';
 
-/** Must match MAX_RECEIPT_BYTES in src/server/public-verify.ts (the server checks again). */
+/** Must match MAX_RECEIPT_BYTES and MAX_KEY_BYTES in src/server/public-verify.ts. */
 const MAX_BYTES = 32 * 1024;
+const MAX_KEY = 4 * 1024;
 
 const DECISION: Record<VerifiedPayment['decision'], { label: string; note: string }> = {
   approved: {
@@ -86,9 +87,11 @@ function Result({ r }: { r: PublicVerifyResult }) {
           Unknown issuer: this site cannot check it
         </p>
         <p className="text-sm text-ink-2">
-          No Flow-E organisation on this site has the issuer id{' '}
+          No public key is published on this site for the issuer id{' '}
           <span className="break-all font-mono text-xs">{r.issuer}</span>. That does not make the
-          receipt false: it may come from a Flow-E installation elsewhere. Check it offline:
+          receipt false: it may come from a Flow-E installation elsewhere. Ask the organisation for
+          its public key and paste it under &ldquo;Use a public key you have&rdquo;, or check it
+          offline:
         </p>
         <OfflineSteps />
       </div>
@@ -102,8 +105,9 @@ function Result({ r }: { r: PublicVerifyResult }) {
           Not valid: do not rely on this receipt
         </p>
         <p className="text-sm text-ink-2">
-          It names a Flow-E {r.issuerKind === 'sandbox' ? 'sandbox' : 'organisation'} on this site,
-          but it was changed after signing or was not signed by it.
+          {r.keySource === 'supplied'
+            ? 'It does not match the public key you supplied: it was changed after signing, or that key is not the one that signed it.'
+            : `It names a Flow-E ${r.issuerKind === 'sandbox' ? 'sandbox' : 'organisation'} whose key is published here, but it was changed after signing or was not signed with that key.`}
         </p>
         <ul className="space-y-0.5 text-sm text-ink-2">
           {(r.checks ?? []).map((c) => (
@@ -121,13 +125,20 @@ function Result({ r }: { r: PublicVerifyResult }) {
         Valid: Flow-E signed this receipt and it is unchanged
       </p>
       <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[auto_1fr] [&_dd]:mb-2 sm:[&_dd]:mb-0">
-        <Row label="Issued by">
-          {r.issuerKind === 'sandbox'
-            ? 'A Flow-E sandbox: the company, suppliers and money are fictional'
-            : `${r.issuerName ?? 'A Flow-E organisation'} (a Flow-E organisation on this site)`}
+        <Row label="Signed by">
+          {r.keySource === 'supplied'
+            ? 'The holder of the public key you supplied'
+            : r.issuerKind === 'sandbox'
+              ? 'A Flow-E sandbox: the company, suppliers and money are fictional'
+              : `${r.issuerName ?? 'A Flow-E organisation'} (the name published with its key)`}
         </Row>
         <Row label="Issuer id">
           <span className="break-all font-mono text-xs">{r.issuer}</span>
+          {r.keyUrl ? (
+            <a href={r.keyUrl} className="ml-2 text-xs text-accent underline">
+              Published key
+            </a>
+          ) : null}
         </Row>
         {p ? (
           <>
@@ -165,6 +176,7 @@ function Result({ r }: { r: PublicVerifyResult }) {
           </>
         )}
       </dl>
+      {r.position ? <Position position={r.position} /> : null}
       <p className="text-xs text-ink-3">
         This is the status when the receipt was signed. A later approval, decline or cancellation is
         a separate signed entry in the buyer’s ledger and is not part of this receipt.
@@ -173,12 +185,55 @@ function Result({ r }: { r: PublicVerifyResult }) {
   );
 }
 
+function Position({ position }: { position: NonNullable<PublicVerifyResult['position']> }) {
+  return (
+    <div className="border-t border-approve/20 pt-3 text-sm">
+      <p className={position.consistent ? 'font-medium text-ink' : 'font-medium text-review'}>
+        {position.consistent
+          ? 'Ledger position: consistent'
+          : 'Ledger position: not consistent. Ask the organisation about this entry.'}
+      </p>
+      <ul className="mt-1 space-y-0.5 text-ink-2">
+        {position.checks.map((c) => (
+          <li key={c}>{c}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function WhatItProves() {
+  return (
+    <div className="grid gap-3 text-sm sm:grid-cols-2">
+      <div className="rounded-lg border border-rule bg-surface px-4 py-3">
+        <h3 className="font-semibold text-ink">A valid receipt proves</h3>
+        <ul className="mt-1.5 list-disc space-y-1 pl-5 text-ink-2">
+          <li>Flow-E, under the organisation’s key, recorded this decision.</li>
+          <li>Not one character was changed after signing.</li>
+          <li>Who asked, how much, to which supplier, and what the rules decided then.</li>
+        </ul>
+      </div>
+      <div className="rounded-lg border border-rule bg-surface px-4 py-3">
+        <h3 className="font-semibold text-ink">It does not prove</h3>
+        <ul className="mt-1.5 list-disc space-y-1 pl-5 text-ink-2">
+          <li>That any money was paid. Flow-E authorizes; it does not move money.</li>
+          <li>That the goods were delivered, or that the price was right.</li>
+          <li>What happened later: approvals and cancellations are separate entries.</li>
+          <li>A guarantee of payment by anyone.</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 export function PublicVerifyForm() {
   const [receipt, setReceipt] = useState('');
+  const [publicKey, setPublicKey] = useState('');
   const [result, setResult] = useState<PublicVerifyResult | null>(null);
   const [pending, setPending] = useState(false);
   const id = useId();
   const fileId = useId();
+  const keyId = useId();
 
   async function check() {
     setPending(true);
@@ -191,10 +246,20 @@ export function PublicVerifyForm() {
         });
         return;
       }
+      if (new TextEncoder().encode(publicKey).byteLength > MAX_KEY) {
+        setResult({
+          outcome: 'error',
+          error: 'That is too long to be a public key (4 KB at most).',
+        });
+        return;
+      }
+      const withKey = publicKey.trim() !== '';
       const res = await fetch('/api/verify', {
         method: 'POST',
-        headers: { 'content-type': 'text/plain; charset=utf-8' },
-        body: receipt,
+        headers: {
+          'content-type': withKey ? 'application/json' : 'text/plain; charset=utf-8',
+        },
+        body: withKey ? JSON.stringify({ receipt, public_key: publicKey }) : receipt,
         cache: 'no-store',
       });
       const body = (await res.json().catch(() => null)) as PublicVerifyResult | null;
@@ -272,6 +337,32 @@ export function PublicVerifyForm() {
             }}
           />
         </div>
+        <details className="rounded-lg border border-rule bg-surface px-4 py-3">
+          <summary className="cursor-pointer text-sm font-medium text-ink">
+            Use a public key you have (optional)
+          </summary>
+          <p className="mt-2 text-sm text-ink-2">
+            By default the receipt is checked against the key the organisation published on this
+            site. If the organisation gave you its key directly, paste it here; then only that key
+            is used.
+          </p>
+          <label htmlFor={keyId} className="sr-only">
+            Public key
+          </label>
+          <textarea
+            id={keyId}
+            name="public_key"
+            rows={4}
+            value={publicKey}
+            onChange={(e) => {
+              setPublicKey(e.target.value);
+            }}
+            spellCheck={false}
+            autoComplete="off"
+            placeholder="-----BEGIN PUBLIC KEY----- …"
+            className="mt-2 w-full rounded-lg border border-rule-strong bg-paper p-3 font-mono text-xs text-ink placeholder:text-ink-3"
+          />
+        </details>
       </form>
       <div aria-live="polite">{result ? <Result r={result} /> : null}</div>
     </div>

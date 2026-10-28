@@ -9,6 +9,22 @@ changes.
 
 ### Added
 
+- Website: **Run reorder** (`/app/<org>/reorder`): a reorder list per organisation and Flow-E's
+  own purchasing agent. It uses the same MCP tools as any external agent (no special access),
+  follows smart-decline hints and records orders; with `ANTHROPIC_API_KEY` Claude decides
+  (at most 12 tool calls and 20,000 tokens per run), without it a simulated run labelled as
+  such. Each run keeps a plain-language log. Migration `006_reorder.sql`; permissions
+  `reorder.manage` and `reorder.run` (owner, approver).
+- Website: a printable **value report** (`/app/<org>/report`, `/sandbox/report`): decisions,
+  declines by reason, overpayment avoided, invoice problems caught, budget pace and the
+  projected run-out day of each monthly and project budget, every number with its method, and
+  an editable minutes-per-approval assumption (default now 5).
+- Website: the public receipt check uses only the receipt and the issuer's **published key**
+  (`/keys/<issuer>.pub` and `.json`), or a key the person pastes; it adds a ledger-position
+  check and plain text on what a receipt proves and what it doesn't.
+- Website: the what-if replay ("Test against the last 30 days") says how many requests kept
+  their decision and how many were decided before item and project were recorded.
+
 - Website: the **mandate editor is complete**: monthly budget and "every purchase must name a
   project" per agent, organisation-wide projects (budget per month or in total, end date,
   agents), invoice tolerance, a usual-price table with supplier and currency, a CSV price list

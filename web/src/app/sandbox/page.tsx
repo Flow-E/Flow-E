@@ -106,6 +106,7 @@ export default async function DashboardPage({
       <DashboardBody
         dash={dash}
         agents={agents}
+        reportHref={`/sandbox/report?period=${period === 'today' ? '30d' : period}`}
         money={{ currency: view.baseCurrency, decimals: view.currencyDecimals }}
         timezone={view.timezone}
         paymentHref={(id) => `/sandbox/payments/${id}`}

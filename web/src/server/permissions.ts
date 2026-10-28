@@ -22,6 +22,10 @@ export const PERMISSIONS = {
   'agent.freeze': ['owner', 'approver'],
   /** Turn the organisation's kill switch on or off. */
   'killswitch.set': ['owner', 'approver'],
+  /** Edit the reorder list of the built-in purchasing agent. */
+  'reorder.manage': ['owner', 'approver'],
+  /** Start a run of the built-in purchasing agent (it asks for payments like any agent). */
+  'reorder.run': ['owner', 'approver'],
   /** Change the mandate: limits, suppliers, countries, statuses. */
   'mandate.update': ['owner'],
   /** Create agents. */

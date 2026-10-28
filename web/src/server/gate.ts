@@ -92,17 +92,22 @@ export const VERIFY_PATH = '/verify';
 export const VERIFY_API_PATH = '/api/verify';
 /** The password page, and where its form posts (a route handler, not a Server Action). */
 export const GATE_PATH = '/gate';
+/** Published issuer public keys, one file each: /keys/<issuer>.pub and .json. */
+export const KEYS_PREFIX = '/keys/';
 export const GATE_API_PATH = '/api/gate';
 
 /**
  * Which requests skip the site password gate. Exact paths only: /api/mcp/x or /verify/x are
- * still gated. The public pages (/gate, /verify) are exempt for reading only: a POST there with
+ * still gated; under /keys/ only one file name deep. The public pages (/gate, /verify) are exempt for reading only: a POST there with
  * a Next-Action header could name any Server Action of the site, so they have none and post to
  * route handlers (/api/gate, /api/verify), which never dispatch Server Actions.
  */
 export function gateExempt(pathname: string, method: string, nextAction: boolean): boolean {
   if (pathname === MCP_PATH) return true;
   if (pathname === GATE_PATH || pathname === VERIFY_PATH) {
+    return (method === 'GET' || method === 'HEAD') && !nextAction;
+  }
+  if (pathname.startsWith(KEYS_PREFIX) && !pathname.slice(KEYS_PREFIX.length).includes('/')) {
     return (method === 'GET' || method === 'HEAD') && !nextAction;
   }
   if (pathname === GATE_API_PATH || pathname === VERIFY_API_PATH) {
