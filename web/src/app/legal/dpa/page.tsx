@@ -11,19 +11,19 @@ export default function DpaPage() {
     <TextPage
       title="Data processing agreement"
       draft
-      intro="For organisations: how Flow-E processes personal data on your behalf (Art. 9 FADP, Art. 28 GDPR). [TO CONFIRM: legal review and signature process]"
+      intro="For organisations: how Mandate processes personal data on your behalf (Art. 9 FADP, Art. 28 GDPR). [TO CONFIRM: legal review and signature process]"
     >
       <h2>Parties and roles</h2>
       <p>
         The organisation is the controller. Lorenzo Sivillica, [TO CONFIRM: postal address],
-        operates Flow-E and is the processor.
+        operates Mandate and is the processor.
       </p>
 
       <h2>Subject and duration</h2>
       <p>
-        Providing Flow-E: deciding agent purchases under the organisation&apos;s mandate, approvals,
-        invoice matching, reports and the signed ledger, for as long as the organisation uses
-        Flow-E. [TO CONFIRM]
+        Providing Mandate: deciding agent purchases under the organisation&apos;s mandate,
+        approvals, invoice matching, reports and the signed ledger, for as long as the organisation
+        uses Mandate. [TO CONFIRM]
       </p>
 
       <h2>Data and people concerned</h2>

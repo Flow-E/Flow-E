@@ -1,8 +1,9 @@
 import { handleMcp, newLimiter } from '@/server/mcp-endpoint';
 import { getOrgStore } from '@/server/runtime';
+import { mandateEnv } from '@/server/env';
 
 /**
- * The remote MCP endpoint for agents: POST /api/mcp with `Authorization: Bearer flowe_ak_…`.
+ * The remote MCP endpoint for agents: POST /api/mcp with `Authorization: Bearer mandate_ak_…`.
  * The only path the site password gate lets through (agents cannot type a password); the key is
  * the authentication. See src/server/mcp-endpoint.ts.
  */
@@ -12,7 +13,7 @@ export const dynamic = 'force-dynamic';
 const limiter = newLimiter();
 
 function origin(request: Request): string {
-  return process.env.FLOWE_SITE_URL?.replace(/\/+$/, '') ?? new URL(request.url).origin;
+  return mandateEnv('SITE_URL')?.replace(/\/+$/, '') ?? new URL(request.url).origin;
 }
 
 async function handle(request: Request): Promise<Response> {

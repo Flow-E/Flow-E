@@ -8,7 +8,7 @@ import { assertCan } from './permissions';
 import { sha256 } from './tokens';
 
 /**
- * Organisation API keys, for systems around Flow-E (an inventory system, accounting). Separate
+ * Organisation API keys, for systems around Mandate (an inventory system, accounting). Separate
  * from agent keys: an organisation key can never ask for a payment, approve or change anything
  * in the mandate. Two scopes: `reorder:write` (send reorder signals) and `read` (orders,
  * payments, receipts). Only the SHA-256 of a key is stored; the key is shown once.
@@ -21,7 +21,7 @@ export const SCOPE_LABEL: Record<ApiScope, string> = {
   read: 'Read orders, payments and receipts',
 };
 
-export const API_KEY_PREFIX = 'flowe_ok_';
+export const API_KEY_PREFIX = 'mandate_ok_';
 const VISIBLE = API_KEY_PREFIX.length + 6;
 export const MAX_API_KEYS = 10;
 export const ACCESS_LOG_DAYS = 90;
@@ -29,8 +29,9 @@ const DAY = 86_400_000;
 
 const iso = (col: string) => `to_char(${col} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
+/** Keys issued before the rename to Mandate start with "flowe_ok_" and still work. */
 export function looksLikeApiKey(text: string): boolean {
-  return /^flowe_ok_[A-Za-z0-9_-]{43}$/.test(text);
+  return /^(?:mandate|flowe)_ok_[A-Za-z0-9_-]{43}$/.test(text);
 }
 
 export const createKeySchema = z.object({

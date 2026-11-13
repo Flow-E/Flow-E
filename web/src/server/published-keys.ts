@@ -1,16 +1,17 @@
 import 'server-only';
 import { createPublicKey } from 'node:crypto';
-import { issuerIdFor } from '@flow-e/mcp/core';
+import { issuerIdForVersion, issuerMatches } from '@flow-e/mcp/core';
 import type { Sql } from './db';
 
 /**
  * Each issuer's public key, published at /keys/<issuer>.pub (PEM) and /keys/<issuer>.json (the
  * key plus the name the organisation signs under). Public on purpose: anyone holding a receipt
- * can check it with this key, here or offline with `flow-e verify`. A public key reveals nothing
+ * can check it with this key, here or offline with `mandate verify`. A public key reveals nothing
  * secret. Only keys whose issuer id matches the key itself are published.
  */
 
-export const ISSUER_PATTERN = /^flow-e-issuer:[0-9a-f]{16}$/;
+/** Current ids, and the "flow-e-issuer:" form of organisations created before the rename. */
+export const ISSUER_PATTERN = /^(?:mandate|flow-e)-issuer:[0-9a-f]{16}$/;
 
 export interface PublishedKey {
   issuer: string;
@@ -22,16 +23,18 @@ export interface PublishedKey {
 
 export async function publishedKey(sql: Sql, issuer: string): Promise<PublishedKey | null> {
   if (!ISSUER_PATTERN.test(issuer)) return null;
+  // The database holds the id in the form it was created with; either form names the same key.
+  const forms = [issuerIdForVersion(issuer, 2), issuerIdForVersion(issuer, 1)];
   const orgs = await sql.query<{ name: string; issuer_public_key: string }>(
-    'select name, issuer_public_key from orgs where issuer = $1 limit 1',
-    [issuer],
+    'select name, issuer_public_key from orgs where issuer in ($1, $2) limit 1',
+    forms,
   );
   // Archived sandboxes too: a receipt from before "Start over" is still genuine.
   const boxes = orgs[0]
     ? []
     : await sql.query<{ issuer_public_key: string }>(
-        'select issuer_public_key from sandboxes where issuer = $1 limit 1',
-        [issuer],
+        'select issuer_public_key from sandboxes where issuer in ($1, $2) limit 1',
+        forms,
       );
   const found = orgs[0]
     ? { organisation: orgs[0].name, kind: 'organisation' as const, pem: orgs[0].issuer_public_key }
@@ -40,7 +43,7 @@ export async function publishedKey(sql: Sql, issuer: string): Promise<PublishedK
       : null;
   if (!found) return null;
   try {
-    if (issuerIdFor(createPublicKey(found.pem)) !== issuer) return null;
+    if (!issuerMatches(issuer, createPublicKey(found.pem))) return null;
   } catch {
     return null;
   }

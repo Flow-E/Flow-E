@@ -26,7 +26,7 @@ const TONE: Record<PilotStatus, Tone> = {
 
 /**
  * Pilot requests from the home page form, newest first. Only for signed-in people whose email
- * is in FLOWE_ADMIN_EMAILS; everyone else, signed in or not, gets the same 404.
+ * is in MANDATE_ADMIN_EMAILS; everyone else, signed in or not, gets the same 404.
  */
 export default async function PilotsPage() {
   const session = await getSession();
@@ -37,7 +37,7 @@ export default async function PilotsPage() {
   return (
     <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <Link href="/" className="text-sm text-ink-2 hover:text-ink">
-        Flow-E
+        Mandate
       </Link>
       <h1 className="mt-2 font-serif text-3xl tracking-[-0.015em] sm:text-4xl">Pilot requests</h1>
       <p className="mt-1 text-sm">

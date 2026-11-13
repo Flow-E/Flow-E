@@ -143,8 +143,8 @@ export function catalogTable(): string {
   ].join('\n');
 }
 
-/** The prompt to paste into Claude once the Flow-E server is connected under `server`. */
-export function demoPrompt(server = 'flow-e-demo'): string {
+/** The prompt to paste into Claude once the Mandate server is connected under `server`. */
+export function demoPrompt(server = 'mandate-demo'): string {
   return `You are the purchasing assistant for a lab at Example Labs AG. This is a demo: the company, suppliers and prices are fictional and no money moves.
 
 Use the "${server}" tools. Call check_mandate first. Before every purchase, call request_payment, and treat its decision as binding.

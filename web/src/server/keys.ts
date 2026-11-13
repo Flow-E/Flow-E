@@ -1,10 +1,11 @@
 import 'server-only';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import { mandateEnv } from './env';
 
 /**
  * Issuer private keys (sandboxes and organisations) are stored encrypted (AES-256-GCM). The
- * 32-byte key-encryption key comes from FLOWE_KEY_ENCRYPTION_KEY, or the older name
- * FLOWE_SANDBOX_KEY (base64), and never leaves the server.
+ * 32-byte key-encryption key comes from MANDATE_KEY_ENCRYPTION_KEY, or the older name
+ * MANDATE_SANDBOX_KEY (base64), and never leaves the server.
  */
 
 export class KeyConfigError extends Error {
@@ -12,20 +13,22 @@ export class KeyConfigError extends Error {
 }
 
 export function parseEncryptionKey(base64: string | undefined): Buffer {
-  if (!base64) throw new KeyConfigError('FLOWE_SANDBOX_KEY is not set.');
+  if (!base64) throw new KeyConfigError('MANDATE_SANDBOX_KEY is not set.');
   const key = Buffer.from(base64, 'base64');
   if (key.length !== 32) {
-    throw new KeyConfigError('FLOWE_SANDBOX_KEY must be 32 random bytes, base64-encoded.');
+    throw new KeyConfigError('MANDATE_SANDBOX_KEY must be 32 random bytes, base64-encoded.');
   }
   return key;
 }
 
 /**
- * The key-encryption key from the environment. FLOWE_KEY_ENCRYPTION_KEY wins; FLOWE_SANDBOX_KEY
+ * The key-encryption key from the environment. MANDATE_KEY_ENCRYPTION_KEY wins; MANDATE_SANDBOX_KEY
  * still works, so existing deployments keep reading their sandboxes. Set only one of them.
  */
 export function encryptionKeyFromEnv(env: NodeJS.ProcessEnv = process.env): Buffer {
-  return parseEncryptionKey(env.FLOWE_KEY_ENCRYPTION_KEY ?? env.FLOWE_SANDBOX_KEY);
+  return parseEncryptionKey(
+    mandateEnv('KEY_ENCRYPTION_KEY', env) ?? mandateEnv('SANDBOX_KEY', env),
+  );
 }
 
 /** base64url(iv) . base64url(tag) . base64url(ciphertext) */

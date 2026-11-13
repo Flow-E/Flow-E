@@ -176,7 +176,7 @@ export function InvoiceDetail({
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <Panel title="Match" description="How Flow-E compared this invoice with what it authorized.">
+      <Panel title="Match" description="How Mandate compared this invoice with what it authorized.">
         <p className="text-sm text-ink">{i.explanation}</p>
         {i.difference !== null ? (
           i.difference > 0 ? (

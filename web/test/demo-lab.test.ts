@@ -54,7 +54,7 @@ describe('demo lab organisation', () => {
 
   it('gives Claude a prompt with the whole catalog', () => {
     const prompt = demoLabPrompt();
-    expect(prompt).toContain('"flow-e" tools');
+    expect(prompt).toContain('"mandate" tools');
     for (const c of CATALOG) expect(prompt).toContain(c.supplier);
   });
 });

@@ -24,7 +24,7 @@ import { BlockedAddressError, safeLookup, webhookUrlProblem } from './safe-url';
  * endpoint has a cursor (the last entry it has seen), so sending can never change, block or
  * slow a decision. Every delivery is signed with the endpoint's secret:
  *
- *   Flow-E-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>
+ *   Mandate-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>
  *
  * Failed deliveries are retried after 1 min, 5 min, 30 min, 2 h, 6 h and 24 h, then marked
  * failed. Only public https addresses are called (src/server/safe-url.ts).
@@ -52,7 +52,7 @@ export const RETRY_DELAYS_MS = [60_000, 300_000, 1_800_000, 7_200_000, 21_600_00
 export const MAX_WEBHOOKS = 5;
 const TIMEOUT_MS = 10_000;
 const BATCH = 50;
-export const SIGNATURE_HEADER = 'Flow-E-Signature';
+export const SIGNATURE_HEADER = 'Mandate-Signature';
 
 const iso = (col: string) => `to_char(${col} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
@@ -118,7 +118,7 @@ export function payloadFor(input: {
             data: JSON.parse(entry.data) as unknown,
           },
         }
-      : { message: 'A test event from Flow-E. Nothing happened.' }),
+      : { message: 'A test event from Mandate. Nothing happened.' }),
     ...(withReceipt ? { receipt: toReceipt(input.issuer, fromStored(entry)) } : {}),
   };
 }
@@ -494,9 +494,9 @@ export class WebhookStore {
       const secret = decryptSecret(row.secret_enc, this.encryptionKey);
       const res = await this.sender(row.url, body, {
         'content-type': 'application/json',
-        'user-agent': 'Flow-E-Webhooks/1',
-        'flow-e-event': row.event,
-        'flow-e-delivery': id,
+        'user-agent': 'Mandate-Webhooks/1',
+        'mandate-event': row.event,
+        'mandate-delivery': id,
         [SIGNATURE_HEADER.toLowerCase()]: sign(secret, Math.floor(now / 1000), body),
       });
       status = res.status;

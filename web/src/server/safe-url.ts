@@ -3,7 +3,7 @@ import { lookup } from 'node:dns';
 import { BlockList, isIP } from 'node:net';
 
 /**
- * Guard against server-side request forgery for webhook addresses: Flow-E only calls public
+ * Guard against server-side request forgery for webhook addresses: Mandate only calls public
  * https addresses. Checked twice: when an address is saved (its form), and at every delivery
  * (the resolved addresses, inside the connection's own DNS lookup, so a name that later points
  * to an internal address is refused too).
@@ -41,7 +41,7 @@ for (const [net, bits] of [
   blocked.addSubnet(net, bits, 'ipv6');
 }
 
-/** True for any address Flow-E must not call: private, loopback, link-local, reserved. */
+/** True for any address Mandate must not call: private, loopback, link-local, reserved. */
 export function isBlockedAddress(address: string): boolean {
   const family = isIP(address);
   if (family === 0) return true;

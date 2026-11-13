@@ -47,10 +47,10 @@ export default function DocsPage() {
         </nav>
         <article className="min-w-0">
           <h1 className="font-serif text-4xl tracking-[-0.015em] sm:text-5xl">
-            Flow-E documentation
+            Mandate documentation
           </h1>
           <p className="mt-4 max-w-[70ch] text-lg text-ink-2">
-            How to run Flow-E, connect an agent, write a mandate, and check the signed ledger. The
+            How to run Mandate, connect an agent, write a mandate, and check the signed ledger. The
             package is not on npm yet: install it from a checkout of the repository, as shown below.
           </p>
           {sections.map((s) => (

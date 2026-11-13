@@ -31,7 +31,7 @@ export default async function SandboxInvoicesPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Invoices</h1>
           <p className="mt-1 max-w-2xl text-ink-2">
-            Type in a supplier invoice and see how Flow-E matches it against the sandbox&rsquo;s
+            Type in a supplier invoice and see how Mandate matches it against the sandbox&rsquo;s
             authorizations. Uploading files works in organisations only.
           </p>
           <FictionalNote className="mt-2" />

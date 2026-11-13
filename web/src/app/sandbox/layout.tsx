@@ -7,7 +7,7 @@ import { sandboxView } from '@/server/view';
 import { signOut } from '../login/actions';
 import { SandboxTabs } from './nav';
 
-export const metadata: Metadata = { title: { default: 'Sandbox', template: '%s · Flow-E' } };
+export const metadata: Metadata = { title: { default: 'Sandbox', template: '%s · Mandate' } };
 
 export default async function SandboxLayout({ children }: { children: React.ReactNode }) {
   const { session, view } = await sandboxView();
@@ -17,7 +17,7 @@ export default async function SandboxLayout({ children }: { children: React.Reac
     <div className="min-h-dvh">
       <header className="border-b border-rule bg-surface print:hidden">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 pt-3 sm:px-6">
-          <Link href="/" aria-label="Flow-E home" className="rounded-md">
+          <Link href="/" aria-label="Mandate home" className="rounded-md">
             <Logo />
           </Link>
           <Pill tone="accent">Sandbox · fictional money</Pill>
@@ -47,7 +47,7 @@ export default async function SandboxLayout({ children }: { children: React.Reac
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</main>
       <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-ink-3 print:hidden sm:px-6">
         {view.organisation ?? 'Fictional organisation'} · issuer{' '}
-        <span className="font-mono">{view.issuer}</span> · Flow-E authorizes payments; it never
+        <span className="font-mono">{view.issuer}</span> · Mandate authorizes payments; it never
         moves money.
       </footer>
     </div>

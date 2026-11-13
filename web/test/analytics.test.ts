@@ -444,11 +444,11 @@ describe('the value report', () => {
     expect(r.stopped.byCategory).toEqual([]);
     expect(r.agents.every((a) => a.perWorkingDay === 0 && !a.oftenNearDaily)).toBe(true);
     expect(valueSummary(r, 'the last 7 days', fmt)).toBe(
-      'In the last 7 days no agent asked Flow-E for a payment.',
+      'In the last 7 days no agent asked Mandate for a payment.',
     );
   });
 
-  it('adds up what Flow-E decided, stopped and avoided', () => {
+  it('adds up what Mandate decided, stopped and avoided', () => {
     const e = [
       decision('a', 'lab', '2026-10-22T08:00:00.000Z', 'approved', 10_000),
       decision('r1', 'lab', '2026-10-22T09:00:00.000Z', 'review', 600_000),
@@ -478,14 +478,14 @@ describe('the value report', () => {
     ]);
     expect(r.overpaymentAvoided).toEqual({ count: 1, over: 21_000 });
     expect(valueSummary(r, 'the last 7 days', fmt)).toBe(
-      'In the last 7 days Flow-E decided 5 of 7 requests on its own, stopped 4 risky purchases and avoided CHF 210.00 of overpayment.',
+      'In the last 7 days Mandate decided 5 of 7 requests on its own, stopped 4 risky purchases and avoided CHF 210.00 of overpayment.',
     );
   });
 
   it('writes the sentence without the parts that are zero', () => {
     const e = [decision('a', 'lab', '2026-10-26T08:00:00.000Z', 'approved', 10_000)];
     const r = buildValueReport(buildDashboard(input(e, { period: 'today' })));
-    expect(valueSummary(r, 'today', fmt)).toBe('Today Flow-E decided 1 of 1 request on its own.');
+    expect(valueSummary(r, 'today', fmt)).toBe('Today Mandate decided 1 of 1 request on its own.');
   });
 
   it('averages approved spend per working day and flags agents near their daily budget', () => {

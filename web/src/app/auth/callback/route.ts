@@ -12,7 +12,7 @@ import {
 
 /**
  * Where the emailed sign-in link lands (after Supabase): /auth/callback?code=…. Trades the code
- * and this browser's PKCE verifier for the user, starts a Flow-E session and opens the sandbox.
+ * and this browser's PKCE verifier for the user, starts a Mandate session and opens the sandbox.
  * Any failure goes back to /login with a message; nothing is half signed in.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {

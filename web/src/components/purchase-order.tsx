@@ -110,7 +110,7 @@ export function PurchaseOrder({
         </p>
         <p className="text-ink-3">
           This order confirms that the purchase is authorized. It is not a payment: the invoice is
-          paid by {buyer} through its usual channel. Issued with Flow-E.
+          paid by {buyer} through its usual channel. Issued with Mandate.
         </p>
       </section>
 

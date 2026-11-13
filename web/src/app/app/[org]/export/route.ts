@@ -16,14 +16,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ org:
         return {
           body: filtered.body,
           type: 'text/csv; charset=utf-8',
-          filename: `flow-e-${filtered.suffix}-${date}.csv`,
+          filename: `mandate-${filtered.suffix}-${date}.csv`,
         };
       }
     }
     return {
       body: await store.csv(org, user),
       type: 'text/csv; charset=utf-8',
-      filename: `flow-e-ledger-${date}.csv`,
+      filename: `mandate-ledger-${date}.csv`,
     };
   });
 }

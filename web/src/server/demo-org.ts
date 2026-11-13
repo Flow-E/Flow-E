@@ -7,11 +7,11 @@ import { ReorderStore } from './reorder';
 
 /**
  * "Lab Alpha (fictional)": a demonstration organisation with 60 days of history, for the
- * what-if replay, the value report and live demos. Only admins (FLOWE_ADMIN_EMAILS) can create
+ * what-if replay, the value report and live demos. Only admins (MANDATE_ADMIN_EMAILS) can create
  * it. It is marked fictional in its first ledger entry, so every page shows a banner that cannot
  * be removed.
  *
- * The history is real Flow-E activity, not inserted rows: a store whose clock walks through
+ * The history is real Mandate activity, not inserted rows: a store whose clock walks through
  * the past 60 days makes every request through the agent tools, every approval, order and
  * invoice, so every entry is signed and hash-chained like any other. Deterministic: the same
  * `now` gives the same history. Nobody is emailed while it is built.
@@ -20,7 +20,7 @@ import { ReorderStore } from './reorder';
 export const DEMO_ORG_NAME = 'Lab Alpha (fictional)';
 export const DEMO_DAYS = 60;
 const DAY = 86_400_000;
-const ORIGIN = 'https://flow-e.invalid';
+const ORIGIN = 'https://mandate.invalid';
 
 const LABWARE = 'Example Labware AG';
 const REAGENTS = 'Example Reagents AG';
@@ -405,7 +405,7 @@ export async function seedDemoOrg(input: {
   await reorder.saveItems(orgId, user, [
     { item: 'Pipette tips, 20 racks', quantity: '2', stock: '3', minStock: '5' },
     { item: 'Nitrile gloves, 10 boxes', quantity: '3', stock: '8', minStock: '4' },
-    // A cheaper supplier outside the approved list: Flow-E declines and names the approved ones.
+    // A cheaper supplier outside the approved list: Mandate declines and names the approved ones.
     { item: 'Petri dishes, 500', quantity: '2', stock: '1', minStock: '4', supplier: OUTSIDER },
     { item: 'PCR master mix, 10 kits', quantity: '1', stock: '0', minStock: '1' },
     { item: 'Agarose, 500 g', quantity: '1' },

@@ -65,7 +65,7 @@ export default async function ReorderPage({ params }: { params: Promise<{ org: s
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Reorder</h1>
         <p className="mt-1 max-w-2xl text-ink-2">
-          Flow-E&apos;s own purchasing agent, so you can try Flow-E without building one. It asks
+          Mandate&apos;s own purchasing agent, so you can try Mandate without building one. It asks
           for payments with the same tools as any agent, under your mandate: it cannot approve,
           change the mandate or unfreeze anything.
         </p>
@@ -75,7 +75,7 @@ export default async function ReorderPage({ params }: { params: Promise<{ org: s
         title="Suggested by other systems"
         description={
           settings.autoIncludeSuggested
-            ? 'Suggestions join the next run automatically, once. Nothing is bought without the agent asking Flow-E.'
+            ? 'Suggestions join the next run automatically, once. Nothing is bought without the agent asking Mandate.'
             : 'An inventory system can suggest items through the API. Add them to the list, or dismiss them. Nothing is bought from a suggestion alone.'
         }
         action={

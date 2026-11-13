@@ -7,7 +7,7 @@ export function SiteHeader() {
   return (
     <header className="border-b border-rule bg-paper/90">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" aria-label="Flow-E home" className="shrink-0 whitespace-nowrap rounded-md">
+        <Link href="/" aria-label="Mandate home" className="shrink-0 whitespace-nowrap rounded-md">
           <Logo />
         </Link>
         <nav aria-label="Main" className="flex items-center gap-1 text-sm sm:gap-2">
@@ -45,7 +45,7 @@ export function SiteFooter() {
         </div>
         <div className="max-w-xl space-y-2">
           <p>
-            Flow-E authorizes payments; it never holds or moves money. The sandbox uses a fictional
+            Mandate authorizes payments; it never holds or moves money. The sandbox uses a fictional
             company, fictional suppliers and fictional money. Not legal advice and not a compliance
             product.
           </p>

@@ -107,7 +107,7 @@ export function createMandateServer(o: MandateServerOptions): MandateServer {
   }
 
   const server = new McpServer(
-    { name: 'flow-e', version: '0.1.0' },
+    { name: 'mandate', version: '0.1.0' },
     { instructions: AGENT_INSTRUCTIONS },
   );
 

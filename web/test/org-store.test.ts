@@ -160,7 +160,7 @@ describe('organisations', () => {
 
   it('starts with its own issuer, an encrypted key, a valid mandate and a signed ledger', async () => {
     const v = await w.store.view(w.orgId, ALICE);
-    expect(v.issuer).toMatch(/^flow-e-issuer:[0-9a-f]{16}$/);
+    expect(v.issuer).toMatch(/^mandate-issuer:[0-9a-f]{16}$/);
     expect(v.baseCurrency).toBe('CHF');
     expect(v.timezone).toBe('Europe/Zurich');
     expect(v.audit.ok).toBe(true);
@@ -380,11 +380,11 @@ describe('agent keys', () => {
   });
 
   it('are shown once with a visible prefix; only the hash is stored, never in the ledger', async () => {
-    expect(w.agentKey).toMatch(/^flowe_ak_[A-Za-z0-9_-]{43}$/);
+    expect(w.agentKey).toMatch(/^mandate_ak_[A-Za-z0-9_-]{43}$/);
     const rows = await w.db.query<{ prefix: string; key_hash: string }>(
       'select prefix, key_hash from agent_keys',
     );
-    expect(rows[0]?.prefix).toBe(w.agentKey.slice(0, 15));
+    expect(rows[0]?.prefix).toBe(w.agentKey.slice(0, 'mandate_ak_'.length + 6));
     expect(rows[0]?.key_hash).toBe(sha256(w.agentKey));
     const everything = JSON.stringify([
       await w.db.query('select * from agent_keys'),
@@ -415,7 +415,7 @@ describe('agent keys', () => {
     await w.store.revokeKey(w.orgId, ALICE, rotated.id);
     expect(await w.store.authenticateAgent(rotated.key)).toBeNull();
     await expect(w.store.revokeKey(w.orgId, ALICE, rotated.id)).rejects.toThrow('already revoked');
-    expect(await w.store.authenticateAgent('flowe_ak_nonsense')).toBeNull();
+    expect(await w.store.authenticateAgent('mandate_ak_nonsense')).toBeNull();
     const statuses = (await w.store.view(w.orgId, ALICE)).agents[0]?.keys
       .map((k) => k.status)
       .sort();

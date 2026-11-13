@@ -100,7 +100,7 @@ describe('organisation API keys (D1)', () => {
 
   it('shows the key once, stores only its hash, and logs calls without the key', async () => {
     const { key, id } = await make(['read']);
-    expect(key).toMatch(/^flowe_ok_[A-Za-z0-9_-]{43}$/);
+    expect(key).toMatch(/^mandate_ok_[A-Za-z0-9_-]{43}$/);
     expect((await call('GET', '/api/v1/orders', key)).status).toBe(200);
     const dump = JSON.stringify([
       await w.db.query('select * from org_api_keys'),
@@ -124,7 +124,7 @@ describe('organisation API keys (D1)', () => {
   it('refuses a missing, malformed, revoked or out-of-scope key', async () => {
     const { key, id } = await make(['reorder:write']);
     expect((await call('GET', '/api/v1/orders', null)).status).toBe(401);
-    expect((await call('GET', '/api/v1/orders', 'flowe_ok_nope')).status).toBe(401);
+    expect((await call('GET', '/api/v1/orders', 'mandate_ok_nope')).status).toBe(401);
     expect((await call('GET', '/api/v1/orders', w.agentKey)).status).toBe(401); // agent keys are not API keys
     expect((await call('GET', '/api/v1/orders', key)).status).toBe(403);
     await keys.revoke(w.orgId, ALICE, id);
@@ -353,7 +353,7 @@ describe('webhooks (D3)', () => {
 
   it('signs each delivery so the receiver can verify it, and refuses old or altered ones', async () => {
     const { secret } = await hooks.create(w.orgId, ALICE, {
-      url: 'https://erp.example.com/flow-e',
+      url: 'https://erp.example.com/mandate',
       events: ['payment.approved'],
     });
     const p = await w.store.requestPayment(w.auth, request('100'), ORIGIN);
@@ -362,19 +362,19 @@ describe('webhooks (D3)', () => {
     const [d] = sent;
     if (!d) throw new Error('nothing sent');
     const nowS = Math.floor(w.clock.now / 1000);
-    expect(verifySignature(secret, d.headers['flow-e-signature'] ?? '', d.body, nowS)).toBe(true);
+    expect(verifySignature(secret, d.headers['mandate-signature'] ?? '', d.body, nowS)).toBe(true);
     expect(
       verifySignature(
         secret,
-        d.headers['flow-e-signature'] ?? '',
+        d.headers['mandate-signature'] ?? '',
         d.body.replace('100', '900'),
         nowS,
       ),
     ).toBe(false);
-    expect(verifySignature(secret, d.headers['flow-e-signature'] ?? '', d.body, nowS + 600)).toBe(
+    expect(verifySignature(secret, d.headers['mandate-signature'] ?? '', d.body, nowS + 600)).toBe(
       false,
     );
-    expect(verifySignature('whsec_wrong', d.headers['flow-e-signature'] ?? '', d.body, nowS)).toBe(
+    expect(verifySignature('whsec_wrong', d.headers['mandate-signature'] ?? '', d.body, nowS)).toBe(
       false,
     );
     const body = JSON.parse(d.body) as {
@@ -387,7 +387,7 @@ describe('webhooks (D3)', () => {
     const view = await w.store.view(w.orgId, ALICE);
     expect(verifyReceipt(body.receipt, createPublicKey(view.publicKeyPem)).valid).toBe(true);
     // No keys or secrets in the payload.
-    expect(d.body).not.toMatch(/PRIVATE KEY|whsec_|flowe_ak_/);
+    expect(d.body).not.toMatch(/PRIVATE KEY|whsec_|mandate_ak_/);
   });
 
   it('retries with backoff, then marks the delivery failed; a person can resend', async () => {

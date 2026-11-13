@@ -10,7 +10,7 @@ import { getSession } from '@/server/session';
 /**
  * Mark a pilot request. A Server Action: the page is behind the preview password and sign-in,
  * and Next.js refuses Server Action posts whose Origin does not match the host (CSRF). Who may
- * act is read from the session and FLOWE_ADMIN_EMAILS here again, never from the form.
+ * act is read from the session and MANDATE_ADMIN_EMAILS here again, never from the form.
  */
 const input = z.object({ id: z.uuid(), status: z.enum(PILOT_STATUSES) });
 

@@ -4,7 +4,7 @@
  * changing the password invalidates every cookie, and nothing secret is stored in the browser.
  */
 
-export const GATE_COOKIE = 'flowe_gate';
+export const GATE_COOKIE = 'mandate_gate';
 export const GATE_MAX_AGE_S = 7 * 24 * 60 * 60;
 
 const encoder = new TextEncoder();
@@ -38,7 +38,7 @@ export async function gateToken(password: string, expiresAtMs: number): Promise<
   const sig = await crypto.subtle.sign(
     'HMAC',
     await hmacKey(password),
-    encoder.encode(`flow-e-gate-v1.${exp}`),
+    encoder.encode(`mandate-gate-v1.${exp}`),
   );
   return `${exp}.${toBase64Url(sig)}`;
 }
@@ -59,7 +59,7 @@ export async function verifyGateToken(
     'HMAC',
     await hmacKey(password),
     bytes,
-    encoder.encode(`flow-e-gate-v1.${exp}`),
+    encoder.encode(`mandate-gate-v1.${exp}`),
   );
 }
 

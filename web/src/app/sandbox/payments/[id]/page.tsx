@@ -132,7 +132,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ id: st
             <p className="mt-2 text-sm text-ink-3">
               Verify it offline with the issuer public key:{' '}
               <span className="font-mono">
-                flow-e verify receipt.json --pubkey issuer.pub --offline
+                mandate verify receipt.json --pubkey issuer.pub --offline
               </span>
             </p>
           </Panel>

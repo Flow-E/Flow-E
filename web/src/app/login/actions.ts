@@ -13,6 +13,7 @@ import {
   newPkce,
   sendSignInLink,
 } from '@/server/supabase-auth';
+import { mandateEnv } from '@/server/env';
 
 export interface LoginState {
   error?: string;
@@ -21,11 +22,11 @@ export interface LoginState {
 }
 
 /**
- * The site's own origin, for the link Supabase emails. FLOWE_SITE_URL wins when set (use it in
+ * The site's own origin, for the link Supabase emails. MANDATE_SITE_URL wins when set (use it in
  * production); otherwise the request's host. Supabase only redirects to URLs on its allowlist.
  */
 async function siteOrigin(): Promise<string> {
-  const fixed = process.env.FLOWE_SITE_URL?.replace(/\/+$/, '');
+  const fixed = mandateEnv('SITE_URL')?.replace(/\/+$/, '');
   if (fixed) return fixed;
   const h = await headers();
   const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3150';

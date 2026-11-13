@@ -72,17 +72,17 @@ export function challengeUrl(next: string): string {
   return `${CHALLENGE_PATH}?next=${encodeURIComponent(safeNext(next, '/app'))}`;
 }
 
-const globalForMfa = globalThis as unknown as { floweMfa?: Promise<MfaStore> };
+const globalForMfa = globalThis as unknown as { mandateMfa?: Promise<MfaStore> };
 
 /** One MFA store per server process, on the shared database. */
 export function getMfaStore(): Promise<MfaStore> {
-  globalForMfa.floweMfa ??= getDb()
+  globalForMfa.mandateMfa ??= getDb()
     .then((db) => new MfaStore(db, encryptionKeyFromEnv()))
     .catch((err: unknown) => {
-      globalForMfa.floweMfa = undefined;
+      globalForMfa.mandateMfa = undefined;
       throw err;
     });
-  return globalForMfa.floweMfa;
+  return globalForMfa.mandateMfa;
 }
 
 /** Where the person came from (same site only), to come back after the code. */

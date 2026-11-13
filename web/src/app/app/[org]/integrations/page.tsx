@@ -41,7 +41,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ o
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Integrations</h1>
         <p className="mt-1 max-w-2xl text-ink-2">
-          Connect the systems around Flow-E: an inventory system can suggest what to reorder, and
+          Connect the systems around Mandate: an inventory system can suggest what to reorder, and
           accounting or a supplier can be told when an order is approved. Nothing from outside can
           approve a purchase. How it works, with examples:{' '}
           <Link href="/developers" className="text-accent underline">
@@ -96,7 +96,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ o
 
       <Panel
         title="Webhooks"
-        description="Flow-E sends a signed message to your address when something happens. Sending never changes or slows a decision; failed deliveries are retried for a day."
+        description="Mandate sends a signed message to your address when something happens. Sending never changes or slows a decision; failed deliveries are retried for a day."
       >
         {activeHooks.length === 0 ? <p className="text-sm text-ink-2">No webhooks yet.</p> : null}
         <ul className="divide-y divide-rule">

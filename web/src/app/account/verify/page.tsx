@@ -25,12 +25,12 @@ export default async function VerifyPage({
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-10">
       <div className="w-full max-w-sm">
-        <Link href="/app" aria-label="Flow-E" className="rounded-md">
+        <Link href="/app" aria-label="Mandate" className="rounded-md">
           <Logo />
         </Link>
         <h1 className="mt-8 font-serif text-3xl tracking-[-0.015em]">Enter your code</h1>
         <p className="mt-2 text-ink-2">
-          Open your authenticator app and enter the 6-digit code for Flow-E. Lost your phone? Use
+          Open your authenticator app and enter the 6-digit code for Mandate. Lost your phone? Use
           one of your recovery codes.
         </p>
         <VerifyForm action={verifyMfaAction} next={next} />

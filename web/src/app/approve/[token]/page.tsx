@@ -92,12 +92,12 @@ export default async function ApprovePage({ params }: { params: Promise<{ token:
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-10">
       <div className="w-full max-w-md">
-        <Link href="/app" aria-label="Flow-E" className="rounded-md">
+        <Link href="/app" aria-label="Mandate" className="rounded-md">
           <Logo />
         </Link>
         {body}
         <p className="mt-6 text-xs text-ink-3">
-          Signed in as {user.email}. Flow-E never moves money.
+          Signed in as {user.email}. Mandate never moves money.
         </p>
       </div>
     </main>

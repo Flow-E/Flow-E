@@ -30,7 +30,7 @@ function Step({ done, children }: { done: boolean; children: React.ReactNode }) 
 
 /**
  * What happens after approval: the purchase order, the order with the supplier and the matched
- * invoice. Flow-E never pays; the company pays the invoice as usual, with the payment id as the
+ * invoice. Mandate never pays; the company pays the invoice as usual, with the payment id as the
  * reference.
  */
 export function Fulfilment({
@@ -70,7 +70,7 @@ export function Fulfilment({
   return (
     <Panel
       title="Order and invoice"
-      description="Flow-E never pays. Order through your usual channel with the payment id as the reference; your accounts team pays the invoice as usual."
+      description="Mandate never pays. Order through your usual channel with the payment id as the reference; your accounts team pays the invoice as usual."
       action={
         <Link href={poHref} className={buttonClass('secondary', 'sm')}>
           <FileText size={15} aria-hidden="true" /> Purchase order

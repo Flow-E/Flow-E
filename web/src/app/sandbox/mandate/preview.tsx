@@ -168,9 +168,9 @@ export function MandatePreview({
               {r.inexact > 0 ? (
                 <p className="text-xs text-ink-2">
                   {r.inexact === 1 ? '1 request was' : `${String(r.inexact)} requests were`} decided
-                  before Flow-E recorded the item and project with each request, so usual prices and
-                  project budgets could not be checked for {r.inexact === 1 ? 'it' : 'them'}. Their
-                  result here may differ from a live decision.
+                  before Mandate recorded the item and project with each request, so usual prices
+                  and project budgets could not be checked for {r.inexact === 1 ? 'it' : 'them'}.
+                  Their result here may differ from a live decision.
                 </p>
               ) : null}
             </>

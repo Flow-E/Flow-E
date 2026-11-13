@@ -85,7 +85,7 @@ export function gettingStarted(input: ChecklistInput): Checklist {
     {
       id: 'prices',
       label: 'Upload a price list',
-      hint: 'Usual prices let Flow-E flag offers far above or below them.',
+      hint: 'Usual prices let Mandate flag offers far above or below them.',
       doneWhen: 'Done when the mandate has at least one usual price.',
       done: prices,
       href: link('mandate.update', `${base}/mandate`),
@@ -93,7 +93,7 @@ export function gettingStarted(input: ChecklistInput): Checklist {
     {
       id: 'connect',
       label: 'Connect the agent',
-      hint: 'Create an API key and add it with the Flow-E endpoint to Claude or another MCP client.',
+      hint: 'Create an API key and add it with the Mandate endpoint to Claude or another MCP client.',
       doneWhen: 'Done when a key has been used or a request has arrived.',
       done: connected,
       href: hasAgent ? link('agent.keys', `${agentPage(keyed)}#connect`) : null,

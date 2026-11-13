@@ -7,9 +7,9 @@ import { DEMO_MARKER, DemoError } from '../demo/setup.js';
 import type { CommandResult } from './ledger-commands.js';
 
 /**
- * `flow-e simulate`: a stand-in agent for the demo, so the dashboard fills up without Claude.
- * It talks to Flow-E over MCP stdio exactly as Claude does, and only ever in a folder made by
- * `flow-e demo`, so fake requests can never land in a real ledger.
+ * `mandate simulate`: a stand-in agent for the demo, so the dashboard fills up without Claude.
+ * It talks to Mandate over MCP stdio exactly as Claude does, and only ever in a folder made by
+ * `mandate demo`, so fake requests can never land in a real ledger.
  */
 
 export const SIMULATE_ACTIONS = ['story', 'buy', 'list', 'status', 'mandate'] as const;
@@ -34,7 +34,7 @@ export function catalogList(): string {
 function demoFolder(dir: string): string {
   const abs = resolve(dir);
   if (!existsSync(join(abs, DEMO_MARKER))) {
-    throw new DemoError(`${abs} is not a demo folder made by "flow-e demo".`);
+    throw new DemoError(`${abs} is not a demo folder made by "mandate demo".`);
   }
   return abs;
 }
@@ -64,14 +64,14 @@ export async function runSimulate(o: SimulateOptions): Promise<CommandResult> {
     throw new DemoError('Say which payment: "simulate status <payment-id>".');
   }
 
-  const client = new Client({ name: 'flow-e-simulate', version: '1' });
+  const client = new Client({ name: 'mandate-simulate', version: '1' });
   await client.connect(
     new StdioClientTransport({
       command: o.nodePath,
       args: [o.cliPath, 'serve', '--agent', DEMO_AGENT],
       env: {
-        FLOWE_HOME: join(dir, '.flow-e'),
-        FLOWE_CONFIG: join(dir, 'mandate.yaml'),
+        MANDATE_HOME: join(dir, '.mandate'),
+        MANDATE_CONFIG: join(dir, 'mandate.yaml'),
       },
       stderr: 'ignore',
     }),

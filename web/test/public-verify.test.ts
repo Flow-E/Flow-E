@@ -57,7 +57,7 @@ describe('public receipt check', () => {
     expect(r.outcome).toBe('valid');
     expect(r.issuerKind).toBe('organisation');
     expect(r.issuerName).toBe('Example Labs AG (fictional)');
-    expect(r.issuer).toMatch(/^flow-e-issuer:/);
+    expect(r.issuer).toMatch(/^mandate-issuer:/);
     expect(r.payment).toMatchObject({
       agentId: 'buyer',
       merchant: 'Fictional Pipettes GmbH',
@@ -121,12 +121,12 @@ describe('public receipt check', () => {
   it('says when the issuer is not known here, without checking anything', async () => {
     const r = await check(
       edit(receiptText, (x) => {
-        x.issuer = 'flow-e-issuer:0000000000000000';
+        x.issuer = 'mandate-issuer:0000000000000000';
       }),
     );
     expect(r).toEqual({
       outcome: 'unknown-issuer',
-      issuer: 'flow-e-issuer:0000000000000000',
+      issuer: 'mandate-issuer:0000000000000000',
       entryType: 'payment.decision',
       createdAt: expect.any(String) as string,
     });
@@ -139,7 +139,7 @@ describe('public receipt check', () => {
       'not json',
       '{}',
       '[]',
-      '{"format":"flow-e-receipt/v1"}',
+      '{"format":"mandate-receipt/v2"}',
       edit(receiptText, (x) => {
         x.extra = '<script>alert(1)</script>';
       }),
@@ -349,7 +349,7 @@ describe('published keys', () => {
       public_key_pem: pem,
     });
     for (const file of [
-      'flow-e-issuer:0000000000000000.pub',
+      'mandate-issuer:0000000000000000.pub',
       `${issuer}.txt`,
       issuer,
       "x' or 1=1 --.pub",
@@ -360,8 +360,8 @@ describe('published keys', () => {
   });
 
   it('needs no site password, for reading only and one level deep', () => {
-    expect(gateExempt('/keys/flow-e-issuer:0123456789abcdef.pub', 'GET', false)).toBe(true);
-    expect(gateExempt('/keys/flow-e-issuer:0123456789abcdef.pub', 'POST', false)).toBe(false);
+    expect(gateExempt('/keys/mandate-issuer:0123456789abcdef.pub', 'GET', false)).toBe(true);
+    expect(gateExempt('/keys/mandate-issuer:0123456789abcdef.pub', 'POST', false)).toBe(false);
     expect(gateExempt('/keys/a.pub', 'GET', true)).toBe(false);
     expect(gateExempt('/keys/a/b.pub', 'GET', false)).toBe(false);
     expect(gateExempt('/keysx', 'GET', false)).toBe(false);

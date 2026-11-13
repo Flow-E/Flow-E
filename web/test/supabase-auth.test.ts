@@ -61,11 +61,11 @@ describe('PKCE', () => {
 describe('sendSignInLink', () => {
   it('posts the email and challenge to /otp with the redirect URL and the publishable key', async () => {
     const f = fakeFetch(200);
-    await sendSignInLink('a@b.ch', 'https://flow-e.example/auth/callback', 'CHAL', config, f.impl);
+    await sendSignInLink('a@b.ch', 'https://mandate.example/auth/callback', 'CHAL', config, f.impl);
     expect(f.calls).toHaveLength(1);
     const call = f.calls[0];
     expect(call?.url).toBe(
-      'https://proj.supabase.co/auth/v1/otp?redirect_to=https%3A%2F%2Fflow-e.example%2Fauth%2Fcallback',
+      'https://proj.supabase.co/auth/v1/otp?redirect_to=https%3A%2F%2Fmandate.example%2Fauth%2Fcallback',
     );
     expect(call?.init.method).toBe('POST');
     expect(call?.init.headers).toMatchObject({ apikey: 'sb_publishable_test' });
@@ -143,7 +143,7 @@ describe('configuration', () => {
   it('uses Supabase sign-in in production even if the dev flag is set', () => {
     const env = {
       NODE_ENV: 'production',
-      FLOWE_DEV_LOGIN: '1',
+      MANDATE_DEV_LOGIN: '1',
       NEXT_PUBLIC_SUPABASE_URL: 'https://p.supabase.co',
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'k',
     } as unknown as NodeJS.ProcessEnv;

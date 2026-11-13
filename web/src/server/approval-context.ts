@@ -160,7 +160,7 @@ function reasonTitle(step: TraceStep): string {
 
 export function reviewReasons(trace: readonly TraceStep[], fallback: string): ApprovalReason[] {
   const steps = trace.filter((t) => t.outcome === 'review');
-  if (steps.length === 0) return [{ rule: '', title: 'Flow-E asked a person', detail: fallback }];
+  if (steps.length === 0) return [{ rule: '', title: 'Mandate asked a person', detail: fallback }];
   return steps.map((t) => ({ rule: t.rule, title: reasonTitle(t), detail: sentence(t.detail) }));
 }
 

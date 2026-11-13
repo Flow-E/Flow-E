@@ -82,7 +82,7 @@ describe('TOTP (RFC 6238)', () => {
   it('builds the otpauth address authenticator apps read', () => {
     const uri = otpauthUri('JBSWY3DPEHPK3PXP', 'alice@example.com');
     expect(uri).toBe(
-      'otpauth://totp/Flow-E%3Aalice%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=Flow-E&algorithm=SHA1&digits=6&period=30',
+      'otpauth://totp/Mandate%3Aalice%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=Mandate&algorithm=SHA1&digits=6&period=30',
     );
   });
 

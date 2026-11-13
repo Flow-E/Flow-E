@@ -7,6 +7,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ org
   return orgDownload(async (store, user) => ({
     body: await store.invoiceCsv(org, user),
     type: 'text/csv; charset=utf-8',
-    filename: `flow-e-invoices-${date}.csv`,
+    filename: `mandate-invoices-${date}.csv`,
   }));
 }

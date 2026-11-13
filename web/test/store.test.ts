@@ -45,7 +45,7 @@ describe('sandbox creation', () => {
     const v = await store.view(ALICE);
     expect(v.agents.map((a) => a.id)).toEqual(['lab-procurement', 'office-supplies']);
     expect(v.organisation).toBe('Example Labs AG (fictional)');
-    expect(v.issuer).toMatch(/^flow-e-issuer:[0-9a-f]{16}$/);
+    expect(v.issuer).toMatch(/^mandate-issuer:[0-9a-f]{16}$/);
     expect(v.entries).toHaveLength(0);
     expect(v.audit).toEqual({ ok: true, entries: 0, head: null });
   });
@@ -62,7 +62,7 @@ describe('sandbox creation', () => {
 });
 
 describe('the demo story', () => {
-  it('gives the same decisions as the core CLI `flow-e simulate`', async () => {
+  it('gives the same decisions as the core CLI `mandate simulate`', async () => {
     const web = decisions(await store.playStory(ALICE));
     expect(web).toEqual([
       'declined SUPPLIER',
@@ -75,7 +75,7 @@ describe('the demo story', () => {
       'review FAIR_PRICE',
     ]);
 
-    const dir = path.join(mkdtempSync(path.join(tmpdir(), 'flow-e-web-')), 'demo');
+    const dir = path.join(mkdtempSync(path.join(tmpdir(), 'mandate-web-')), 'demo');
     execFileSync(process.execPath, [CLI, 'demo', '--dir', dir, '--no-panel']);
     const out = execFileSync(process.execPath, [CLI, 'simulate', '--dir', dir], {
       encoding: 'utf8',
@@ -210,7 +210,7 @@ describe('receipts', () => {
     const [first] = await store.playStory(ALICE);
     const detail = await store.payment(ALICE, first?.paymentId ?? '');
     const v = await store.view(ALICE);
-    const dir = mkdtempSync(path.join(tmpdir(), 'flow-e-receipt-'));
+    const dir = mkdtempSync(path.join(tmpdir(), 'mandate-receipt-'));
     writeFileSync(path.join(dir, 'receipt.json'), JSON.stringify(detail?.receipt));
     writeFileSync(path.join(dir, 'issuer.pub'), v.publicKeyPem);
     const out = execFileSync(

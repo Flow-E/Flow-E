@@ -374,7 +374,7 @@ export function CustomRequestForm({ action, agents }: { action: Req; agents: str
         </label>
         <div className="sm:col-span-2">
           <button type="submit" disabled={pending} className={buttonClass('primary')}>
-            {pending ? 'Asking Flow-E…' : 'Request payment'}
+            {pending ? 'Asking Mandate…' : 'Request payment'}
           </button>
         </div>
       </form>

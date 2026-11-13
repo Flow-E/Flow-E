@@ -7,6 +7,22 @@ changes.
 
 ## [Unreleased]
 
+### Changed
+
+- **One name: Mandate.** Flow-E (this code) and Warrandi (the blueprint) are now both Mandate.
+  CLI `mandate`, MCP server name `mandate`, state folder `.mandate/`, env `MANDATE_*`, agent keys
+  `mandate_ak_…`, organisation API keys `mandate_ok_…`, webhook headers `Mandate-Signature`,
+  `Mandate-Event`, `Mandate-Delivery` (user agent `Mandate-Webhooks/1`), cookies `mandate_*`.
+  The npm package stays `@flow-e/mcp`.
+- **Signed data version 2**: new ledger entries, receipts and credentials use
+  `mandate-ledger-v2`, `mandate-receipt-v2`, `mandate-receipt/v2`, `mandate-credential/v2`
+  and issuer ids `mandate-issuer:…`. Version 1 (`flow-e-*`) receipts, credentials and chains
+  still verify; a chain may continue from v1 into v2, never back.
+- Still accepted for existing installs and deployments: `FLOWE_*` env vars, a `.flow-e/`
+  state folder when no `.mandate/` exists, and `flowe_ak_`/`flowe_ok_` keys. Webhook receivers
+  must read `Mandate-Signature` instead of `Flow-E-Signature`.
+- Migration `010_rename_append_only.sql` renames the ledger's append-only guard.
+
 ### Added
 
 - Website, **connections in and out** (Part D): organisation API keys with scopes

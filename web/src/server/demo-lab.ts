@@ -58,5 +58,5 @@ export async function createDemoLab(store: OrgStore, user: User): Promise<string
 
 /** The prompt to paste into Claude once it is connected to the demo lab's MCP address. */
 export function demoLabPrompt(): string {
-  return demoPrompt('flow-e');
+  return demoPrompt('mandate');
 }

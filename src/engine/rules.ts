@@ -1,4 +1,5 @@
 import { hasRate, toBaseMinor } from './fx.js';
+import { sameIssuer } from './issuer.js';
 import { formatMoney } from './money.js';
 import { normalizeCode, normalizeName } from './normalize.js';
 import { formatClock, localTime } from './time.js';
@@ -124,7 +125,8 @@ function checkCredential({ agent, ctx }: RuleInput): RuleResult {
   const credential = agent.credential;
   if (!credential) return decline('No Know Your Agent credential was presented.');
   const { claims } = credential;
-  if (claims.issuer !== ctx.kya.issuer) {
+  // The same issuer may appear in its pre-rename form ("mandate-issuer:…") in older credentials.
+  if (!sameIssuer(claims.issuer, ctx.kya.issuer)) {
     return decline(`Credential was issued by "${claims.issuer}", not by "${ctx.kya.issuer}".`);
   }
   const signature = ctx.kya.verifySignature(credential);

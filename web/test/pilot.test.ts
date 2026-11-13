@@ -83,7 +83,7 @@ beforeEach(async () => {
     sql: db,
     limits: newPilotLimits(() => clock.now),
     mailer: () => mailer,
-    env: { NODE_ENV: 'test', FLOWE_LEADS_TO: 'founder@flow-e.test' },
+    env: { NODE_ENV: 'test', MANDATE_LEADS_TO: 'founder@mandate.test' },
     origin: 'http://localhost:3150',
   };
 });
@@ -162,21 +162,21 @@ describe('POST /api/pilot', () => {
       message: null,
     });
     expect(sent).toHaveLength(1);
-    expect(sent[0]?.to).toBe('founder@flow-e.test');
+    expect(sent[0]?.to).toBe('founder@mandate.test');
     expect(sent[0]?.subject).toBe('Pilot request: Example Labs AG (fictional)');
     expect(sent[0]?.text).toContain('Reagents and consumables');
     expect(sent[0]?.text).toContain('http://localhost:3150/admin/pilots');
   });
 
-  it('sends no email without FLOWE_LEADS_TO, or with an invalid one', async () => {
+  it('sends no email without MANDATE_LEADS_TO, or with an invalid one', async () => {
     await handlePilot(post(VALID), { ...deps, env: { NODE_ENV: 'test' } });
     await handlePilot(post(VALID), {
       ...deps,
-      env: { NODE_ENV: 'test', FLOWE_LEADS_TO: 'a, b@c.test' },
+      env: { NODE_ENV: 'test', MANDATE_LEADS_TO: 'a, b@c.test' },
     });
     expect(sent).toHaveLength(0);
     expect(await listPilotRequests(db)).toHaveLength(2);
-    expect(leadsRecipient({ NODE_ENV: 'test', FLOWE_LEADS_TO: ' x@y.test ' })).toBe('x@y.test');
+    expect(leadsRecipient({ NODE_ENV: 'test', MANDATE_LEADS_TO: ' x@y.test ' })).toBe('x@y.test');
   });
 
   it('lands in the development outbox with the real mailer', async () => {
@@ -289,9 +289,12 @@ describe('pilot request storage', () => {
     expect(rows.map((r) => r.id)).toEqual([second, first]);
     expect(rows[0]?.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
 
-    expect(await setPilotStatus(db, first, 'contacted', 'founder@flow-e.test')).toBe(true);
+    expect(await setPilotStatus(db, first, 'contacted', 'founder@mandate.test')).toBe(true);
     const marked = (await listPilotRequests(db)).find((r) => r.id === first);
-    expect(marked).toMatchObject({ status: 'contacted', status_changed_by: 'founder@flow-e.test' });
+    expect(marked).toMatchObject({
+      status: 'contacted',
+      status_changed_by: 'founder@mandate.test',
+    });
     expect(marked?.status_changed_at).toMatch(/Z$/);
   });
 
@@ -335,13 +338,13 @@ describe('pilot request storage', () => {
 describe('who may see pilot requests', () => {
   const env: NodeJS.ProcessEnv = {
     NODE_ENV: 'test',
-    FLOWE_ADMIN_EMAILS: ' Founder@Flow-E.test, second@flow-e.test ,,nonsense',
+    MANDATE_ADMIN_EMAILS: ' Founder@Mandate.test, second@mandate.test ,,nonsense',
   };
 
-  it('only signed-in people whose email is in FLOWE_ADMIN_EMAILS, case-insensitively', () => {
-    expect(isPilotAdmin({ email: 'founder@flow-e.test' }, env)).toBe(true);
-    expect(isPilotAdmin({ email: 'SECOND@flow-e.test' }, env)).toBe(true);
-    expect(isPilotAdmin({ email: 'someone@flow-e.test' }, env)).toBe(false);
+  it('only signed-in people whose email is in MANDATE_ADMIN_EMAILS, case-insensitively', () => {
+    expect(isPilotAdmin({ email: 'founder@mandate.test' }, env)).toBe(true);
+    expect(isPilotAdmin({ email: 'SECOND@mandate.test' }, env)).toBe(true);
+    expect(isPilotAdmin({ email: 'someone@mandate.test' }, env)).toBe(false);
     expect(isPilotAdmin({ email: 'nonsense' }, env)).toBe(false);
     expect(isPilotAdmin(null, env)).toBe(false);
     expect(isPilotAdmin(undefined, env)).toBe(false);
@@ -350,9 +353,12 @@ describe('who may see pilot requests', () => {
 
   it('lets nobody in when the variable is unset or empty', () => {
     expect(adminEmails({ NODE_ENV: 'test' }).size).toBe(0);
-    expect(isPilotAdmin({ email: 'founder@flow-e.test' }, { NODE_ENV: 'test' })).toBe(false);
+    expect(isPilotAdmin({ email: 'founder@mandate.test' }, { NODE_ENV: 'test' })).toBe(false);
     expect(
-      isPilotAdmin({ email: 'founder@flow-e.test' }, { NODE_ENV: 'test', FLOWE_ADMIN_EMAILS: '' }),
+      isPilotAdmin(
+        { email: 'founder@mandate.test' },
+        { NODE_ENV: 'test', MANDATE_ADMIN_EMAILS: '' },
+      ),
     ).toBe(false);
   });
 });

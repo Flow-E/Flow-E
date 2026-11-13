@@ -11,7 +11,7 @@ export async function GET() {
   return new Response(await store.invoiceCsv(session.userId), {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="flow-e-sandbox-invoices-${date}.csv"`,
+      'Content-Disposition': `attachment; filename="mandate-sandbox-invoices-${date}.csv"`,
       'Cache-Control': 'no-store',
     },
   });

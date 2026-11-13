@@ -52,7 +52,7 @@ export default async function SecurityPage({
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-10">
       <div className="w-full max-w-lg">
-        <Link href="/app" aria-label="Flow-E" className="rounded-md">
+        <Link href="/app" aria-label="Mandate" className="rounded-md">
           <Logo />
         </Link>
         <h1 className="mt-8 font-serif text-3xl tracking-[-0.015em]">Authenticator app</h1>

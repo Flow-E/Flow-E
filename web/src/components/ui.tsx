@@ -101,12 +101,12 @@ export function Panel({
 export function FictionalNote({ className = '' }: { className?: string }) {
   return (
     <p className={`text-xs text-ink-3 ${className}`}>
-      Sandbox: the company, people, suppliers and money are fictional. Flow-E never moves money.
+      Sandbox: the company, people, suppliers and money are fictional. Mandate never moves money.
     </p>
   );
 }
 
-/** The Flow-E mark: two linked ledger entries, drawn as geometry. */
+/** The Mandate mark: two linked ledger entries, drawn as geometry. */
 export function Logo({ className = '' }: { className?: string }) {
   return (
     <span
@@ -125,7 +125,7 @@ export function Logo({ className = '' }: { className?: string }) {
         />
         <rect x="9.5" y="9.5" width="11" height="11" rx="3" fill="var(--accent)" />
       </svg>
-      <span>Flow-E</span>
+      <span>Mandate</span>
     </span>
   );
 }

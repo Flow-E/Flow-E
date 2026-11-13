@@ -1,7 +1,7 @@
-# Flow-E live demo (10 minutes)
+# Mandate live demo (10 minutes)
 
 For a pilot customer: a lab manager, a head of operations or someone from finance. Everything
-shown is fictional: the company, the people, the suppliers and the amounts. Flow-E authorizes,
+shown is fictional: the company, the people, the suppliers and the amounts. Mandate authorizes,
 matches and records purchases; it does not move money. The company pays through its normal
 process.
 
@@ -9,7 +9,7 @@ The story has eight steps. Each one is a screen you click through, with what to 
 
 ## Before the call (15 minutes, once)
 
-1. Sign in on the website with an admin address (one listed in `FLOWE_ADMIN_EMAILS`) and set up
+1. Sign in on the website with an admin address (one listed in `MANDATE_ADMIN_EMAILS`) and set up
    your authenticator app at **Account → Security** if you haven't.
 2. Open **`/admin/demo`** and click **Build the demo organisation** (or **Reset: build a fresh
    one**). It takes up to a minute and opens **Lab Alpha (fictional)**: two agents, a price list
@@ -45,7 +45,7 @@ recorded with the old and the new value."
 Show the reorder list: pipette tips, gloves, PCR master mix, agarose, with stock and minimum.
 Choose the **Lab consumables agent** and click **Run reorder**.
 
-> "This is Flow-E's own purchasing agent, so you can start without building one. It has no
+> "This is Mandate's own purchasing agent, so you can start without building one. It has no
 > special rights: it asks for each purchase exactly like any AI agent would, through the same
 > five tools. It can't approve anything, change your rules or unfreeze itself."
 
@@ -53,12 +53,12 @@ Read the log under **Recent runs**: what it asked for, which supplier, the amoun
 sent to a person, and items skipped (stock is fine). Without an AI key the run is labelled
 "simulated"; with one, Claude decides, capped per run.
 
-### 3. Flow-E steers it (1 min, same log, then Dashboard)
+### 3. Mandate steers it (1 min, same log, then Dashboard)
 
-Point to the petri dishes: the list asked a cheaper supplier outside the approved list. Flow-E
+Point to the petri dishes: the list asked a cheaper supplier outside the approved list. Mandate
 declined, named the approved suppliers, and the agent asked again from Example Labware AG.
 
-> "When Flow-E says no, it also tells the agent how to get a yes: which suppliers are approved,
+> "When Mandate says no, it also tells the agent how to get a yes: which suppliers are approved,
 > how much budget is left and when it resets, or what the usual price is. The agent follows
 > that once. It never splits a purchase to get under a limit; splitting is caught and goes to a
 > person."
@@ -82,7 +82,7 @@ Open **Invoices**. Filter **Needs review**: an invoice 8% above what was authori
 authorization at all, and the same invoice sent twice. Open the mismatch: request →
 authorization → order → invoice, with the difference.
 
-> "Flow-E matches each supplier invoice against what it authorized: by reference first, then
+> "Mandate matches each supplier invoice against what it authorized: by reference first, then
 > by supplier and amount. Within 2% (at least CHF 5) it passes; anything else waits for a
 > person. Matched invoices export as a CSV for accounting."
 
@@ -91,7 +91,7 @@ authorization → order → invoice, with the difference.
 Lower the **Lab consumables agent**'s approval threshold from CHF 1,200 to CHF 600. Before
 saving, click **Test against the last 30 days**.
 
-> "Before you change a rule, Flow-E replays the last 30 days of real requests through the new
+> "Before you change a rule, Mandate replays the last 30 days of real requests through the new
 > rules: how many would have gone to a person instead, how spend changes, and which requests
 > exactly. It writes nothing."
 
@@ -114,12 +114,12 @@ signed it, agent, amount, supplier and date, and that its ledger position is con
 Change one digit of the amount in the text box and check again: **Not valid**.
 
 > "A supplier or an auditor can check that a purchase was really authorized, without access to
-> your account. It uses only the receipt and your published public key. A receipt proves Flow-E
+> your account. It uses only the receipt and your published public key. A receipt proves Mandate
 > authorized it; it is not a payment and not a guarantee."
 
 ### Close (30 s)
 
-> "Flow-E sits between your agents and your money: a mandate they can't exceed, a person for
+> "Mandate sits between your agents and your money: a mandate they can't exceed, a person for
 > the big decisions, invoices checked against what was authorized, and a record anyone can
 > verify. A pilot takes two to three weeks with your own suppliers and rules."
 

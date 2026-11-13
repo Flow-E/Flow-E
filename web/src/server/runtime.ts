@@ -8,11 +8,12 @@ import { ApiKeyStore } from './api-keys';
 import { ReorderStore } from './reorder';
 import { WebhookStore } from './webhooks';
 import { SandboxStore } from './store';
+import { mandateEnv } from './env';
 
 /**
  * One database and one set of stores per server process. Storage is chosen by environment:
  * - DATABASE_URL set: Postgres (Supabase). Apply db/migrations/*.sql there yourself.
- * - otherwise: PGlite in FLOWE_PGLITE_DIR (default web/.data/pglite), migrated on start.
+ * - otherwise: PGlite in MANDATE_PGLITE_DIR (default web/.data/pglite), migrated on start.
  */
 
 interface Stores {
@@ -21,7 +22,7 @@ interface Stores {
   orgs: OrgStore;
 }
 
-const globalForStore = globalThis as unknown as { floweStores?: Promise<Stores> };
+const globalForStore = globalThis as unknown as { mandateStores?: Promise<Stores> };
 
 async function open(): Promise<Stores> {
   const key = encryptionKeyFromEnv();
@@ -29,12 +30,10 @@ async function open(): Promise<Stores> {
   if (process.env.DATABASE_URL) {
     db = await openPostgres(process.env.DATABASE_URL);
   } else {
-    if (process.env.NODE_ENV === 'production' && !process.env.FLOWE_ALLOW_PGLITE) {
+    if (process.env.NODE_ENV === 'production' && !mandateEnv('ALLOW_PGLITE')) {
       throw new Error('DATABASE_URL is not set. Production needs Postgres (see web/README.md).');
     }
-    db = await openPglite(
-      process.env.FLOWE_PGLITE_DIR ?? path.join(process.cwd(), '.data', 'pglite'),
-    );
+    db = await openPglite(mandateEnv('PGLITE_DIR') ?? path.join(process.cwd(), '.data', 'pglite'));
     await migrate(db);
   }
   return {
@@ -46,11 +45,11 @@ async function open(): Promise<Stores> {
 
 /** Survives hot reloads in development, so PGlite opens its data directory once. */
 function stores(): Promise<Stores> {
-  globalForStore.floweStores ??= open().catch((err: unknown) => {
-    globalForStore.floweStores = undefined;
+  globalForStore.mandateStores ??= open().catch((err: unknown) => {
+    globalForStore.mandateStores = undefined;
     throw err;
   });
-  return globalForStore.floweStores;
+  return globalForStore.mandateStores;
 }
 
 export async function getStore(): Promise<SandboxStore> {

@@ -24,7 +24,7 @@ const serif = Newsreader({
 });
 
 export const metadata: Metadata = {
-  title: { default: 'Flow-E: spending mandates for AI agents', template: '%s · Flow-E' },
+  title: { default: 'Mandate: spending mandates for AI agents', template: '%s · Mandate' },
   description:
     'Give an AI agent a mandate: a verified identity, a budget and rules, human approval, a kill switch and a signed receipt for every decision. Authorizes payments; never moves money.',
   robots: { index: false, follow: false },

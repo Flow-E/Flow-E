@@ -24,15 +24,15 @@ export default async function LoginPage({
   return (
     <main className="grid min-h-dvh place-items-center px-4">
       <div className="w-full max-w-sm">
-        <Link href="/" aria-label="Flow-E home" className="rounded-md">
+        <Link href="/" aria-label="Mandate home" className="rounded-md">
           <Logo />
         </Link>
         <h1 className="mt-8 font-serif text-3xl tracking-[-0.015em]">
-          {sandbox ? 'Open the sandbox' : 'Sign in to Flow-E'}
+          {sandbox ? 'Open the sandbox' : 'Sign in to Mandate'}
         </h1>
         <p className="mt-2 text-ink-2">
           {sandbox
-            ? 'Your own fictional company with two AI agents, a mandate, and a signed ledger to try everything Flow-E does.'
+            ? 'Your own fictional company with two AI agents, a mandate, and a signed ledger to try everything Mandate does.'
             : 'Sign in to continue to your organisation, invitation or approval.'}
         </p>
         {mode === 'dev' ? (

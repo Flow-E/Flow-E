@@ -9,13 +9,13 @@ export default function PrivacyPage() {
     <TextPage
       title="Privacy notice"
       draft
-      intro="What personal data Flow-E processes, why, where, and your rights. Swiss Data Protection Act (FADP) and, where it applies, the EU GDPR. [TO CONFIRM: legal review]"
+      intro="What personal data Mandate processes, why, where, and your rights. Swiss Data Protection Act (FADP) and, where it applies, the EU GDPR. [TO CONFIRM: legal review]"
     >
       <h2>Who is responsible</h2>
       <p>
         Lorenzo Sivillica, [TO CONFIRM: postal address], [TO CONFIRM: contact email]. For data an
-        organisation puts into Flow-E (its members, suppliers, invoices), the organisation is
-        responsible and Flow-E processes it on its behalf (see the{' '}
+        organisation puts into Mandate (its members, suppliers, invoices), the organisation is
+        responsible and Mandate processes it on its behalf (see the{' '}
         <Link href="/legal/dpa" className="text-accent underline">
           data processing agreement
         </Link>

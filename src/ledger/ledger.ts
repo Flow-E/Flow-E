@@ -1,6 +1,7 @@
 import type { KeyObject } from 'node:crypto';
 import Database from 'better-sqlite3';
 import type { EvaluationResult, LedgerEntryView, PaymentRequest } from '../engine/types.js';
+import { sameIssuer } from '../engine/issuer.js';
 import {
   KILL_SWITCH,
   AGENT_FREEZE,
@@ -96,7 +97,7 @@ export class Ledger {
         if (issuer === undefined) {
           insert.run('issuer', signer.issuer);
           insert.run('schema_version', SCHEMA_VERSION);
-        } else if (issuer !== signer.issuer) {
+        } else if (!sameIssuer(issuer, signer.issuer)) {
           throw new LedgerError(
             `This ledger belongs to issuer ${issuer}, not ${signer.issuer}. Refusing to mix keys.`,
           );

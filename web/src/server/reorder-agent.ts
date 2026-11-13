@@ -7,7 +7,7 @@ import { agentServer } from './mcp-endpoint';
 import type { AgentAuth, OrgStore } from './org-store';
 
 /**
- * "Run reorder": Flow-E's own purchasing agent, so a pilot company does not need one. It has no
+ * "Run reorder": Mandate's own purchasing agent, so a pilot company does not need one. It has no
  * special access. It talks to the very same MCP server as an external agent (connected in
  * memory instead of over HTTP), so it can only check its mandate, ask for payments, look at its
  * own payments and record orders: never approve, change a mandate or unfreeze.
@@ -75,7 +75,7 @@ export async function mcpTools(
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const server = agentServer(store, auth, origin);
   await server.connect(serverSide);
-  const client = new Client({ name: 'flow-e-reorder', version: '1' });
+  const client = new Client({ name: 'mandate-reorder', version: '1' });
   await client.connect(clientSide);
   return {
     async list() {
@@ -216,7 +216,7 @@ export async function simulatedRun(input: {
     if (steps >= MAX_STEPS)
       return stop(`Stopped after ${String(MAX_STEPS)} tool calls, the cap per run.`);
     // The preferred supplier's own price first; otherwise the list price of that item from any
-    // supplier, asked from the preferred one (Flow-E then judges supplier and price).
+    // supplier, asked from the preferred one (Mandate then judges supplier and price).
     const ref =
       findReference(input.prices, it.item, it.supplier ?? undefined) ??
       (it.supplier
@@ -249,7 +249,7 @@ export async function simulatedRun(input: {
     const retry =
       a?.decision === 'declined' ? hintedRetry(args, a.how_to_comply as Comply[]) : null;
     if (retry && steps < MAX_STEPS) {
-      log.push({ text: `Followed Flow-E's hint: ${retry.why}.`, tone: 'neutral' });
+      log.push({ text: `Followed Mandate's hint: ${retry.why}.`, tone: 'neutral' });
       args = retry.args;
       r = await call('request_payment', args);
       a = r.ok ? parseAnswer(r.text) : null;
@@ -320,9 +320,9 @@ const messageSchema = z.object({
   usage: z.object({ input_tokens: z.number(), output_tokens: z.number() }),
 });
 
-const SYSTEM = `You are the reorder agent of a company that uses Flow-E. Flow-E decides whether each purchase is authorized under the company's mandate.
+const SYSTEM = `You are the reorder agent of a company that uses Mandate. Mandate decides whether each purchase is authorized under the company's mandate.
 
-Your job: for each item due on the reorder list, ask Flow-E for one payment with request_payment, using the usual price from the price list times the quantity, the preferred supplier, the item and the quantity. When a payment is approved, call record_order with its payment id.
+Your job: for each item due on the reorder list, ask Mandate for one payment with request_payment, using the usual price from the price list times the quantity, the preferred supplier, the item and the quantity. When a payment is approved, call record_order with its payment id.
 
 Rules:
 - Start with check_mandate once.

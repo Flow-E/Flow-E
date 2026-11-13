@@ -33,7 +33,7 @@ export default async function InvoicesPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Invoices</h1>
           <p className="mt-1 max-w-2xl text-ink-2">
-            Supplier invoices, matched against what Flow-E authorized. Anything that does not match
+            Supplier invoices, matched against what Mandate authorized. Anything that does not match
             waits here for a person.
           </p>
         </div>

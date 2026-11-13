@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { NextConfig } from 'next';
 
-// The Flow-E core lives one level up (the published package's pure `@flow-e/mcp/core` entry,
+// The Mandate core lives one level up (the published package's pure `@flow-e/mcp/core` entry,
 // built to ../dist). The app imports it through this alias instead of a `file:..` link, which
 // would make the package contain itself through web/.
 const repoRoot = path.join(__dirname, '..');

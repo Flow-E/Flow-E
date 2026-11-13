@@ -108,7 +108,7 @@ describe('Lab Alpha (fictional), the demo organisation', () => {
     });
     const text = run.log.map((l) => l.text).join('\n');
     expect(text).toMatch(/Petri dishes, 500 from Example Discount Supplies GmbH .*: declined/);
-    expect(text).toMatch(/Followed Flow-E's hint: ask Example Labware AG/);
+    expect(text).toMatch(/Followed Mandate's hint: ask Example Labware AG/);
     expect(text).toMatch(/Petri dishes, 500 from Example Labware AG .*: approved/);
   });
 
