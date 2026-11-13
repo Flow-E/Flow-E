@@ -6,9 +6,9 @@ export const metadata: Metadata = { title: 'Terms (draft)', robots: { index: fal
 export default function TermsPage() {
   return (
     <TextPage title="Terms of use" draft>
-      <h2>What Flow-E is</h2>
+      <h2>What Mandate is</h2>
       <p>
-        Flow-E lets an organisation give AI agents a mandate: rules for what they may buy, a person
+        Mandate lets an organisation give AI agents a mandate: rules for what they may buy, a person
         for larger decisions, and a signed record of every decision. It authorizes, matches and
         records purchases. It does not move money, pay suppliers or hold funds; the organisation
         pays through its own process.
@@ -16,7 +16,7 @@ export default function TermsPage() {
 
       <h2>Pilot status</h2>
       <p>
-        Flow-E is early software (version 0.1), offered for pilots without charge [TO CONFIRM]. It
+        Mandate is early software (version 0.1), offered for pilots without charge [TO CONFIRM]. It
         has not had an external security review. Use it with limits you are comfortable with, and
         keep your own approval process for anything critical.
       </p>

@@ -20,7 +20,7 @@ import {
   dailySpend,
   decisionData,
   effectiveStatus,
-  entryHash,
+  entryVersion,
   evaluate,
   foldControls,
   foldInvoices,
@@ -741,7 +741,7 @@ export class OrgStore {
     if (!stored) {
       ok = false;
       checks.push(`✖ this organisation's ledger has no entry #${seq}`);
-    } else if (stored.hash !== hash || entryHash(fromStored(stored)) !== hash) {
+    } else if (stored.hash !== hash || entryVersion(fromStored(stored)) === null) {
       ok = false;
       checks.push(`✖ ledger entry #${seq} differs from this receipt`);
     } else if (seq > 1 && prev?.hash !== prevHash) {
@@ -796,7 +796,7 @@ export class OrgStore {
 
   /**
    * Add an agent with a starting mandate and a Know Your Agent credential signed by the
-   * organisation's issuer, in the same format as `flow-e credential issue`.
+   * organisation's issuer, in the same format as `mandate credential issue`.
    */
   async createAgent(orgId: string, user: User, input: CreateAgentInput): Promise<string> {
     const a = createAgentSchema.parse(input);

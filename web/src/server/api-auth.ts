@@ -78,7 +78,7 @@ export async function withApiKey(
   if (!caller) {
     return json(
       401,
-      { error: 'Send a valid organisation API key as "Authorization: Bearer flowe_ok_…".' },
+      { error: 'Send a valid organisation API key as "Authorization: Bearer mandate_ok_…".' },
       { 'www-authenticate': 'Bearer' },
     );
   }

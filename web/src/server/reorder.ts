@@ -501,7 +501,7 @@ export class ReorderStore {
         supplier,
         quantity: signal.quantity,
         message: ref
-          ? 'Added to the reorder list as a suggestion. Nothing is bought until a run asks Flow-E for it.'
+          ? 'Added to the reorder list as a suggestion. Nothing is bought until a run asks Mandate for it.'
           : 'Kept as "needs matching": no price-list item has this id or name. A person will link it.',
       };
       await tx.query(

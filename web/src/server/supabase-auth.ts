@@ -10,11 +10,11 @@ import { createHash, randomBytes } from 'node:crypto';
  * 3. `exchangeCode` trades the code plus the verifier for the user. Without the verifier (another
  *    browser, an attacker who only has the link) the exchange fails.
  *
- * Only the user's id and email are kept, in Flow-E's own session cookie; Supabase tokens are
+ * Only the user's id and email are kept, in Mandate's own session cookie; Supabase tokens are
  * never stored or sent to the browser. Requests use the public publishable key only.
  */
 
-export const PKCE_COOKIE = 'flowe_pkce';
+export const PKCE_COOKIE = 'mandate_pkce';
 /** How long a sign-in link can be used from this browser. Matches Supabase's default (1 h). */
 export const PKCE_MAX_AGE_S = 60 * 60;
 

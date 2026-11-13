@@ -36,6 +36,11 @@ describe('rule 1: kill switch and agent status', () => {
 });
 
 describe('rule 2: Know Your Agent credential', () => {
+  const contextKya = (issuer: string) => ({
+    issuer,
+    requiredScope: 'payments:request',
+    verifySignature: () => ({ valid: true as const }),
+  });
   it('passes a valid credential and names the owner', () => {
     expect(traceOf(run(), 'KYA_CREDENTIAL').detail).toMatch(/M\. Keller/);
   });
@@ -48,6 +53,22 @@ describe('rule 2: Know Your Agent credential', () => {
     const r = run({ agent: { credential: credential({ issuer: 'someone-else' }) } });
     expect(r.rule).toBe('KYA_CREDENTIAL');
     expect(r.reason).toMatch(/issued by "someone-else"/);
+  });
+  it('accepts a credential naming the trusted issuer in its pre-rename flow-e form', () => {
+    const issuer = 'mandate-issuer:0123456789abcdef';
+    const r = run({
+      agent: { credential: credential({ issuer: 'flow-e-issuer:0123456789abcdef' }) },
+      context: { kya: contextKya(issuer) },
+    });
+    expect(traceOf(r, 'KYA_CREDENTIAL').outcome).toBe('pass');
+  });
+  it('declines a flow-e form id of a different key', () => {
+    const r = run({
+      agent: { credential: credential({ issuer: 'flow-e-issuer:ffffffffffffffff' }) },
+      context: { kya: contextKya('mandate-issuer:0123456789abcdef') },
+    });
+    expect(r.rule).toBe('KYA_CREDENTIAL');
+    expect(r.reason).toMatch(/issued by "flow-e-issuer:ffffffffffffffff"/);
   });
   it('declines a tampered credential (bad signature)', () => {
     const c = { ...credential(), signature: 'tampered' };

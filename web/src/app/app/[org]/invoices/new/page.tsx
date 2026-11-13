@@ -34,7 +34,7 @@ export default async function NewInvoicePage({
       {can(view.role, 'invoice.record') ? (
         <Panel
           title="Supplier invoice"
-          description="Flow-E matches it against the authorizations. It never pays: your accounts team pays matched invoices as usual."
+          description="Mandate matches it against the authorizations. It never pays: your accounts team pays matched invoices as usual."
         >
           <AddInvoice
             action={addInvoiceAction}

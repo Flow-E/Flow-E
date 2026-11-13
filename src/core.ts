@@ -1,5 +1,5 @@
 /**
- * `@flow-e/mcp/core`: the pure half of Flow-E, for other hosts such as the website. Rules,
+ * `@flow-e/mcp/core`: the pure half of Mandate, for other hosts such as the website. Rules,
  * money, crypto, ledger entries and receipts, config validation, owner actions as plans, CSV and
  * the demo content. No file system, no SQLite, no network: test/core.test.ts enforces that.
  */
@@ -7,9 +7,15 @@ export * from './engine/index.js';
 export { formatClock } from './engine/time.js';
 export { canonicalJson } from './crypto/canonical.js';
 export {
+  ISSUER_PREFIX,
+  LEGACY_ISSUER_PREFIX,
   generateKeyPair,
   issuerIdFor,
+  issuerIdForVersion,
+  issuerMatches,
+  keyFingerprint,
   publicKeyOf,
+  sameIssuer,
   signPayload,
   verifyPayload,
   type PemKeyPair,
@@ -30,6 +36,8 @@ export {
   CREDENTIAL_DOMAIN,
   CREDENTIAL_FORMAT,
   CredentialError,
+  LEGACY_CREDENTIAL_DOMAIN,
+  LEGACY_CREDENTIAL_FORMAT,
   MAX_VALID_DAYS,
   PAYMENT_SCOPE,
   issueCredential,

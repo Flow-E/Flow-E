@@ -16,8 +16,8 @@ export async function GET(request: Request) {
   const filtered = view ? dashboardCsv(view, params, Date.now()) : null;
   const csv = filtered?.body ?? (await store.csv(session.userId));
   const name = filtered
-    ? `flow-e-sandbox-${filtered.suffix}-${date}`
-    : `flow-e-sandbox-ledger-${date}`;
+    ? `mandate-sandbox-${filtered.suffix}-${date}`
+    : `mandate-sandbox-ledger-${date}`;
   return new Response(csv, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',

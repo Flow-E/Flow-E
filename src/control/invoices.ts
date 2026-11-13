@@ -13,7 +13,7 @@ import {
 import { ActionError, type Actor } from './plan.js';
 
 /**
- * Supplier invoices, matched against what Flow-E authorized. Pure: the matcher and the plans
+ * Supplier invoices, matched against what Mandate authorized. Pure: the matcher and the plans
  * read payments and earlier invoices and return the ledger entry to append. Every invoice that
  * is recorded, and every decision a person takes on one, is a signed ledger entry.
  */

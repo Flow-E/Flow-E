@@ -108,7 +108,7 @@ export function verifyTotp(
 }
 
 /** The otpauth:// address an authenticator app reads from the QR code. */
-export function otpauthUri(secret: string, account: string, issuer = 'Flow-E'): string {
+export function otpauthUri(secret: string, account: string, issuer = 'Mandate'): string {
   const label = encodeURIComponent(`${issuer}:${account}`);
   const params = new URLSearchParams({
     secret,

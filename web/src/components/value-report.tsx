@@ -51,7 +51,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /**
- * The printable value report: what Flow-E decided, stopped and caught in a period, computed from
+ * The printable value report: what Mandate decided, stopped and caught in a period, computed from
  * the ledger alone, with the method next to every number.
  */
 export function ValueReportPage({
@@ -97,7 +97,7 @@ export function ValueReportPage({
     <article className="mx-auto max-w-4xl space-y-8 text-ink">
       <header className="space-y-2">
         <p className="text-sm text-ink-3">
-          Flow-E value report{fictional ? ' · fictional data' : ''}
+          Mandate value report{fictional ? ' · fictional data' : ''}
         </p>
         <h1 className="font-serif text-3xl tracking-tight sm:text-4xl">{organisation}</h1>
         <p className="text-ink-2">
@@ -143,7 +143,7 @@ export function ValueReportPage({
 
       {report.requests === 0 ? (
         <p className="rounded-xl border border-rule bg-surface px-4 py-6 text-center text-ink-2">
-          No agent asked Flow-E for a payment in this period, so there is nothing to report yet.
+          No agent asked Mandate for a payment in this period, so there is nothing to report yet.
         </p>
       ) : (
         <>
@@ -157,7 +157,7 @@ export function ValueReportPage({
                     <span className="text-base font-normal text-ink-3"> of {report.requests}</span>
                   </>
                 }
-                method="Requests Flow-E approved or declined on its own: every request in the period minus those sent to a person."
+                method="Requests Mandate approved or declined on its own: every request in the period minus those sent to a person."
               />
               <Figure
                 label="Sent to a person"
@@ -176,7 +176,7 @@ export function ValueReportPage({
           <Section title="What was stopped">
             <dl className="grid gap-3 sm:grid-cols-2">
               <Figure
-                label="Declined by Flow-E"
+                label="Declined by Mandate"
                 value={report.stopped.count}
                 detail={report.stopped.count > 0 ? declinedText(report.stopped, fmt) : 'None'}
                 method="Requests the engine declined, by the first rule that said no. Amounts in other currencies are converted at the mandate's rate; ones without a rate are counted but not summed."
@@ -224,7 +224,7 @@ export function ValueReportPage({
                   ? 'No invoices recorded in this period'
                   : `${plural(inv.mismatch, 'amount mismatch', 'amount mismatches')}, ${plural(inv.unmatched, 'without an authorization', 'without an authorization')}, ${plural(inv.duplicate, 'duplicate', 'duplicates')}`
               }
-              method="Invoices recorded in the period that did not match what Flow-E authorized: a different amount beyond the tolerance, no authorization found, or the same supplier and number twice."
+              method="Invoices recorded in the period that did not match what Mandate authorized: a different amount beyond the tolerance, no authorization found, or the same supplier and number twice."
             />
             <Figure
               label="Billed above the authorization"
@@ -327,8 +327,8 @@ export function ValueReportPage({
       </Section>
 
       <p className="border-t border-rule pt-4 text-xs text-ink-3">
-        Flow-E authorizes, matches and records purchases; it does not move money. Every number above
-        is recomputed from the organisation&apos;s hash-chained ledger when the page loads.
+        Mandate authorizes, matches and records purchases; it does not move money. Every number
+        above is recomputed from the organisation&apos;s hash-chained ledger when the page loads.
       </p>
     </article>
   );

@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 function curl(e: ApiExample, origin: string): string {
   const lines = [
     `curl${e.method === 'GET' ? '' : ` -X ${e.method}`} ${origin}${e.path.replace('{payment_id}', 'pay_…')}`,
-    `  -H "Authorization: Bearer $FLOWE_KEY"`,
+    `  -H "Authorization: Bearer $MANDATE_KEY"`,
   ];
   if (e.body) {
     lines.push(`  -H "Content-Type: application/json"`);
@@ -44,14 +44,14 @@ export default async function DevelopersPage() {
   return (
     <TextPage
       title="Connect your systems"
-      intro="An inventory system can tell Flow-E what to reorder. Accounting, a supplier or another system can be told when an order is approved, and can check it. Nothing from outside can approve a purchase."
+      intro="An inventory system can tell Mandate what to reorder. Accounting, a supplier or another system can be told when an order is approved, and can check it. Nothing from outside can approve a purchase."
     >
       <h2>Keys</h2>
       <p>
         An owner creates an organisation API key under <strong>Integrations</strong>. It belongs to
         one organisation, is shown once, and is stored only as a hash. Revoking it takes effect at
         once. It is separate from agent keys: it cannot ask for payments. Send it as{' '}
-        <code className="font-mono text-sm">Authorization: Bearer flowe_ok_…</code>.
+        <code className="font-mono text-sm">Authorization: Bearer mandate_ok_…</code>.
       </p>
       <ul>
         {API_SCOPES.map((s) => (
@@ -72,7 +72,7 @@ export default async function DevelopersPage() {
         A signal only adds a suggestion to the reorder list, &ldquo;suggested by&rdquo; your
         key&apos;s name. A person adds it to the list or dismisses it, or, if the organisation
         turned it on, it joins the next Run reorder once. Every purchase still goes through the
-        agent, Flow-E&apos;s rules and, where required, a person.
+        agent, Mandate&apos;s rules and, where required, a person.
       </p>
       <ul>
         <li>
@@ -116,7 +116,7 @@ export default async function DevelopersPage() {
 
       <h2>Webhooks</h2>
       <p>
-        An owner adds an https address under <strong>Integrations</strong> and picks events. Flow-E
+        An owner adds an https address under <strong>Integrations</strong> and picks events. Mandate
         sends each event as a signed JSON POST, about a minute after it happens. Sending never
         changes or slows a decision. Answer with any 2xx status; anything else is retried after{' '}
         {RETRY_DELAYS_MS.map(minutes).join(', ')}, then marked failed (you can resend it). Only
@@ -138,7 +138,7 @@ export default async function DevelopersPage() {
       <h3 className="font-semibold text-ink">Check the signature</h3>
       <p>
         <code className="font-mono text-sm">
-          Flow-E-Signature: t=&lt;seconds&gt;,v1=&lt;hex&gt;
+          Mandate-Signature: t=&lt;seconds&gt;,v1=&lt;hex&gt;
         </code>{' '}
         is an HMAC-SHA256 of <code className="font-mono text-sm">t + &quot;.&quot; + body</code>{' '}
         with your webhook&apos;s secret. Refuse anything older than 5 minutes, so a recorded message
@@ -158,9 +158,9 @@ export default async function DevelopersPage() {
         receipt as the body), or check it offline with the open-source command line:
       </p>
       <Code>{`curl -o issuer.pub ${origin}/keys/<issuer>.pub
-flow-e verify receipt.json --pubkey issuer.pub --offline`}</Code>
+mandate verify receipt.json --pubkey issuer.pub --offline`}</Code>
       <p>
-        A valid receipt proves that Flow-E, under the organisation&apos;s key, recorded that
+        A valid receipt proves that Mandate, under the organisation&apos;s key, recorded that
         decision unchanged. It is not a payment and not a guarantee.
       </p>
     </TextPage>

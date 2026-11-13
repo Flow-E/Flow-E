@@ -1,20 +1,21 @@
 import 'server-only';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
+import { mandateEnv } from './env';
 
 /**
  * Sign-in sessions: a cookie holding the user id, email and expiry, signed with
- * FLOWE_SESSION_SECRET (HMAC-SHA256). How a person proves who they are is an adapter:
+ * MANDATE_SESSION_SECRET (HMAC-SHA256). How a person proves who they are is an adapter:
  *
- * - `dev`: type any email, no verification. Only when FLOWE_DEV_LOGIN=1 and NODE_ENV is not
+ * - `dev`: type any email, no verification. Only when MANDATE_DEV_LOGIN=1 and NODE_ENV is not
  *   production; refused everywhere else.
  * - `supabase`: email sign-in link through Supabase Auth with PKCE (NEXT_PUBLIC_SUPABASE_URL and
  *   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY); see src/server/supabase-auth.ts and /auth/callback.
  */
 
-export const SESSION_COOKIE = 'flowe_session';
+export const SESSION_COOKIE = 'mandate_session';
 /** Where an emailed sign-in link continues to (a path checked with safeNext). */
-export const NEXT_COOKIE = 'flowe_next';
+export const NEXT_COOKIE = 'mandate_next';
 const MAX_AGE_S = 12 * 60 * 60;
 
 export interface Session {
@@ -28,15 +29,15 @@ export interface Session {
 export type AuthMode = 'dev' | 'supabase' | 'none';
 
 export function authMode(env: NodeJS.ProcessEnv = process.env): AuthMode {
-  if (env.FLOWE_DEV_LOGIN === '1' && env.NODE_ENV !== 'production') return 'dev';
+  if (mandateEnv('DEV_LOGIN', env) === '1' && env.NODE_ENV !== 'production') return 'dev';
   if (env.NEXT_PUBLIC_SUPABASE_URL && env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) return 'supabase';
   return 'none';
 }
 
 function secret(): string {
-  const s = process.env.FLOWE_SESSION_SECRET;
+  const s = mandateEnv('SESSION_SECRET');
   if (!s || s.length < 32)
-    throw new Error('FLOWE_SESSION_SECRET must be set (at least 32 characters).');
+    throw new Error('MANDATE_SESSION_SECRET must be set (at least 32 characters).');
   return s;
 }
 

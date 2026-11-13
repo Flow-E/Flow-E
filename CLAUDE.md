@@ -1,4 +1,4 @@
-# Flow-E (`@flow-e/mcp`)
+# Mandate (`@flow-e/mcp`)
 
 Open-source MCP server that lets companies give AI agents a mandate: identity, budgets and rules, human approval, a kill switch, and signed receipts. v1 authorizes payments only; it never moves real money.
 
@@ -22,8 +22,10 @@ CI (.github/workflows/ci.yml) runs on Ubuntu with Node 22 and 24; Windows only o
 
 ## Naming
 
-- Brand **Flow-E**: package `@flow-e/mcp`, CLI `flow-e`, state folder `.flow-e/`, env `FLOWE_HOME`/`FLOWE_CONFIG`, signed-data ids `flow-e-issuer:`, `flow-e-credential/v1`, `flow-e-receipt/v1`.
-- "Mandate" stays as the concept word: `mandate.yaml`, the `check_mandate` tool, the `Mandate` type.
+- Brand **Mandate** (one name since 13 Nov 2026; the product was built as "Flow-E" and its blueprint as "Warrandi"). CLI `mandate`, MCP server `mandate`, state folder `.mandate/`, env `MANDATE_*` (core `MANDATE_HOME`/`MANDATE_CONFIG`), agent keys `mandate_ak_`, org API keys `mandate_ok_`, webhook headers `Mandate-Signature`/`-Event`/`-Delivery`, signed-data ids `mandate-issuer:`, `mandate-credential/v2`, `mandate-receipt/v2`, domains `mandate-ledger-v2`, `mandate-receipt-v2`, `mandate-credential-v2`.
+- The npm package stays `@flow-e/mcp`: the `@mandate` scope belongs to someone else. The GitHub repository and the Vercel address keep their Flow-E names until the founder renames them.
+- Legacy, kept on purpose so nothing signed before the rename is orphaned: version 1 signed data (`flow-e-ledger-v1`, `flow-e-receipt-v1`, `flow-e-receipt/v1`, `flow-e-credential/v1`, `flow-e-issuer:`) still verifies, a chain may go v1 → v2 but never back; `FLOWE_*` env vars, a `.flow-e/` state folder and `flowe_ak_`/`flowe_ok_` keys are still accepted. New data is always v2. Never remove these fallbacks without a migration plan.
+- "Mandate" is also the concept word: `mandate.yaml`, the `check_mandate` tool, the `Mandate` type.
 - Never write `npx mandate-mcp` or `npx mandate`: those npm names belong to other people. Don't put `npx @flow-e/mcp` in instructions until the package is published (the npm org `flow-e` exists, owner `lowrexius`). Repository: https://github.com/Flow-E/Flow-E (public). Printed commands take the package name from package.json.
 
 ## Conventions

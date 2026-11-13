@@ -51,7 +51,7 @@ export default async function DashboardPage({
         <div>
           <h1 className="font-serif text-3xl tracking-tight">Dashboard</h1>
           <p className="mt-1 text-ink-2">
-            What your agents spend, where, how often Flow-E says no, and what waits for you.
+            What your agents spend, where, how often Mandate says no, and what waits for you.
           </p>
         </div>
         <ButtonLink href="/sandbox/agent" variant="secondary">

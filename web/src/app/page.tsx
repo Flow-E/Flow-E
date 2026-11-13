@@ -87,25 +87,25 @@ const CAPABILITIES: readonly [string, string, string][] = [
 
 const FAQ: readonly [string, React.ReactNode][] = [
   [
-    'Does Flow-E hold or move our money?',
-    'No. It answers yes, no or “ask a person”. The order then goes through the channels you already use: a supplier account, an invoice, a purchase order. Flow-E needs no card and no access to a bank account.',
+    'Does Mandate hold or move our money?',
+    'No. It answers yes, no or “ask a person”. The order then goes through the channels you already use: a supplier account, an invoice, a purchase order. Mandate needs no card and no access to a bank account.',
   ],
   [
     'Which agents does it work with?',
-    'Any agent that speaks the Model Context Protocol (MCP), such as Claude. Each agent connects to Flow-E’s MCP endpoint with its own key and asks before every purchase.',
+    'Any agent that speaks the Model Context Protocol (MCP), such as Claude. Each agent connects to Mandate’s MCP endpoint with its own key and asks before every purchase.',
   ],
   [
     'What stops an agent from buying without asking?',
-    'Flow-E decides; it cannot reach into a shop. It is strongest when the agent has no other way to pay: no card and no stored shop password, so an order only goes out after a yes. Keys can be revoked at any time, and the kill switch declines every request at once.',
+    'Mandate decides; it cannot reach into a shop. It is strongest when the agent has no other way to pay: no card and no stored shop password, so an order only goes out after a yes. Keys can be revoked at any time, and the kill switch declines every request at once.',
   ],
   [
     'What happens when something goes wrong?',
-    'Flow-E fails closed. An error in the engine, a broken mandate or a missing credential means declined, never approved.',
+    'Mandate fails closed. An error in the engine, a broken mandate or a missing credential means declined, never approved.',
   ],
   [
     'Is it certified or audited?',
     <>
-      Not yet. Flow-E is early (version 0.1), has not had an external security review and is not a
+      Not yet. Mandate is early (version 0.1), has not had an external security review and is not a
       compliance product. The{' '}
       <Link href="/docs#security-model" className="text-accent underline">
         security model
@@ -114,7 +114,7 @@ const FAQ: readonly [string, React.ReactNode][] = [
     </>,
   ],
   [
-    'Who runs Flow-E?',
+    'Who runs Mandate?',
     'An independent founder, for now without a company behind it. That is why it starts with pilots: a few teams, one agent each, set up together. The code is open source under the MIT licence, so you can read exactly what it does.',
   ],
   [
@@ -156,8 +156,9 @@ export default async function Home({
             className={`${css.after} mt-16 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between`}
           >
             <p className="max-w-[46ch] text-lg leading-snug text-ink sm:text-[1.375rem]">
-              Give each agent a budget, approved suppliers and a person who signs off. Flow-E checks
-              every purchase before it happens, keeps a signed record, and never touches the money.
+              Give each agent a budget, approved suppliers and a person who signs off. Mandate
+              checks every purchase before it happens, keeps a signed record, and never touches the
+              money.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row">
               <ButtonLink href="#pilot" className={`${css.press} h-12 px-6 text-base`}>
@@ -239,7 +240,7 @@ export default async function Home({
                 The agent <span className="font-medium text-ink">lab-procurement</span> may spend
                 CHF 20,000 a day, at most CHF 8,000 at once, from two approved suppliers. Above CHF
                 5,000, or 20% over the usual price, a person decides. Pick a request to see what
-                Flow-E did with it.
+                Mandate did with it.
               </p>
             </div>
             <div className="mt-12">
@@ -283,7 +284,7 @@ export default async function Home({
               How the money moves
             </h2>
             <p className="max-w-[54ch] text-ink-2">
-              It does not move through Flow-E. Flow-E only says whether a purchase is allowed. No
+              It does not move through Mandate. Mandate only says whether a purchase is allowed. No
               new card, no new payment provider, nothing to connect to your bank.
             </p>
           </div>
@@ -293,7 +294,7 @@ export default async function Home({
                 Decides.
               </p>
               <p className="mt-6 max-w-[40ch] text-base">
-                <strong className="font-semibold">Flow-E</strong> checks the request against the
+                <strong className="font-semibold">Mandate</strong> checks the request against the
                 mandate, asks a person when needed and signs the decision.
               </p>
             </div>
@@ -311,8 +312,8 @@ export default async function Home({
           <ol className="mt-14 grid gap-6 text-base sm:grid-cols-2 lg:grid-cols-4">
             {(
               [
-                ['The agent finds the offer', 'and asks Flow-E before ordering.'],
-                ['Flow-E answers', 'approved, declined or waiting for a person.'],
+                ['The agent finds the offer', 'and asks Mandate before ordering.'],
+                ['Mandate answers', 'approved, declined or waiting for a person.'],
                 ['On a yes, the order goes out', 'through your usual supplier channel.'],
                 ['The supplier invoices you', 'as always. The receipt proves who allowed it.'],
               ] as const
@@ -333,7 +334,7 @@ export default async function Home({
                 Proof, and an off switch
               </h2>
               <p className="mt-6 max-w-[48ch] text-lg opacity-85">
-                Trust is the product, so Flow-E is built to be checked rather than believed.
+                Trust is the product, so Mandate is built to be checked rather than believed.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
@@ -355,7 +356,7 @@ export default async function Home({
                 [
                   [
                     'It never moves money.',
-                    'Flow-E holds no funds and no card numbers. The worst a fault can do is say no.',
+                    'Mandate holds no funds and no card numbers. The worst a fault can do is say no.',
                   ],
                   [
                     'Every decision is signed.',
@@ -405,7 +406,7 @@ export default async function Home({
           <div className="mt-12 overflow-hidden rounded-xl">
             <table className="w-full border-collapse text-left text-base">
               <caption className="sr-only">
-                The sixteen rules in the order Flow-E checks them, and what happens if one fails
+                The sixteen rules in the order Mandate checks them, and what happens if one fails
               </caption>
               <thead className="bg-sunken text-sm text-ink-2">
                 <tr>
@@ -526,7 +527,7 @@ export default async function Home({
                 For developers
               </h2>
               <p className="mt-4 max-w-[48ch] text-ink-2">
-                Flow-E is an open-source MCP server (MIT). Agents connect to the remote endpoint
+                Mandate is an open-source MCP server (MIT). Agents connect to the remote endpoint
                 with their own key and call <code className="text-ink">check_mandate</code> and{' '}
                 <code className="text-ink">request_payment</code>. The engine also runs on your own
                 machine.
@@ -544,9 +545,9 @@ export default async function Home({
               </div>
             </div>
             <pre className="overflow-x-auto rounded-xl bg-sunken p-5 font-mono text-[0.8125rem] leading-relaxed text-ink">
-              <code>{`# Connect Claude Code to Flow-E with an agent's key
-claude mcp add --transport http flow-e https://<site>/api/mcp \\
-  --header "Authorization: Bearer flowe_ak_…"`}</code>
+              <code>{`# Connect Claude Code to Mandate with an agent's key
+claude mcp add --transport http mandate https://<site>/api/mcp \\
+  --header "Authorization: Bearer mandate_ak_…"`}</code>
             </pre>
           </div>
         </section>
@@ -709,7 +710,7 @@ function ReceiptFragment() {
       </div>
       <pre className="overflow-x-auto border-t border-rule bg-sunken px-5 py-4 font-mono text-[0.8125rem] leading-relaxed text-ink-2">
         {`{
-  "format": "flow-e-receipt/v1",
+  "format": "mandate-receipt/v2",
   "entry": {
     "seq": 3,
     "type": "payment.decision",

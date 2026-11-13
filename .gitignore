@@ -2,11 +2,12 @@ node_modules/
 dist/
 coverage/
 *.log
-# local state created by `flow-e init` (keys, ledger) — never commit
-.flow-e/
-# default folder of "flow-e demo" when run inside the repository (fictional data, has keys)
-flow-e-demo/
-# state and demo folders from earlier working names (Mandate, Imprest)
+# local state created by `mandate init` (keys, ledger) — never commit
 .mandate/
+# default folder of "mandate demo" when run inside the repository (fictional data, has keys)
+mandate-demo/
+# state and demo folders from earlier working names (Flow-E, Imprest)
+.flow-e/
+flow-e-demo/
 .imprest/
 imprest-demo/

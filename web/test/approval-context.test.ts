@@ -71,7 +71,7 @@ const FAIR: TraceStep = {
   },
 };
 
-describe('why Flow-E asked', () => {
+describe('why Mandate asked', () => {
   it('lists every review step in plain words, without the engine’s boilerplate', () => {
     const reasons = reviewReasons(
       [{ rule: 'AMOUNT', outcome: 'pass', detail: 'ok' }, THRESHOLD, FAIR],
@@ -104,7 +104,7 @@ describe('why Flow-E asked', () => {
       'Asked outside business hours',
     ]);
     expect(reviewReasons([], 'Needs a person.')).toEqual([
-      { rule: '', title: 'Flow-E asked a person', detail: 'Needs a person.' },
+      { rule: '', title: 'Mandate asked a person', detail: 'Needs a person.' },
     ]);
   });
 });

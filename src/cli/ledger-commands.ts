@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { KeyStoreError, loadIssuer } from '../kya/store.js';
 import { Ledger, LedgerError } from '../ledger/ledger.js';
-import { entryHash, parseReceipt, verifyReceipt } from '../ledger/receipt.js';
+import { entryVersion, parseReceipt, verifyReceipt } from '../ledger/receipt.js';
 
 /** Command bodies for the ledger, kept apart from commander so tests can call them directly. */
 
@@ -77,7 +77,7 @@ export function runVerify(o: {
       if (!stored) {
         ok = false;
         lines.push(`✖ the ledger has no entry #${seq} (it was removed or this is another ledger)`);
-      } else if (stored.hash !== hash || entryHash(stored) !== hash) {
+      } else if (stored.hash !== hash || entryVersion(stored) === null) {
         ok = false;
         lines.push(`✖ ledger entry #${seq} differs from this receipt`);
       } else if (seq > 1 && prev?.hash !== prevHash) {
@@ -89,7 +89,7 @@ export function runVerify(o: {
     } finally {
       ledger.close();
     }
-    lines.push('  (run "flow-e audit" to check the whole chain)');
+    lines.push('  (run "mandate audit" to check the whole chain)');
   }
   lines.push(ok ? 'VALID' : 'INVALID');
   return { ok, text: lines.join('\n') };

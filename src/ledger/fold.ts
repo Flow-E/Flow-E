@@ -1,12 +1,14 @@
 import { randomBytes, type KeyObject } from 'node:crypto';
 import { canonicalJson } from '../crypto/canonical.js';
-import { issuerIdFor } from '../crypto/ed25519.js';
+import { issuerIdFor, issuerMatches } from '../crypto/ed25519.js';
 import type { Comply, EvaluationResult, LedgerEntryView, PaymentRequest } from '../engine/types.js';
 import {
   GENESIS_HASH,
   entryHash,
+  entryVersion,
   signHash,
   verifyHashSignature,
+  type LedgerVersion,
   type Entry,
   type EntryBody,
   type JsonValue,
@@ -412,7 +414,8 @@ export function auditEntries(
   publicKey: KeyObject,
 ): AuditResult {
   const keyId = issuerIdFor(publicKey);
-  if (keyId !== issuer) {
+  // A ledger made before the rename is bound to the legacy "mandate-issuer:" form of the same id.
+  if (!issuerMatches(issuer, publicKey)) {
     return {
       ok: false,
       entries: 0,
@@ -425,6 +428,7 @@ export function auditEntries(
   }
   let expectedSeq = 1;
   let prevHash = GENESIS_HASH;
+  let lastVersion: LedgerVersion = 1;
   for (const row of rows) {
     const broken = (reason: string): AuditResult => ({
       ok: false,
@@ -454,12 +458,18 @@ export function auditEntries(
     } catch {
       return broken('data is not valid canonical JSON (edited by hand?)');
     }
-    if (entryHash(entry) !== row.hash) {
+    const version = entryVersion({ ...entry, hash: row.hash });
+    if (version === null) {
       return broken('contents do not match the stored hash (edited after writing)');
     }
-    if (!verifyHashSignature(publicKey, issuer, row.hash, row.signature)) {
+    // Entries written before the rename (version 1) may only come before the first version 2 one.
+    if (version < lastVersion) {
+      return broken('a version 1 entry after a version 2 entry (the chain was rewritten)');
+    }
+    if (!verifyHashSignature(publicKey, issuer, row.hash, row.signature, version)) {
       return broken('issuer signature is not valid (hash rewritten without the issuer key)');
     }
+    lastVersion = version;
     prevHash = row.hash;
     expectedSeq += 1;
   }

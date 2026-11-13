@@ -17,7 +17,7 @@ export default async function GatePage({
         <Logo />
         <h1 className="mt-8 font-serif text-3xl tracking-[-0.015em]">Private preview</h1>
         <p className="mt-2 text-ink-2">
-          Flow-E is being tested. Enter the preview password you were given.
+          Mandate is being tested. Enter the preview password you were given.
         </p>
         <GateForm next={safeNext(next)} error={error === '1'} />
       </div>

@@ -24,7 +24,7 @@ import {
   dailySpend,
   decisionData,
   effectiveStatus,
-  entryHash,
+  entryVersion,
   evaluate,
   foldControls,
   foldInvoices,
@@ -299,7 +299,7 @@ export class SandboxStore {
     if (!stored) {
       ok = false;
       checks.push(`✖ this sandbox's ledger has no entry #${seq}`);
-    } else if (stored.hash !== hash || entryHash(fromStored(stored)) !== hash) {
+    } else if (stored.hash !== hash || entryVersion(fromStored(stored)) === null) {
       ok = false;
       checks.push(`✖ ledger entry #${seq} differs from this receipt`);
     } else if (seq > 1 && prev?.hash !== prevHash) {
@@ -435,7 +435,7 @@ export class SandboxStore {
     });
   }
 
-  /** The same seven requests as `flow-e simulate`, as the lab-procurement agent. */
+  /** The same seven requests as `mandate simulate`, as the lab-procurement agent. */
   async playStory(ownerId: string): Promise<PaymentOutcome[]> {
     const outcomes: PaymentOutcome[] = [];
     for (const step of DEMO_STORY_STEPS) {

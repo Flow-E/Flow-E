@@ -67,7 +67,7 @@ export default async function OrgDashboard({
       <div>
         <h1 className="font-serif text-3xl tracking-tight">Dashboard</h1>
         <p className="mt-1 text-ink-2">
-          What your agents spend, where, how often Flow-E says no, and what waits for a human.
+          What your agents spend, where, how often Mandate says no, and what waits for a human.
         </p>
       </div>
 

@@ -91,7 +91,7 @@ export function CreateWebhookForm({
             type="url"
             required
             maxLength={500}
-            placeholder="https://erp.example.com/flow-e"
+            placeholder="https://erp.example.com/mandate"
             className={field}
           />
         </label>

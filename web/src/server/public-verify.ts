@@ -16,12 +16,12 @@ import { RateLimiter } from './rate-limit';
 
 /**
  * The public receipt check behind /verify: anyone (a supplier, an auditor, finance) pastes a
- * Flow-E receipt and learns whether it is genuine. No sign-in.
+ * Mandate receipt and learns whether it is genuine. No sign-in.
  *
  * It uses only two things: the pasted receipt, and the issuer's published public key (the file
  * at /keys/<issuer>.pub, or a key the person pastes themselves). No lookups by payment id, no
  * search, nothing else from the account; it never says what happened after signing. The crypto
- * is the core's verifyReceipt, the same check as `flow-e verify --offline`.
+ * is the core's verifyReceipt, the same check as `mandate verify --offline`.
  */
 
 export const MAX_RECEIPT_BYTES = 32 * 1024;
@@ -151,7 +151,7 @@ export async function verifyPublicReceipt(
 ): Promise<PublicVerifyResult> {
   if (text.trim() === '') return { outcome: 'error', error: 'Paste a receipt first.' };
   if (Buffer.byteLength(text, 'utf8') > MAX_RECEIPT_BYTES) {
-    return { outcome: 'error', error: 'That is too long to be a Flow-E receipt (32 KB at most).' };
+    return { outcome: 'error', error: 'That is too long to be a Mandate receipt (32 KB at most).' };
   }
   let receipt;
   try {
@@ -162,7 +162,7 @@ export async function verifyPublicReceipt(
         outcome: 'error',
         error: err.message.startsWith('Receipt is not valid JSON')
           ? 'This is not valid JSON. Paste the whole receipt file, from { to }.'
-          : 'This is not a Flow-E receipt: it lacks fields a receipt has, or has others.',
+          : 'This is not a Mandate receipt: it lacks fields a receipt has, or has others.',
       };
     }
     throw err;
@@ -334,7 +334,7 @@ export async function handleVerify(
   if (body === null) {
     return reply(413, {
       outcome: 'error',
-      error: 'That is too long to be a Flow-E receipt (32 KB at most).',
+      error: 'That is too long to be a Mandate receipt (32 KB at most).',
     });
   }
   try {

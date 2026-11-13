@@ -5,7 +5,7 @@ import { OfflineSteps, PublicVerifyForm, WhatItProves } from './verify-form';
 
 export const metadata: Metadata = {
   title: 'Check a receipt',
-  description: 'Was this purchase authorized? Check a Flow-E receipt. No sign-in needed.',
+  description: 'Was this purchase authorized? Check a Mandate receipt. No sign-in needed.',
 };
 
 /**
@@ -26,13 +26,13 @@ export default function VerifyPage() {
             Was this purchase authorized?
           </h1>
           <p className="mt-3 text-ink-2">
-            Paste a Flow-E receipt or open the receipt file. You see whether Flow-E really signed
+            Paste a Mandate receipt or open the receipt file. You see whether Mandate really signed
             it, and what it says: who asked, how much, to which supplier, and the decision. No
             sign-in needed.
           </p>
           <p className="mt-3 rounded-lg border border-rule bg-surface px-4 py-3 text-sm text-ink-2">
             <strong className="font-semibold text-ink">
-              Flow-E authorizes payments; it never moves money.
+              Mandate authorizes payments; it never moves money.
             </strong>{' '}
             A valid receipt shows what the buyer’s rules decided. It is not proof that money was
             paid.

@@ -12,7 +12,7 @@ const KEY = 're_test_0123456789abcdef';
 const ENV: NodeJS.ProcessEnv = {
   NODE_ENV: 'production',
   RESEND_API_KEY: KEY,
-  EMAIL_FROM: 'Flow-E <approvals@example.com>',
+  EMAIL_FROM: 'Mandate <approvals@example.com>',
 };
 const sql = { query: () => Promise.resolve([]) };
 

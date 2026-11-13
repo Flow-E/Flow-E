@@ -1,6 +1,7 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import type { Sql } from './db';
+import { mandateEnv } from './env';
 
 /**
  * Outgoing email as an adapter. Every message is plain text plus a simple HTML version with no
@@ -156,7 +157,7 @@ export function mailerFromEnv(sql: Sql, env: NodeJS.ProcessEnv = process.env): M
 
 /** Whether /dev/outbox may be shown. */
 export function outboxVisible(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.NODE_ENV !== 'production' && env.FLOWE_DEV_LOGIN === '1';
+  return env.NODE_ENV !== 'production' && mandateEnv('DEV_LOGIN', env) === '1';
 }
 
 export interface OutboxMessage {
@@ -196,7 +197,7 @@ function htmlPage(paragraphs: string[], links: { label: string; href: string }[]
         `<p><a href="${escapeHtml(l.href)}" style="display:inline-block;padding:10px 16px;border:1px solid #444;border-radius:6px;color:#111;text-decoration:none">${escapeHtml(l.label)}</a></p>`,
     )
     .join('\n');
-  return `<!doctype html><html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#111">\n${body}\n${buttons}\n<p style="color:#666;font-size:12px">Flow-E authorizes payments; it never moves money.</p>\n</body></html>`;
+  return `<!doctype html><html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#111">\n${body}\n${buttons}\n<p style="color:#666;font-size:12px">Mandate authorizes payments; it never moves money.</p>\n</body></html>`;
 }
 
 export function invitationEmail(input: {
@@ -208,13 +209,13 @@ export function invitationEmail(input: {
   expiresAt: string;
 }): EmailMessage {
   const lines = [
-    `${input.invitedBy} invited you to join ${input.orgName} on Flow-E as ${input.role}.`,
+    `${input.invitedBy} invited you to join ${input.orgName} on Mandate as ${input.role}.`,
     `Open the link and sign in as ${input.to} to accept. It works once and expires on ${input.expiresAt}.`,
     'If you did not expect this, ignore this email.',
   ];
   return {
     to: input.to,
-    subject: `Join ${input.orgName} on Flow-E`,
+    subject: `Join ${input.orgName} on Mandate`,
     text: `${lines.join('\n\n')}\n\nAccept: ${input.link}\n`,
     html: htmlPage(lines, [{ label: 'Accept the invitation', href: input.link }]),
     kind: 'invitation',

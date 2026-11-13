@@ -4,7 +4,7 @@ import { css } from './home-styles';
 
 /**
  * The worked example on the home page: five requests from the sandbox's demo story, and what
- * Flow-E decided. A radio group switches between them with CSS alone (no script, so the CSP and
+ * Mandate decided. A radio group switches between them with CSS alone (no script, so the CSP and
  * the no-JavaScript case need nothing extra). Amounts and usual prices come from the core's demo
  * content, so they stay in step with the sandbox. Everything in it is fictional.
  */

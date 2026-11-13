@@ -13,7 +13,7 @@ const MAX_KEY = 4 * 1024;
 const DECISION: Record<VerifiedPayment['decision'], { label: string; note: string }> = {
   approved: {
     label: 'Approved by the buyer’s rules',
-    note: 'Flow-E authorized this payment when it signed the receipt.',
+    note: 'Mandate authorized this payment when it signed the receipt.',
   },
   review: {
     label: 'Sent to a person for approval',
@@ -21,7 +21,7 @@ const DECISION: Record<VerifiedPayment['decision'], { label: string; note: strin
   },
   declined: {
     label: 'Declined',
-    note: 'Flow-E did not authorize this payment.',
+    note: 'Mandate did not authorize this payment.',
   },
 };
 
@@ -55,7 +55,7 @@ export function OfflineSteps() {
         <span className="font-mono">issuer.pub</span>).
       </li>
       <li>
-        Install the Flow-E command line from the{' '}
+        Install the Mandate command line from the{' '}
         <a href="https://github.com/Flow-E/Flow-E" className="text-accent underline">
           open-source repository
         </a>
@@ -64,7 +64,7 @@ export function OfflineSteps() {
       <li>
         Run{' '}
         <code className="break-all rounded bg-sunken px-1.5 py-0.5 font-mono text-xs text-ink">
-          flow-e verify receipt.json --pubkey issuer.pub --offline
+          mandate verify receipt.json --pubkey issuer.pub --offline
         </code>
       </li>
     </ol>
@@ -89,7 +89,7 @@ function Result({ r }: { r: PublicVerifyResult }) {
         <p className="text-sm text-ink-2">
           No public key is published on this site for the issuer id{' '}
           <span className="break-all font-mono text-xs">{r.issuer}</span>. That does not make the
-          receipt false: it may come from a Flow-E installation elsewhere. Ask the organisation for
+          receipt false: it may come from a Mandate installation elsewhere. Ask the organisation for
           its public key and paste it under &ldquo;Use a public key you have&rdquo;, or check it
           offline:
         </p>
@@ -107,7 +107,7 @@ function Result({ r }: { r: PublicVerifyResult }) {
         <p className="text-sm text-ink-2">
           {r.keySource === 'supplied'
             ? 'It does not match the public key you supplied: it was changed after signing, or that key is not the one that signed it.'
-            : `It names a Flow-E ${r.issuerKind === 'sandbox' ? 'sandbox' : 'organisation'} whose key is published here, but it was changed after signing or was not signed with that key.`}
+            : `It names a Mandate ${r.issuerKind === 'sandbox' ? 'sandbox' : 'organisation'} whose key is published here, but it was changed after signing or was not signed with that key.`}
         </p>
         <ul className="space-y-0.5 text-sm text-ink-2">
           {(r.checks ?? []).map((c) => (
@@ -122,15 +122,15 @@ function Result({ r }: { r: PublicVerifyResult }) {
     <div className="space-y-4 rounded-xl border border-approve/30 bg-approve-soft px-4 py-4">
       <p className="flex items-start gap-2 font-semibold text-approve">
         <CircleCheck size={20} className="mt-0.5 shrink-0" aria-hidden="true" />
-        Valid: Flow-E signed this receipt and it is unchanged
+        Valid: Mandate signed this receipt and it is unchanged
       </p>
       <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[auto_1fr] [&_dd]:mb-2 sm:[&_dd]:mb-0">
         <Row label="Signed by">
           {r.keySource === 'supplied'
             ? 'The holder of the public key you supplied'
             : r.issuerKind === 'sandbox'
-              ? 'A Flow-E sandbox: the company, suppliers and money are fictional'
-              : `${r.issuerName ?? 'A Flow-E organisation'} (the name published with its key)`}
+              ? 'A Mandate sandbox: the company, suppliers and money are fictional'
+              : `${r.issuerName ?? 'A Mandate organisation'} (the name published with its key)`}
         </Row>
         <Row label="Issuer id">
           <span className="break-all font-mono text-xs">{r.issuer}</span>
@@ -208,7 +208,7 @@ export function WhatItProves() {
       <div className="rounded-lg border border-rule bg-surface px-4 py-3">
         <h3 className="font-semibold text-ink">A valid receipt proves</h3>
         <ul className="mt-1.5 list-disc space-y-1 pl-5 text-ink-2">
-          <li>Flow-E, under the organisation’s key, recorded this decision.</li>
+          <li>Mandate, under the organisation’s key, recorded this decision.</li>
           <li>Not one character was changed after signing.</li>
           <li>Who asked, how much, to which supplier, and what the rules decided then.</li>
         </ul>
@@ -216,7 +216,7 @@ export function WhatItProves() {
       <div className="rounded-lg border border-rule bg-surface px-4 py-3">
         <h3 className="font-semibold text-ink">It does not prove</h3>
         <ul className="mt-1.5 list-disc space-y-1 pl-5 text-ink-2">
-          <li>That any money was paid. Flow-E authorizes; it does not move money.</li>
+          <li>That any money was paid. Mandate authorizes; it does not move money.</li>
           <li>That the goods were delivered, or that the price was right.</li>
           <li>What happened later: approvals and cancellations are separate entries.</li>
           <li>A guarantee of payment by anyone.</li>
@@ -242,7 +242,7 @@ export function PublicVerifyForm() {
       if (new TextEncoder().encode(receipt).byteLength > MAX_BYTES) {
         setResult({
           outcome: 'error',
-          error: 'That is too long to be a Flow-E receipt (32 KB at most).',
+          error: 'That is too long to be a Mandate receipt (32 KB at most).',
         });
         return;
       }
@@ -297,7 +297,7 @@ export function PublicVerifyForm() {
           }}
           spellCheck={false}
           autoComplete="off"
-          placeholder='{ "format": "flow-e-receipt/v1", … }'
+          placeholder='{ "format": "mandate-receipt/v2", … }'
           className="tabular w-full rounded-lg border border-rule-strong bg-surface p-3 font-mono text-xs text-ink placeholder:text-ink-3"
         />
         <div className="flex flex-wrap items-center gap-3">
@@ -326,7 +326,7 @@ export function PublicVerifyForm() {
               if (file.size > MAX_BYTES) {
                 setResult({
                   outcome: 'error',
-                  error: 'That file is too large to be a Flow-E receipt (32 KB at most).',
+                  error: 'That file is too large to be a Mandate receipt (32 KB at most).',
                 });
                 return;
               }

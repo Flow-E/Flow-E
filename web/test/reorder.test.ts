@@ -108,7 +108,7 @@ describe('Run reorder, simulated (no API key)', () => {
       ]),
     );
     expect(run.log.map((l) => l.text)).toContain(
-      "Followed Flow-E's hint: ask Example Labware AG, an approved supplier.",
+      "Followed Mandate's hint: ask Example Labware AG, an approved supplier.",
     );
   });
 

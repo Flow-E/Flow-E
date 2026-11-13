@@ -1,4 +1,4 @@
-# Flow-E MVP plan
+# Mandate MVP plan
 
 Status on 27 Oct 2026, `main` at `19b690c` (CI green, deployed behind the preview password at
 flow-e.vercel.app). Working tree clean: nothing in flight is uncommitted.
@@ -10,7 +10,7 @@ flow-e.vercel.app). Working tree clean: nothing in flight is uncommitted.
 | Landing page, pilot form, purchase orders, orders and invoices | Committed and pushed (`19b690c`), CI green                                                                                                                                                     |
 | Browser check of the purchase order page                       | Done locally: order recorded, invoice CHF 15 over flagged, printable PO correct                                                                                                                |
 | Pilot request database step                                    | **Waits for you**: migration `web/db/migrations/003_pilot_requests.sql` is not yet run in Supabase. Until it is, the live pilot form answers "something went wrong" (nothing else is affected) |
-| Pilot request settings                                         | **Waits for you**: `FLOWE_LEADS_TO`, `FLOWE_ADMIN_EMAILS` in Vercel                                                                                                                            |
+| Pilot request settings                                         | **Waits for you**: `MANDATE_LEADS_TO`, `MANDATE_ADMIN_EMAILS` in Vercel                                                                                                                        |
 
 ## Status against the brief
 
@@ -49,15 +49,15 @@ done = meets the brief · partial = exists, gaps listed · missing = not built
 
 ### Part D: connections in and out (built 28 Oct)
 
-Goal: systems before and after Flow-E can connect without us building them. In: an inventory
-system tells Flow-E what to reorder. Out: a supplier, accounting or a future marketplace learns
+Goal: systems before and after Mandate can connect without us building them. In: an inventory
+system tells Mandate what to reorder. Out: a supplier, accounting or a future marketplace learns
 when an order was approved and can verify it. Nothing from outside can approve anything.
 
 | #   | Item                         | Status   | What exists today                                                                                                                                           | Gaps                                                                                                                                                              |
 | --- | ---------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | D1  | Organisation API keys        | **done** | Agent keys (`agent_keys`: hash only, prefix, last use, expiry, revoke; `src/server/org-store.ts` `createKey`/`authenticateAgent`) are the pattern to follow | A separate key type per organisation with scopes `reorder:write` and `read`, owner-only page, access log                                                          |
 | D2  | Reorder signals (in)         | **done** | Reorder list and runs (B4: `org_reorder_items`, `src/server/reorder.ts`); price list in the mandate                                                         | `POST /api/v1/reorder-signals`, "suggested by", "needs matching", dismiss, idempotency, optional auto-include in the next run; price-list items need stable ids   |
-| D3  | Notifications out (webhooks) | **done** | Signed receipts per entry; the email outbox has a send-and-record pattern; SSRF has no guard yet because Flow-E never calls out to user addresses           | Endpoints, events, HMAC signatures with timestamp, retries with backoff, delivery log, test event, https-only and no private addresses                            |
+| D3  | Notifications out (webhooks) | **done** | Signed receipts per entry; the email outbox has a send-and-record pattern; SSRF has no guard yet because Mandate never calls out to user addresses          | Endpoints, events, HMAC signatures with timestamp, retries with backoff, delivery log, test event, https-only and no private addresses                            |
 | D4  | Read API                     | **done** | Receipt download and payment detail behind sign-in; agent `list_payments` over MCP (agent's own only)                                                       | `GET /api/v1/orders`, `/api/v1/payments/{id}`, `/api/v1/receipts/{id}` with the `read` scope, cursor pagination                                                   |
 | D5  | Developer page               | **done** | `/docs` (README), the "Connect the agent" snippets, `/verify` and `/keys/<issuer>.pub`                                                                      | "Connect your systems" page with keys, signal format, events and example payloads, signature and receipt verification, curl examples run by tests; README section |
 
@@ -80,11 +80,11 @@ when an order was approved and can verify it. Nothing from outside can approve a
 
 #### How the pieces fit
 
-- **Keys**: `flowe_ok_…`, shown once, SHA-256 hash stored, prefix shown for recognition. Every call: zod-validated body, per-key rate limit (60 per minute, per instance), one access-log row (method, path, status; never the key or the body).
+- **Keys**: `mandate_ok_…`, shown once, SHA-256 hash stored, prefix shown for recognition. Every call: zod-validated body, per-key rate limit (60 per minute, per instance), one access-log row (method, path, status; never the key or the body).
 - **Signals never buy.** A signal only adds or updates a reorder-list row marked "suggested by <key name>"; an unknown item is kept as "needs matching" and never guessed. With auto-include on, suggested rows join the next Run reorder, which still goes through the agent tools, the engine and, when required, a person.
 - **Webhooks are decoupled from decisions.** Nothing is sent inside a decision. A dispatcher reads ledger entries after each endpoint's `cursor_seq`, turns matching ones into delivery rows, and sends them: right after a request when possible, and by a cron every minute for retries. A failed delivery can therefore never change, block or slow a decision.
 - **Events** come from ledger entries: `payment.approved` / `payment.declined` / `payment.review` (decision or human resolution), `order.recorded` (`payment.ordered`), `invoice.matched` / `invoice.mismatch` (`invoice.recorded`). Payload: the entry as recorded, plus the signed receipt for approvals and orders.
-- **Signature**: header `Flow-E-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, t + "." + body)>`; receivers reject timestamps older than 5 minutes. The endpoint secret is shown once and stored encrypted (it is needed to sign).
+- **Signature**: header `Mandate-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, t + "." + body)>`; receivers reject timestamps older than 5 minutes. The endpoint secret is shown once and stored encrypted (it is needed to sign).
 - **SSRF guard**: https only, port 443, no credentials in the URL; the host is resolved before every delivery and refused if any address is private, loopback, link-local, carrier-grade NAT, multicast or a cloud metadata address; redirects are not followed; 10 s timeout; response bodies are not stored.
 
 #### Open questions for Part D
@@ -131,7 +131,7 @@ Numbered migrations; `001`–`003` are never edited.
 1. **Second factor for approvers.** Decided: own TOTP (RFC 6238 on `node:crypto`, not Supabase MFA), required for owners and approvers before they approve/decline, change a mandate, manage keys or members, or flip the kill switch; viewers and the sandbox exempt. Built in A6 (`web/src/server/totp.ts`, `mfa.ts`, `strong-session.ts`, `/account/security`, migration 005).
 2. **Claude API key** for invoice extraction (A7) and "Run reorder" (B4). You create the key at console.anthropic.com and set `ANTHROPIC_API_KEY` in Vercel. Proposal: a small model for extraction, a cap of 12 steps and about 20,000 tokens per reorder run, and a monthly spending limit set in the Anthropic console. OK?
 3. **Invoice files.** Keep the uploaded PDF (private Supabase Storage bucket in the Zurich project, deleted after N years), or extract the fields and discard the file? Keeping it is better for audits but means storing documents. Your choice, and if kept: how long?
-4. **Demo organisation with history (C1).** So far, real organisations never get backdated sample data, so nobody can mistake a demo for real history. Proposal: an admin-only seed (only for `FLOWE_ADMIN_EMAILS`) that creates "Lab Alpha (fictional)" with a permanent "Demo organisation, fictional data" banner and a ledger entry saying so. OK?
+4. **Demo organisation with history (C1).** So far, real organisations never get backdated sample data, so nobody can mistake a demo for real history. Proposal: an admin-only seed (only for `MANDATE_ADMIN_EMAILS`) that creates "Lab Alpha (fictional)" with a permanent "Demo organisation, fictional data" banner and a ledger entry saying so. OK?
 5. **Project budgets.** The brief says name, amount and end date. Today a project has a budget per month or in total. Proposal: total budget plus an optional end date (after it, requests are declined with "project ended"), and keep the monthly option. OK?
 6. **Public proof page (B3).** Today it looks up the issuer's key itself and shows the organisation's name. To follow the brief: each organisation's public key is published at a public address (`/keys/<issuer-id>.pub`), the page checks the receipt against that published key only, shows only what is inside the receipt, and adds the ledger-position check. The organisation name then comes from the receipt (it is signed into the credential), not from the database. OK?
 7. **Usual prices in other currencies (A3).** Proposal: store each usual price in its own currency and let the engine convert through the mandate's fx table at decision time (exact, no stale converted numbers). OK?
@@ -142,7 +142,7 @@ Numbered migrations; `001`–`003` are never edited.
 ## Steps that already wait for you
 
 1. Supabase, SQL editor: run `web/db/migrations/003_pilot_requests.sql` (I can put it on your clipboard).
-2. Vercel, Settings → Environment Variables: `FLOWE_LEADS_TO` (your email), `FLOWE_ADMIN_EMAILS` (your email), then Redeploy.
+2. Vercel, Settings → Environment Variables: `MANDATE_LEADS_TO` (your email), `MANDATE_ADMIN_EMAILS` (your email), then Redeploy.
 3. Domain, then Resend (`RESEND_API_KEY`, `EMAIL_FROM`): needed for approval emails (A6) and pilot notifications.
 
 ## Order of work after your approval

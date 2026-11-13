@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'Dev outbox', robots: { index: false 
 export const dynamic = 'force-dynamic';
 
 /**
- * Development only (NODE_ENV not production and FLOWE_DEV_LOGIN=1): the emails Flow-E would
+ * Development only (NODE_ENV not production and MANDATE_DEV_LOGIN=1): the emails Mandate would
  * have sent, with their links. 404 everywhere else.
  */
 export default async function OutboxPage() {

@@ -82,7 +82,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   return (
     <main className="grid min-h-dvh place-items-center px-4">
       <div className="w-full max-w-md">
-        <Link href="/" aria-label="Flow-E home" className="rounded-md">
+        <Link href="/" aria-label="Mandate home" className="rounded-md">
           <Logo />
         </Link>
         <div className="mt-2">{body}</div>

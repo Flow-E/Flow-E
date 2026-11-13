@@ -14,7 +14,7 @@ export default function ImprintPage() {
         [TO CONFIRM: contact email]
       </p>
       <p>
-        Flow-E is open-source software under the MIT licence. It authorizes, matches and records
+        Mandate is open-source software under the MIT licence. It authorizes, matches and records
         purchases for organisations; it does not hold or move money and is not a payment service.
       </p>
       <p>[TO CONFIRM: whether a company register entry or VAT number applies.]</p>

@@ -42,7 +42,7 @@ export const API_EXAMPLES: ApiExample[] = [
   "price_item": "pipette-tips-20-racks--example-labware-ag",
   "supplier": "Example Labware AG",
   "quantity": 3,
-  "message": "Added to the reorder list as a suggestion. Nothing is bought until a run asks Flow-E for it."
+  "message": "Added to the reorder list as a suggestion. Nothing is bought until a run asks Mandate for it."
 }`,
   },
   {
@@ -98,7 +98,7 @@ export const API_EXAMPLES: ApiExample[] = [
     path: '/api/v1/receipts/{payment_id}',
     scope: 'read',
     status: 200,
-    answer: `{ "format": "flow-e-receipt/v1", "issuer": "flow-e-issuer:…", "entry": { … }, "signature": "…" }`,
+    answer: `{ "format": "mandate-receipt/v2", "issuer": "mandate-issuer:…", "entry": { … }, "signature": "…" }`,
   },
 ];
 
@@ -106,9 +106,9 @@ export const API_EXAMPLES: ApiExample[] = [
 export const VERIFY_WEBHOOK_SNIPPET = `import { createHmac, timingSafeEqual } from 'node:crypto';
 
 // secret: the signing secret shown when you added the webhook
-// header: the "Flow-E-Signature" request header
+// header: the "Mandate-Signature" request header
 // body:   the raw request body, as text, before parsing it
-export function verifyFloweSignature(secret, header, body, nowSeconds = Math.floor(Date.now() / 1000)) {
+export function verifyMandateSignature(secret, header, body, nowSeconds = Math.floor(Date.now() / 1000)) {
   const parts = Object.fromEntries(header.split(',').map((p) => p.split('=')));
   const t = Number(parts.t);
   if (!Number.isInteger(t) || Math.abs(nowSeconds - t) > 300) return false; // older than 5 minutes
@@ -119,15 +119,15 @@ export function verifyFloweSignature(secret, header, body, nowSeconds = Math.flo
 
 export const WEBHOOK_PAYLOAD_EXAMPLE = `POST /your/address
 Content-Type: application/json
-Flow-E-Event: payment.approved
-Flow-E-Delivery: 2b8e…
-Flow-E-Signature: t=1793180000,v1=5d41402abc4b2a76b9719d911017c592…
+Mandate-Event: payment.approved
+Mandate-Delivery: 2b8e…
+Mandate-Signature: t=1793180000,v1=5d41402abc4b2a76b9719d911017c592…
 
 {
   "id": "2b8e…",
   "event": "payment.approved",
   "created_at": "2026-10-28T09:40:02.000Z",
-  "issuer": "flow-e-issuer:476cc78c17d76b3f",
+  "issuer": "mandate-issuer:476cc78c17d76b3f",
   "entry": {
     "seq": 812,
     "id": "pay_…",
@@ -142,5 +142,5 @@ Flow-E-Signature: t=1793180000,v1=5d41402abc4b2a76b9719d911017c592…
       …
     }
   },
-  "receipt": { "format": "flow-e-receipt/v1", … }
+  "receipt": { "format": "mandate-receipt/v2", … }
 }`;

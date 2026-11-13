@@ -16,8 +16,8 @@ import { RateLimiter } from './rate-limit';
  * Pilot requests: the form on the home page posts to /api/pilot (a route handler, so it works
  * without JavaScript and never dispatches a Server Action). Every field is capped and validated,
  * a hidden honeypot field catches simple bots, each client address may send only a few per
- * window, and the content is never logged. The founder is emailed when FLOWE_LEADS_TO is set;
- * a failed email never fails the request. /admin/pilots lists them for FLOWE_ADMIN_EMAILS.
+ * window, and the content is never logged. The founder is emailed when MANDATE_LEADS_TO is set;
+ * a failed email never fails the request. /admin/pilots lists them for MANDATE_ADMIN_EMAILS.
  */
 
 export {
@@ -28,6 +28,7 @@ export {
   type PilotSize,
   type PilotStatus,
 } from '@/lib/pilot-fields';
+import { mandateEnv } from './env';
 
 /** Larger bodies are refused before parsing. Well above the sum of the field caps. */
 export const MAX_PILOT_BODY_BYTES = 16 * 1024;
@@ -177,10 +178,10 @@ export async function setPilotStatus(
 
 // Who may see them ------------------------------------------------------------------------------
 
-/** FLOWE_ADMIN_EMAILS, comma-separated, compared case-insensitively. Empty means nobody. */
+/** MANDATE_ADMIN_EMAILS, comma-separated, compared case-insensitively. Empty means nobody. */
 export function adminEmails(env: NodeJS.ProcessEnv = process.env): Set<string> {
   return new Set(
-    (env.FLOWE_ADMIN_EMAILS ?? '')
+    (mandateEnv('ADMIN_EMAILS', env) ?? '')
       .split(',')
       .map((e) => e.trim().toLowerCase())
       .filter((e) => e.includes('@')),
@@ -197,9 +198,9 @@ export function isPilotAdmin(
 
 // Notification ----------------------------------------------------------------------------------
 
-/** FLOWE_LEADS_TO when it is one valid address; otherwise null (no email is sent). */
+/** MANDATE_LEADS_TO when it is one valid address; otherwise null (no email is sent). */
 export function leadsRecipient(env: NodeJS.ProcessEnv = process.env): string | null {
-  const to = env.FLOWE_LEADS_TO?.trim();
+  const to = mandateEnv('LEADS_TO', env)?.trim();
   if (!to) return null;
   return z.email().safeParse(to).success ? to : null;
 }
@@ -233,7 +234,7 @@ export function pilotLeadEmail(
     adminUrl ? `\nAll requests: ${adminUrl}\n` : ''
   }`;
   const html = `<!doctype html><html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#111">
-<p>New pilot request from the Flow-E site.</p>
+<p>New pilot request from the Mandate site.</p>
 <table style="border-collapse:collapse">${rows
     .map(
       ([k, v]) =>

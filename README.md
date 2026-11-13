@@ -1,7 +1,7 @@
-# Flow-E
+# Mandate
 
 Give an AI agent a **mandate**: a verified identity, a budget and rules, human approval above a
-threshold, a kill switch, and a signed receipt for every decision. **Flow-E** is an open-source
+threshold, a kill switch, and a signed receipt for every decision. **Mandate** is an open-source
 [MCP](https://modelcontextprotocol.io) server that **authorizes** the payments an agent asks for.
 It never holds or moves money.
 
@@ -16,7 +16,7 @@ AI agents are starting to buy things: lab supplies, compute, data, travel. Most 
 let them, because there is no trustworthy way to give an agent a budget and rules, see every
 decision, and stop it instantly.
 
-Flow-E is that missing layer, and you can add it to an agent in five minutes:
+Mandate is that missing layer, and you can add it to an agent in five minutes:
 
 - **Know Your Agent.** Each agent carries a signed credential that names a responsible person.
 - **A mandate per agent.** Daily budget, per-payment limit, allowed suppliers, categories,
@@ -34,12 +34,12 @@ features come later (see the [roadmap](#roadmap)).
 You need Node.js 22.12 or later, git, and Claude Code or Claude Desktop.
 
 ```sh
-git clone https://github.com/Flow-E/Flow-E.git flow-e && cd flow-e
-npm install && npm run build && npm link   # puts the `flow-e` command on your PATH
-cd .. && flow-e demo
+git clone https://github.com/Flow-E/Flow-E.git mandate && cd mandate
+npm install && npm run build && npm link   # puts the `mandate` command on your PATH
+cd .. && mandate demo
 ```
 
-This sets up a folder called `flow-e-demo` holding a **fictional** company, two agents, a supplier
+This sets up a folder called `mandate-demo` holding a **fictional** company, two agents, a supplier
 catalog and fresh keys. It also starts the control panel and prints three things:
 
 1. **A command that connects Claude** to the demo agent: `claude mcp add …` for Claude Code, or a
@@ -63,23 +63,23 @@ You should then see Claude:
 so the control panel fills up straight away:
 
 ```sh
-flow-e simulate --dir flow-e-demo            # the whole story above
-flow-e simulate --dir flow-e-demo buy 6      # one item from the catalog (see: simulate list)
-flow-e simulate --dir flow-e-demo mandate    # budget left today
+mandate simulate --dir mandate-demo            # the whole story above
+mandate simulate --dir mandate-demo buy 6      # one item from the catalog (see: simulate list)
+mandate simulate --dir mandate-demo mandate    # budget left today
 ```
 
-It only runs in a folder made by `flow-e demo`, so fake requests never reach a real ledger.
+It only runs in a folder made by `mandate demo`, so fake requests never reach a real ledger.
 
-Run `flow-e demo --reset` to start over. Every company, person, supplier and price in the
+Run `mandate demo --reset` to start over. Every company, person, supplier and price in the
 demo is invented; supplier names all start with "Example".
 
 ## Use it with your own agents
 
 ```sh
-flow-e init                       # issuer keys in .flow-e/ and a starter mandate.yaml
+mandate init                       # issuer keys in .mandate/ and a starter mandate.yaml
 # edit mandate.yaml: your agents, budgets, suppliers, categories
-flow-e check                      # validate it
-flow-e agent add lab-procurement  # a signed credential for one agent
+mandate check                      # validate it
+mandate agent add lab-procurement  # a signed credential for one agent
 ```
 
 Then connect each agent with its own MCP server. Use **absolute paths** throughout, because the
@@ -88,10 +88,10 @@ client starts the server from its own working directory and may not share your `
 **Claude Code:**
 
 ```sh
-claude mcp add flow-e \
-  -e FLOWE_HOME=/absolute/path/to/project/.flow-e \
-  -e FLOWE_CONFIG=/absolute/path/to/project/mandate.yaml \
-  -- node /absolute/path/to/flow-e/dist/cli/index.js serve --agent lab-procurement
+claude mcp add mandate \
+  -e MANDATE_HOME=/absolute/path/to/project/.mandate \
+  -e MANDATE_CONFIG=/absolute/path/to/project/mandate.yaml \
+  -- node /absolute/path/to/mandate/dist/cli/index.js serve --agent lab-procurement
 ```
 
 **Claude Desktop** (`claude_desktop_config.json`):
@@ -99,19 +99,24 @@ claude mcp add flow-e \
 ```json
 {
   "mcpServers": {
-    "flow-e": {
+    "mandate": {
       "command": "node",
-      "args": ["/absolute/path/to/flow-e/dist/cli/index.js", "serve", "--agent", "lab-procurement"],
+      "args": [
+        "/absolute/path/to/mandate/dist/cli/index.js",
+        "serve",
+        "--agent",
+        "lab-procurement"
+      ],
       "env": {
-        "FLOWE_HOME": "/absolute/path/to/project/.flow-e",
-        "FLOWE_CONFIG": "/absolute/path/to/project/mandate.yaml"
+        "MANDATE_HOME": "/absolute/path/to/project/.mandate",
+        "MANDATE_CONFIG": "/absolute/path/to/project/mandate.yaml"
       }
     }
   }
 }
 ```
 
-`flow-e demo` prints both snippets with the real paths filled in. After the first npm release,
+`mandate demo` prints both snippets with the real paths filled in. After the first npm release,
 `npx -y @flow-e/mcp serve …` will replace the `node …/dist/cli/index.js serve …` part. Any MCP client that supports
 stdio servers works the same way.
 
@@ -167,7 +172,7 @@ Good to know:
   person can tell it from a genuine second order. It also catches a genuine second order from the same supplier inside 10 minutes
   when the two together exceed the per-payment limit. Pending reviews count towards that sum.
 - **Fair price** compares a request with the usual price you set for the item. The agent names
-  the item and quantity (`item`, `quantity`; the memo is used when there is no item), and Flow-E
+  the item and quantity (`item`, `quantity`; the memo is used when there is no item), and Mandate
   matches it by the item's name or extra words such as "phosphate buffer"; the longest match
   wins. More than `above_percent` over the usual price goes to a human (or is declined, if you
   set `above: decline`); more than `below_percent` under it goes to a human too, because a
@@ -179,13 +184,13 @@ Good to know:
 ## Human control
 
 ```sh
-flow-e approve <payment-id> --note "Checked the quote"   # or: decline
-flow-e freeze lab-procurement                          # one agent; unfreeze undoes it
-flow-e freeze --all                                    # kill switch: decline everything
-flow-e unfreeze --all                                  # release it (frozen agents stay frozen)
-flow-e cooloff-cancel <payment-id>                     # within the 10-minute window
-flow-e export --out ledger.csv                         # the whole ledger as CSV
-flow-e panel                                           # the control panel in your browser
+mandate approve <payment-id> --note "Checked the quote"   # or: decline
+mandate freeze lab-procurement                          # one agent; unfreeze undoes it
+mandate freeze --all                                    # kill switch: decline everything
+mandate unfreeze --all                                  # release it (frozen agents stay frozen)
+mandate cooloff-cancel <payment-id>                     # within the 10-minute window
+mandate export --out ledger.csv                         # the whole ledger as CSV
+mandate panel                                           # the control panel in your browser
 ```
 
 Each action is a signed ledger entry that records who acted (`--by`, which defaults to your OS user
@@ -193,7 +198,7 @@ name), when, and an optional note. It takes effect on the agent's next request; 
 restart. You can also set `status: frozen` or `paused` for an agent in `mandate.yaml`, and that too
 applies at once.
 
-**After approval.** Flow-E never pays. The agent orders through the company's usual channel (a
+**After approval.** Mandate never pays. The agent orders through the company's usual channel (a
 supplier account, on invoice) with the payment id as the reference, then calls `record_order`
 (only after any cooling-off window has closed). On the website a person can print a purchase
 order for each approved payment and match the supplier's invoice to it; an invoice above the
@@ -213,7 +218,7 @@ and cannot hide what it did. You can stop it at once, and anyone can check the r
 - **The model** sees only tool results. No tool returns keys, credentials or signatures, and an
   agent can read only its own payments. All input is validated with zod before the engine sees it.
 - **The MCP server process** holds the issuer private key, so that it can sign receipts. Anyone who
-  can read `.flow-e/issuer.key` can issue credentials and sign ledger entries: guard it like a
+  can read `.mandate/issuer.key` can issue credentials and sign ledger entries: guard it like a
   production secret.
 - **The human owner** acts through the CLI or the panel, both on the same machine.
 
@@ -252,19 +257,19 @@ the payment is not authorized.
 - No accounts: `--by` is a label, not an authenticated identity.
 
 > **Not legal advice.** The country list in the examples is a demo and is **not** sanctions
-> screening. Flow-E makes no claim of regulatory compliance. Configure your own screening.
+> screening. Mandate makes no claim of regulatory compliance. Configure your own screening.
 
 ## Ledger, receipts and audit
 
 ```sh
-flow-e audit                                     # check the whole chain
-flow-e receipt <receipt-or-payment-id> > receipt.json
-flow-e verify receipt.json                       # signature, hash and position in the ledger
-flow-e verify receipt.json --pubkey issuer.pub --offline   # an auditor with only the public key
+mandate audit                                     # check the whole chain
+mandate receipt <receipt-or-payment-id> > receipt.json
+mandate verify receipt.json                       # signature, hash and position in the ledger
+mandate verify receipt.json --pubkey issuer.pub --offline   # an auditor with only the public key
 ```
 
-All commands accept `--home <dir>` and `--config <file>`, or the `FLOWE_HOME` and
-`FLOWE_CONFIG` environment variables.
+All commands accept `--home <dir>` and `--config <file>`, or the `MANDATE_HOME` and
+`MANDATE_CONFIG` environment variables.
 
 ## Configuration
 
@@ -307,10 +312,10 @@ projects: # optional; budgets shared by the agents that may book to them
 
 ## Integrations
 
-The hosted website lets the systems around Flow-E connect, without anything from outside being
+The hosted website lets the systems around Mandate connect, without anything from outside being
 able to approve a purchase. Full guide with examples: `/developers` ("Connect your systems").
 
-- **Organisation API keys** (`flowe_ok_…`), separate from agent keys, created by an owner, with
+- **Organisation API keys** (`mandate_ok_…`), separate from agent keys, created by an owner, with
   scopes `reorder:write` and `read`. Stored as a hash, revocable at once, rate-limited, and every
   call is logged (method, path, status) for 90 days.
 - **Reorder signals in:** `POST /api/v1/reorder-signals` with an item (price-list id or exact
@@ -319,7 +324,7 @@ able to approve a purchase. Full guide with examples: `/developers` ("Connect yo
   still goes through the agent, the engine and, where required, a person.
 - **Webhooks out:** `payment.approved`, `payment.declined`, `payment.review`, `order.recorded`,
   `invoice.matched`, `invoice.mismatch`, sent from the ledger after the fact (so they can never
-  block a decision), signed with `Flow-E-Signature: t=…,v1=<HMAC-SHA256>`, retried with backoff
+  block a decision), signed with `Mandate-Signature: t=…,v1=<HMAC-SHA256>`, retried with backoff
   for a day, to public https addresses only.
 - **Read API:** `GET /api/v1/orders` (paginated), `/api/v1/payments/{id}`,
   `/api/v1/receipts/{id}`, each limited to the key's organisation.

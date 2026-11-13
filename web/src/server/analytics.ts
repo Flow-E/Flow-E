@@ -559,7 +559,7 @@ function recentActivity(
             : text(d.status),
       amount: p.request.amount,
       currency: p.request.currency,
-      by: kind === 'decision' ? 'Flow-E' : text(d.by),
+      by: kind === 'decision' ? 'Mandate' : text(d.by),
     });
   }
   return out;
@@ -619,7 +619,7 @@ export function parseMinutes(value: unknown): number {
   return n <= MAX_MINUTES_PER_APPROVAL ? n : MINUTES_PER_APPROVAL;
 }
 
-/** Invoices recorded in a period that did not match what Flow-E authorized. */
+/** Invoices recorded in a period that did not match what Mandate authorized. */
 export interface InvoiceStats {
   /** Invoices recorded in the period. */
   recorded: number;
@@ -767,7 +767,7 @@ export function workingDays(from: string, to: string): number {
 }
 
 /**
- * "What Flow-E did for you", derived from a built dashboard (so it follows its period and
+ * "What Mandate did for you", derived from a built dashboard (so it follows its period and
  * agent filter). Pure; no second ledger read.
  */
 export function buildValueReport(
@@ -839,7 +839,7 @@ export function workSaved(minutes: number): string {
 }
 
 /**
- * The value report in one sentence: "In the last 30 days Flow-E decided 64 of 75 requests on
+ * The value report in one sentence: "In the last 30 days Mandate decided 64 of 75 requests on
  * its own, stopped 9 risky purchases and avoided CHF 210.00 of overpayment." `periodText` is
  * "today" or "the last 30 days", as the dashboard writes it.
  */
@@ -849,7 +849,7 @@ export function valueSummary(
   fmt: (minor: number) => string,
 ): string {
   const when = periodText === 'today' ? 'Today' : `In ${periodText}`;
-  if (report.requests === 0) return `${when} no agent asked Flow-E for a payment.`;
+  if (report.requests === 0) return `${when} no agent asked Mandate for a payment.`;
   const plural = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
   const parts = [
     `decided ${String(report.autoDecided)} of ${plural(report.requests, 'request', 'requests')} on its own`,
@@ -862,5 +862,5 @@ export function valueSummary(
   }
   const last = parts.pop() ?? '';
   const list = parts.length === 0 ? last : `${parts.join(', ')} and ${last}`;
-  return `${when} Flow-E ${list}.`;
+  return `${when} Mandate ${list}.`;
 }

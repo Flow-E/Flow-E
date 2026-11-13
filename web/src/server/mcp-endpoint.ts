@@ -15,7 +15,7 @@ import { RateLimiter } from './rate-limit';
 
 /**
  * The remote MCP endpoint (/api/mcp): Streamable HTTP, stateless, one McpServer per request.
- * An agent authenticates with `Authorization: Bearer flowe_ak_…`; the key decides the
+ * An agent authenticates with `Authorization: Bearer mandate_ak_…`; the key decides the
  * organisation and agent, so a request can never name another agent's data. The tools are the
  * same definitions as the stdio server (src/tools/agent-tools.ts in the core). No cookies are
  * read and no CORS headers are sent: this is for agents, not browsers.
@@ -27,7 +27,7 @@ export const RATE_LIMIT_PER_MINUTE = 60;
 export interface McpDeps {
   store: OrgStore;
   limiter: RateLimiter;
-  /** Site origin for links in approval emails, e.g. https://flow-e.example. */
+  /** Site origin for links in approval emails, e.g. https://mandate.example. */
   origin: string;
 }
 
@@ -49,7 +49,7 @@ function rpcError(
 
 export function unauthorized(message: string): Response {
   return rpcError(401, -32001, message, {
-    'www-authenticate': 'Bearer realm="flow-e", error="invalid_token"',
+    'www-authenticate': 'Bearer realm="mandate", error="invalid_token"',
   });
 }
 
@@ -96,7 +96,7 @@ function logFailure(tool: string, err: unknown) {
 /** An MCP server bound to one authenticated agent. */
 export function agentServer(store: OrgStore, auth: AgentAuth, origin: string): McpServer {
   const server = new McpServer(
-    { name: 'flow-e', version: '0.1.0' },
+    { name: 'mandate', version: '0.1.0' },
     { instructions: AGENT_INSTRUCTIONS },
   );
 
@@ -159,7 +159,7 @@ export async function handleMcp(req: Request, deps: McpDeps): Promise<Response> 
     return new Response(null, { status: 405, headers: { allow: 'POST' } });
   }
   const key = bearer(req);
-  if (!key) return unauthorized('Missing agent key. Send Authorization: Bearer flowe_ak_…');
+  if (!key) return unauthorized('Missing agent key. Send Authorization: Bearer mandate_ak_…');
   const auth = await deps.store.authenticateAgent(key);
   if (!auth) return unauthorized('This agent key is not valid, revoked or expired.');
 

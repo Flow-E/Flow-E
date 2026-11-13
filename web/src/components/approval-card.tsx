@@ -13,7 +13,7 @@ import { DecisionButtons } from './approval-actions';
 import { StatusPill } from './ui';
 
 /**
- * The approval card: why Flow-E asked, the effect on the day's, the month's and the project's
+ * The approval card: why Mandate asked, the effect on the day's, the month's and the project's
  * budget, the supplier's history,
  * similar purchases and the usual price, then Approve / Decline. Mobile first. The numbers
  * come from src/server/approval-context.ts; the buttons use the existing resolve action, which
@@ -145,7 +145,7 @@ export function ApprovalFacts({
   const fp = ctx.fairPrice;
   return (
     <div className="space-y-4">
-      <Section title="Why Flow-E asked">
+      <Section title="Why Mandate asked">
         <ul className="space-y-2">
           {ctx.reasons.map((r, i) => (
             <li key={`${r.rule}-${String(i)}`}>

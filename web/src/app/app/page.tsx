@@ -20,7 +20,7 @@ export default async function OrgsPage() {
     <div className="min-h-dvh">
       <header className="border-b border-rule bg-surface">
         <div className="mx-auto flex max-w-4xl items-center gap-4 px-4 py-3 sm:px-6">
-          <Link href="/" aria-label="Flow-E home" className="rounded-md">
+          <Link href="/" aria-label="Mandate home" className="rounded-md">
             <Logo />
           </Link>
           <div className="ml-auto flex items-center gap-2 text-sm">
@@ -78,7 +78,7 @@ export default async function OrgsPage() {
 
         <Panel
           title="Demo lab"
-          description="Creates “Example Labs AG (demo, fictional)” with a lab procurement agent, the sandbox's fictional suppliers and limits, and an empty ledger. Use it to show a real Claude buying through Flow-E."
+          description="Creates “Example Labs AG (demo, fictional)” with a lab procurement agent, the sandbox's fictional suppliers and limits, and an empty ledger. Use it to show a real Claude buying through Mandate."
         >
           <ActionButton
             action={createDemoLabAction}

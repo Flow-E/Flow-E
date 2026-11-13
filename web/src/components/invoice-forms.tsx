@@ -139,7 +139,7 @@ export function InvoiceForm({
           />
           <span id="reference-help" className="mt-1 block text-xs font-normal text-ink-3">
             The payment id the agent quoted to the supplier, usually printed on the invoice. Leave
-            it empty if there is none; Flow-E then matches by supplier and amount.
+            it empty if there is none; Mandate then matches by supplier and amount.
           </span>
         </label>
       </div>

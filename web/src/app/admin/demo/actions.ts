@@ -10,7 +10,7 @@ import { getSession } from '@/server/session';
 
 /**
  * Create, or reset, the demo organisation "Lab Alpha (fictional)". Admins only
- * (FLOWE_ADMIN_EMAILS), read from the session here again, never from the form. Reset leaves
+ * (MANDATE_ADMIN_EMAILS), read from the session here again, never from the form. Reset leaves
  * the earlier Lab Alpha (its ledger stays, unreachable) and builds a fresh one up to now.
  */
 export async function seedDemoAction(form: FormData): Promise<void> {

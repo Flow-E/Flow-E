@@ -15,13 +15,18 @@ export {
 } from './ledger.js';
 export {
   GENESIS_HASH,
+  LEDGER_VERSION,
+  LEGACY_RECEIPT_FORMAT,
   RECEIPT_FORMAT,
   ReceiptError,
   entryHash,
+  entryVersion,
   parseReceipt,
   verifyReceipt,
   type Entry,
   type EntryBody,
+  type LedgerVersion,
   type Receipt,
+  type ReceiptFormat,
   type ReceiptCheck,
 } from './receipt.js';

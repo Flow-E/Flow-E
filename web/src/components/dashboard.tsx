@@ -532,7 +532,7 @@ function BudgetMeter({
 
 // The value report --------------------------------------------------------------------------------
 
-/** "What Flow-E did for you": what it decided, stopped and avoided in the period. */
+/** "What Mandate did for you": what it decided, stopped and avoided in the period. */
 export function ValueReportPanel({
   report,
   periodText,
@@ -551,7 +551,7 @@ export function ValueReportPanel({
   const near = report.agents.filter((a) => a.oftenNearDaily);
   return (
     <Panel
-      title="What Flow-E did for you"
+      title="What Mandate did for you"
       description={valueSummary(report, periodText, fmt)}
       action={
         reportHref ? (
@@ -688,7 +688,7 @@ function activityTone(a: Activity) {
 }
 
 const KIND_LABEL: Record<Activity['kind'], string> = {
-  decision: 'Flow-E decided',
+  decision: 'Mandate decided',
   resolved: 'Human decision',
   cancelled: 'Cancelled in cooling-off',
   kill_switch: 'Kill switch',
@@ -801,7 +801,7 @@ export function DashboardBody({
           detail={`${String(dash.autoApproved)} of ${String(dash.requests)} requests`}
         />
         <Tile
-          label="Declined by Flow-E"
+          label="Declined by Mandate"
           value={dash.declined.count}
           detail={dash.declined.count > 0 ? declinedText(dash.declined, fmt) : 'None'}
         />
@@ -858,7 +858,7 @@ export function DashboardBody({
                 }`}
               />
             </Panel>
-            <Panel title="Decisions" description="What Flow-E said when each request came in">
+            <Panel title="Decisions" description="What Mandate said when each request came in">
               <StackedColumns
                 title="Decisions"
                 points={dash.days}
@@ -892,7 +892,7 @@ export function DashboardBody({
                 />
               )}
             </Panel>
-            <Panel title="Why Flow-E said no" description="Declines by rule">
+            <Panel title="Why Mandate said no" description="Declines by rule">
               {dash.declinesByRule.length === 0 ? (
                 <p className="text-sm text-ink-2">No declines in this period.</p>
               ) : (
@@ -985,7 +985,7 @@ export function DashboardBody({
         {dash.priceCheck.checked === 0 ? (
           <p className="text-sm text-ink-2">
             No request matched a usual price {periodText}. Add usual prices for the items your
-            agents buy on the Mandate page, and Flow-E flags offers far above or below them.
+            agents buy on the Mandate page, and Mandate flags offers far above or below them.
           </p>
         ) : (
           <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">

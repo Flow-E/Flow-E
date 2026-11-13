@@ -23,12 +23,12 @@ import type { Controls, PaymentRecord } from '../ledger/fold.js';
  * The agent-facing tools, defined once for every host: names, input schemas, descriptions for
  * the model, and the exact shape of each answer. The stdio server (src/mcp/server.ts) and the
  * website's remote endpoint both build their MCP servers from these, so an agent sees the same
- * tools wherever Flow-E runs. Pure: no I/O.
+ * tools wherever Mandate runs. Pure: no I/O.
  */
 
 export const AGENT_INSTRUCTIONS = `This server holds your spending mandate: the budget and rules your organisation set for you.
 Call check_mandate before planning purchases. Call request_payment before every purchase and only buy when the decision is "approved".
-Flow-E authorizes payments; it does not move money. A decision is final unless a human changes it: never split a declined payment, or re-submit it with a changed supplier name, category, country or currency, to get around a rule. Buying the item from a different supplier that is genuinely allowed is fine. Never place an order that is "review" until get_payment shows "approved".
+Mandate authorizes payments; it does not move money. A decision is final unless a human changes it: never split a declined payment, or re-submit it with a changed supplier name, category, country or currency, to get around a rule. Buying the item from a different supplier that is genuinely allowed is fine. Never place an order that is "review" until get_payment shows "approved".
 After you order an approved purchase from the supplier, quote the payment_id as your reference and call record_order with the supplier's order number.`;
 
 export const recordOrderShape = {
@@ -173,7 +173,7 @@ export const AGENT_TOOLS = {
 export const NEXT_STEP = {
   approved:
     'Authorized. Complete the purchase through the normal checkout and quote the payment_id. ' +
-    'Flow-E has not moved any money.',
+    'Mandate has not moved any money.',
   declined:
     'Not authorized. Do not buy this, and do not retry it in a disguised form (split, renamed, ' +
     're-categorised or in another currency). You may buy the item from a different supplier ' +

@@ -35,12 +35,12 @@ export default async function AgentPage({
   const keys = can(view.role, 'agent.keys');
   const killed = view.controls.killSwitch?.on === true;
   const endpoint = `${await siteOrigin()}/api/mcp`;
-  const placeholder = 'flowe_ak_YOUR_KEY';
-  const claude = `claude mcp add --transport http flow-e ${endpoint} --header "Authorization: Bearer ${placeholder}"`;
+  const placeholder = 'mandate_ak_YOUR_KEY';
+  const claude = `claude mcp add --transport http mandate ${endpoint} --header "Authorization: Bearer ${placeholder}"`;
   const json = JSON.stringify(
     {
       mcpServers: {
-        'flow-e': {
+        mandate: {
           type: 'http',
           url: endpoint,
           headers: { Authorization: `Bearer ${placeholder}` },
@@ -211,7 +211,7 @@ export default async function AgentPage({
 
       <Panel
         title="Connect the agent"
-        description="Replace flowe_ak_YOUR_KEY with the key you copied. The key is the only credential: keep it in the agent's secret store, not in code."
+        description="Replace mandate_ak_YOUR_KEY with the key you copied. The key is the only credential: keep it in the agent's secret store, not in code."
       >
         <div id="connect" className="space-y-5">
           <CopyBlock title="Claude Code" value={claude} />

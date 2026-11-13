@@ -1,46 +1,46 @@
-# Flow-E website
+# Mandate website
 
-The public site and the sandbox for [Flow-E](https://github.com/Flow-E/Flow-E): a Next.js 16 app
+The public site and the sandbox for [Mandate](https://github.com/Flow-E/Flow-E): a Next.js 16 app
 (App Router, TypeScript strict, Tailwind 4).
 
-| Route                     | What it is                                                                                |
-| ------------------------- | ----------------------------------------------------------------------------------------- |
-| `/`                       | For companies: the problem, how it works, a lab example, trust, rules, FAQ, pilot form    |
-| `/docs`                   | The repository README, synced at build time                                               |
-| `/sandbox`                | Signed-in only. Your own fictional company: dashboard, approvals, agents, kill switch     |
-| `/app`                    | Signed-in only. Your organisations: real agents with API keys, members and roles          |
-| `/app/<org>/invoices`     | Supplier invoices: upload or type in, matched against the authorizations, CSV export      |
-| `/sandbox/invoices`       | The same for the sandbox, typed-in invoices only (fictional)                              |
-| `/app/<org>/report`       | Printable value report (also `/sandbox/report`): every number with its method             |
-| `/app/<org>/reorder`      | "Run reorder": the reorder list and Flow-E's own purchasing agent, with each run's log    |
-| `/api/mcp`                | The remote MCP endpoint for agents (Streamable HTTP, `Authorization: Bearer` agent key)   |
-| `/verify`                 | Public, no password: paste a receipt to check it was authorized (POSTs to `/api/verify`)  |
-| `/keys/<issuer>.pub`      | Public, no password: an issuer's published public key (PEM; `.json` adds its name)        |
-| `/api/pilot`              | The home page’s pilot form posts here (route handler, 303 back to `/#pilot`)              |
-| `/admin/pilots`           | Pilot requests; mark contacted or declined. Only `FLOWE_ADMIN_EMAILS`, others 404         |
-| `/admin/demo`             | Build or reset "Lab Alpha (fictional)" with 60 days of history. Only `FLOWE_ADMIN_EMAILS` |
-| `/app/<org>/integrations` | Organisation API keys, webhooks, delivery log and API access log (owners manage)          |
-| `/developers`             | "Connect your systems": keys, reorder signals, webhooks, receipts, with tested examples   |
-| `/api/v1/…`               | API for other systems (organisation key, not the site password); see `/developers`        |
-| `/api/cron/webhooks`      | Vercel Cron, every minute (`vercel.json`): sends webhook deliveries; needs `CRON_SECRET`  |
-| `/security`               | Security in plain words: what is stored, where, what is signed, what isn't done yet       |
-| `/legal/…`                | Imprint, privacy, terms and data processing agreement: drafts marked `[TO CONFIRM]`       |
-| `/invite/…`, `/approve/…` | One-time links from invitation and approval emails (sign-in, then confirm)                |
-| `/account/security`       | Signed-in only. Set up, check or turn off the authenticator app (second factor)           |
-| `/account/verify`         | Signed-in only. Enter a code from the authenticator app (or a recovery code), then on     |
-| `/dev/outbox`             | Development only: the emails Flow-E would have sent                                       |
-| `/gate`                   | The private-preview password page (only while `SITE_PASSWORD` is set)                     |
+| Route                     | What it is                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------- |
+| `/`                       | For companies: the problem, how it works, a lab example, trust, rules, FAQ, pilot form      |
+| `/docs`                   | The repository README, synced at build time                                                 |
+| `/sandbox`                | Signed-in only. Your own fictional company: dashboard, approvals, agents, kill switch       |
+| `/app`                    | Signed-in only. Your organisations: real agents with API keys, members and roles            |
+| `/app/<org>/invoices`     | Supplier invoices: upload or type in, matched against the authorizations, CSV export        |
+| `/sandbox/invoices`       | The same for the sandbox, typed-in invoices only (fictional)                                |
+| `/app/<org>/report`       | Printable value report (also `/sandbox/report`): every number with its method               |
+| `/app/<org>/reorder`      | "Run reorder": the reorder list and Mandate's own purchasing agent, with each run's log     |
+| `/api/mcp`                | The remote MCP endpoint for agents (Streamable HTTP, `Authorization: Bearer` agent key)     |
+| `/verify`                 | Public, no password: paste a receipt to check it was authorized (POSTs to `/api/verify`)    |
+| `/keys/<issuer>.pub`      | Public, no password: an issuer's published public key (PEM; `.json` adds its name)          |
+| `/api/pilot`              | The home page’s pilot form posts here (route handler, 303 back to `/#pilot`)                |
+| `/admin/pilots`           | Pilot requests; mark contacted or declined. Only `MANDATE_ADMIN_EMAILS`, others 404         |
+| `/admin/demo`             | Build or reset "Lab Alpha (fictional)" with 60 days of history. Only `MANDATE_ADMIN_EMAILS` |
+| `/app/<org>/integrations` | Organisation API keys, webhooks, delivery log and API access log (owners manage)            |
+| `/developers`             | "Connect your systems": keys, reorder signals, webhooks, receipts, with tested examples     |
+| `/api/v1/…`               | API for other systems (organisation key, not the site password); see `/developers`          |
+| `/api/cron/webhooks`      | Vercel Cron, every minute (`vercel.json`): sends webhook deliveries; needs `CRON_SECRET`    |
+| `/security`               | Security in plain words: what is stored, where, what is signed, what isn't done yet         |
+| `/legal/…`                | Imprint, privacy, terms and data processing agreement: drafts marked `[TO CONFIRM]`         |
+| `/invite/…`, `/approve/…` | One-time links from invitation and approval emails (sign-in, then confirm)                  |
+| `/account/security`       | Signed-in only. Set up, check or turn off the authenticator app (second factor)             |
+| `/account/verify`         | Signed-in only. Enter a code from the authenticator app (or a recovery code), then on       |
+| `/dev/outbox`             | Development only: the emails Mandate would have sent                                        |
+| `/gate`                   | The private-preview password page (only while `SITE_PASSWORD` is set)                       |
 
 Sandbox pages: Dashboard, Fake agent (catalog, demo story, custom request, full rule trace),
 Ledger (integrity check, CSV, issuer public key, receipt verify), Payment detail (trace,
 receipt, download), Mandate (editor validated by the core schema) and Start over.
 
-Everything in the sandbox is fictional. Flow-E authorizes payments; it never moves money.
+Everything in the sandbox is fictional. Mandate authorizes payments; it never moves money.
 
 ## Dashboard
 
 The first page of the sandbox and of every organisation: what the agents spend, where, how often
-Flow-E says no and why, and what waits for a human. The kill switch, the approval queue,
+Mandate says no and why, and what waits for a human. The kill switch, the approval queue,
 cooling-off cancels and freezes stay on the same page.
 
 - **Period and agent** from the URL (`?period=today|7d|30d|90d&agent=<id>`, default 30 days):
@@ -48,7 +48,7 @@ cooling-off cancels and freezes stay on the same page.
   charted per hour.
 - **Key figures:** approved spend; today against the agents' combined daily budget (approved and
   waiting); waiting for approval (count and amount, whatever the period); share approved without
-  a human; Flow-E's declines; payments cancelled in cooling-off; agents that made requests.
+  a human; Mandate's declines; payments cancelled in cooling-off; agents that made requests.
 - **Charts:** approved spend per day by agent; decisions per day (approved, sent to a human,
   declined, as the engine decided at request time); top suppliers; declines by rule with plain
   names; budget used today per agent; human approvals (count, approved/declined, median wait
@@ -112,7 +112,7 @@ the link once, to pass it on another way.
 
 **Agents and keys.** An owner creates an agent with a starting mandate; the organisation's
 issuer signs its Know Your Agent credential in the core's format (90 days, renewed
-automatically). An agent key is `flowe_ak_` plus 32 random bytes (base64url), shown once.
+automatically). An agent key is `mandate_ak_` plus 32 random bytes (base64url), shown once.
 Only its SHA-256 and a visible prefix are stored. Keys can expire, be rotated (old one revoked,
 new one shown once) and be revoked; at most five are active per agent. Keys work only on
 `/api/mcp`.
@@ -128,7 +128,7 @@ per request. No cookies, no CORS. It is the only path the `SITE_PASSWORD` gate l
 Connect Claude Code with the command on the agent's page:
 
 ```bash
-claude mcp add --transport http flow-e https://<site>/api/mcp --header "Authorization: Bearer flowe_ak_…"
+claude mcp add --transport http mandate https://<site>/api/mcp --header "Authorization: Bearer mandate_ak_…"
 ```
 
 **Approval emails.** A payment that needs review emails every owner and approver: amount,
@@ -167,7 +167,7 @@ an app also enter a code right after signing in.
 
 **Email delivery** is an adapter (`src/server/email.ts`). In development emails go to the
 `email_outbox` table and `/dev/outbox` shows them (only with `NODE_ENV` not production and
-`FLOWE_DEV_LOGIN=1`); production refuses the outbox. With `RESEND_API_KEY` and `EMAIL_FROM`
+`MANDATE_DEV_LOGIN=1`); production refuses the outbox. With `RESEND_API_KEY` and `EMAIL_FROM`
 set, emails go out through the Resend HTTP API instead, in any environment (10 second timeout,
 no retries). Setting only one of the two makes every send fail on purpose. A failed send never
 fails the request: it is logged with the HTTP status and Resend's message, never the key or the
@@ -176,7 +176,7 @@ simple HTML, no tracking.
 
 ## Invoices
 
-Supplier invoices are matched against what Flow-E authorized, with the core's
+Supplier invoices are matched against what Mandate authorized, with the core's
 `src/control/invoices.ts` (tolerance from the mandate's `invoice_check`). Pages:
 
 | Route                                  | What                                                                      |
@@ -225,7 +225,7 @@ The Mandate page's "Test against the last 30 days" (`src/server/replay.ts`) repl
 request of the period through the same engine with the rules as typed, before saving. It reads
 the ledger only and writes nothing (tested on frozen entries). Two limits are shown with the
 result: requests stopped by the kill switch, a frozen agent or a credential problem keep their
-decision; and requests decided before Flow-E recorded the item and project with each request
+decision; and requests decided before Mandate recorded the item and project with each request
 (before 27 Oct 2026; told apart by the rules in their recorded trace) can't be checked against
 usual prices or project budgets, so they are counted as "inexact".
 
@@ -321,7 +321,7 @@ README sections into `src/content/readme.generated.ts` and builds the core.
 `src/server/store.ts` keeps each sandbox in two tables (`db/migrations/001_init.sql`):
 
 - `sandboxes`: one active row per owner, with the mandate, the agent credentials and the
-  issuer key pair. The private key is encrypted with AES-256-GCM under `FLOWE_SANDBOX_KEY`.
+  issuer key pair. The private key is encrypted with AES-256-GCM under `MANDATE_SANDBOX_KEY`.
 - `ledger_entries`: the hash-chained, signed ledger. Triggers refuse `UPDATE`, `DELETE` and
   `TRUNCATE`; status changes are new entries. Every write locks its sandbox row
   (`SELECT … FOR UPDATE`) so two requests cannot fork the chain.
@@ -366,7 +366,7 @@ npm install --prefix ..
 npm install
 ```
 
-Copy `.env.example` to `.env.local`, fill in the two keys and set `FLOWE_DEV_LOGIN=1`, then:
+Copy `.env.example` to `.env.local`, fill in the two keys and set `MANDATE_DEV_LOGIN=1`, then:
 
 ```bash
 npm run dev
@@ -379,21 +379,21 @@ Checks: `npm run lint`, `npm run typecheck`, `npm test` (in-memory PGlite, no se
 
 | Name                                   | Where           | Secret | Purpose                                                                                                              |
 | -------------------------------------- | --------------- | ------ | -------------------------------------------------------------------------------------------------------------------- |
-| `FLOWE_KEY_ENCRYPTION_KEY`             | everywhere      | yes    | 32 random bytes, base64. Encrypts every issuer private key (sandboxes and organisations)                             |
-| `FLOWE_SANDBOX_KEY`                    | older name      | yes    | Same key under its old name; still read when `FLOWE_KEY_ENCRYPTION_KEY` is not set. Set only one                     |
+| `MANDATE_KEY_ENCRYPTION_KEY`           | everywhere      | yes    | 32 random bytes, base64. Encrypts every issuer private key (sandboxes and organisations)                             |
+| `MANDATE_SANDBOX_KEY`                  | older name      | yes    | Same key under its old name; still read when `MANDATE_KEY_ENCRYPTION_KEY` is not set. Set only one                   |
 | `RESEND_API_KEY`                       | production      | yes    | Resend API key (sending access is enough). With `EMAIL_FROM`, sends invitation and approval emails                   |
-| `EMAIL_FROM`                           | production      | no     | Sender, e.g. `Flow-E <approvals@yourdomain>`. The domain must be verified in Resend                                  |
-| `FLOWE_SESSION_SECRET`                 | everywhere      | yes    | 32+ random characters. Signs the session cookie                                                                      |
+| `EMAIL_FROM`                           | production      | no     | Sender, e.g. `Mandate <approvals@yourdomain>`. The domain must be verified in Resend                                 |
+| `MANDATE_SESSION_SECRET`               | everywhere      | yes    | 32+ random characters. Signs the session cookie                                                                      |
 | `SITE_PASSWORD`                        | optional        | yes    | Private-preview gate for every page. Remove to make the site public                                                  |
 | `DATABASE_URL`                         | production      | yes    | Postgres connection string (Supabase transaction pooler)                                                             |
-| `FLOWE_PGLITE_DIR`                     | local, optional | no     | PGlite folder. Default `web/.data/pglite`                                                                            |
-| `FLOWE_DEV_LOGIN`                      | local only      | no     | `1` = sign in with any email. Ignored when `NODE_ENV=production`                                                     |
+| `MANDATE_PGLITE_DIR`                   | local, optional | no     | PGlite folder. Default `web/.data/pglite`                                                                            |
+| `MANDATE_DEV_LOGIN`                    | local only      | no     | `1` = sign in with any email. Ignored when `NODE_ENV=production`                                                     |
 | `NEXT_PUBLIC_SUPABASE_URL`             | production      | no     | Supabase project URL, for the email sign-in link                                                                     |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | production      | no     | Supabase publishable key (public by design)                                                                          |
-| `FLOWE_SITE_URL`                       | production, opt | no     | The site's public origin for sign-in links, e.g. `https://flow-e.vercel.app`. Default: the request's host            |
+| `MANDATE_SITE_URL`                     | production, opt | no     | The site's public origin for sign-in links, e.g. `https://flow-e.vercel.app`. Default: the request's host            |
 | `CRON_SECRET`                          | for webhooks    | yes    | Random secret; Vercel Cron sends it to `/api/cron/webhooks`. Unset: webhooks are queued but never sent               |
-| `FLOWE_LEADS_TO`                       | optional        | no     | One address that gets an email for each pilot request (through the mailer above; dev: outbox)                        |
-| `FLOWE_ADMIN_EMAILS`                   | optional        | no     | Comma-separated emails that may open `/admin/pilots` after signing in. Unset: nobody                                 |
+| `MANDATE_LEADS_TO`                     | optional        | no     | One address that gets an email for each pilot request (through the mailer above; dev: outbox)                        |
+| `MANDATE_ADMIN_EMAILS`                 | optional        | no     | Comma-separated emails that may open `/admin/pilots` after signing in. Unset: nobody                                 |
 | `ANTHROPIC_API_KEY`                    | optional        | yes    | Reads uploaded invoices (a person confirms) and runs "Run reorder" with Claude. Unset: form empty, reorder simulated |
 
 Generate a sandbox key:
@@ -403,11 +403,11 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
 Changing the key-encryption key later makes existing sandboxes and organisations unreadable.
-To move from `FLOWE_SANDBOX_KEY` to the new name, give `FLOWE_KEY_ENCRYPTION_KEY` the same value.
+To move from `MANDATE_SANDBOX_KEY` to the new name, give `MANDATE_KEY_ENCRYPTION_KEY` the same value.
 
 ## Security
 
-- `src/proxy.ts`: the password gate (HMAC-signed `flowe_gate` cookie, 7 days, httpOnly) and
+- `src/proxy.ts`: the password gate (HMAC-signed `mandate_gate` cookie, 7 days, httpOnly) and
   headers on every response: a CSP with a per-request nonce and `strict-dynamic`,
   `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`,
   `Permissions-Policy`. All pages are rendered per request because of the nonce.
@@ -416,7 +416,7 @@ To move from `FLOWE_SANDBOX_KEY` to the new name, give `FLOWE_KEY_ENCRYPTION_KEY
 - Sign-in: Supabase Auth email links with PKCE, all server side (`src/server/supabase-auth.ts`,
   `/auth/callback`). The verifier lives in an httpOnly cookie scoped to `/auth/callback`, so a
   forwarded or intercepted link is useless in another browser. Supabase tokens are never stored;
-  only the user id and email go into Flow-E's session.
+  only the user id and email go into Mandate's session.
 - Organisations: every store method takes the signed-in user and checks their role from
   `org_members` against `src/server/permissions.ts`. A non-member gets the same answer whether
   or not the organisation exists. Ids from forms and URLs are only ever looked up inside the
@@ -442,7 +442,7 @@ publishable key `sb_publishable__LHTIX5Dmr0Fg1ctdUztJA_Ak2sFoKm` (public).
    `003_pilot_requests.sql`, then every later file in number order: `004_invoice_files.sql`
    (invoice files), `005_mfa.sql` (second factor), `006_reorder.sql` (reorder list and runs),
    `007_org_api_keys.sql` (API keys, access log), `008_reorder_signals.sql` (suggestions,
-   signals, settings), `009_webhooks.sql` (webhooks, deliveries). All are idempotent.
+   signals, settings), `009_webhooks.sql` (webhooks, deliveries), `010_rename_append_only.sql` (the append-only guard under its Mandate name). All are idempotent.
 2. Project Settings → Database → Connection string → **Transaction pooler** (port 6543). That
    is `DATABASE_URL`, with the database password filled in. The client uses
    `prepare: false`, which the pooler needs.
@@ -452,7 +452,7 @@ publishable key `sb_publishable__LHTIX5Dmr0Fg1ctdUztJA_Ak2sFoKm` (public).
    `https://<your-vercel-address>/**` and `http://localhost:3150/**`. Sign-in links may only
    return to these.
 5. The built-in email service sends only a few emails per hour: fine for testing. Before a
-   public launch, set up custom SMTP (Authentication → Emails) with the Flow-E domain.
+   public launch, set up custom SMTP (Authentication → Emails) with the Mandate domain.
 
 ### Vercel
 
@@ -461,11 +461,11 @@ publishable key `sb_publishable__LHTIX5Dmr0Fg1ctdUztJA_Ak2sFoKm` (public).
 2. **Install Command:** `npm ci --prefix .. --ignore-scripts && npm ci --ignore-scripts`.
    Build command and output stay at the Next.js defaults (`npm run build` builds the core
    first).
-3. Environment variables (Production and Preview): `FLOWE_SANDBOX_KEY` (or
-   `FLOWE_KEY_ENCRYPTION_KEY` with the same value), `FLOWE_SESSION_SECRET`, `SITE_PASSWORD`,
+3. Environment variables (Production and Preview): `MANDATE_SANDBOX_KEY` (or
+   `MANDATE_KEY_ENCRYPTION_KEY` with the same value), `MANDATE_SESSION_SECRET`, `SITE_PASSWORD`,
    `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and
-   `FLOWE_SITE_URL` (links in emails and on agent pages must not follow the request's Host
-   header). Never set `FLOWE_DEV_LOGIN` there. Organisations need real email first
+   `MANDATE_SITE_URL` (links in emails and on agent pages must not follow the request's Host
+   header). Never set `MANDATE_DEV_LOGIN` there. Organisations need real email first
    (`RESEND_API_KEY`, `EMAIL_FROM`): production refuses the dev outbox.
 4. Region: Frankfurt (`fra1`) or Zurich-near, to sit next to the database.
 

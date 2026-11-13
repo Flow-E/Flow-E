@@ -4,14 +4,14 @@ import { TextPage } from '@/components/text-page';
 
 export const metadata: Metadata = {
   title: 'Security',
-  description: 'What Flow-E stores, where, what is signed, and what is not done yet.',
+  description: 'What Mandate stores, where, what is signed, and what is not done yet.',
 };
 
 export default function SecurityPage() {
   return (
     <TextPage
       title="Security, in plain words"
-      intro="What Flow-E stores, where it is kept, what is signed, and what is not done yet. Flow-E authorizes, matches and records purchases; it never holds or moves money."
+      intro="What Mandate stores, where it is kept, what is signed, and what is not done yet. Mandate authorizes, matches and records purchases; it never holds or moves money."
     >
       <h2>What is stored</h2>
       <ul>
@@ -97,10 +97,10 @@ export default function SecurityPage() {
           Signing keys are not in a managed key service (such as a cloud HSM); they are encrypted in
           the database.
         </li>
-        <li>Flow-E has not had an external security review or penetration test.</li>
+        <li>Mandate has not had an external security review or penetration test.</li>
         <li>Rate limits are kept per server instance, so they are approximate under heavy load.</li>
         <li>Uploaded invoice files cannot be deleted yet.</li>
-        <li>Flow-E is not certified for any standard and is not a compliance product.</li>
+        <li>Mandate is not certified for any standard and is not a compliance product.</li>
       </ul>
 
       <h2>Reporting a problem</h2>

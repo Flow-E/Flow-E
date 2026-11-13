@@ -122,7 +122,7 @@ describe('remote MCP endpoint', () => {
   });
 
   it('answers 401 with a JSON-RPC error for a missing, wrong, revoked or expired key', async () => {
-    for (const key of [null, 'flowe_ak_wrong', `flowe_ak_${'A'.repeat(43)}`]) {
+    for (const key of [null, 'mandate_ak_wrong', `mandate_ak_${'A'.repeat(43)}`]) {
       const res = await post(key, ping);
       expect(res.status).toBe(401);
       expect(res.headers.get('www-authenticate')).toMatch(/^Bearer/);

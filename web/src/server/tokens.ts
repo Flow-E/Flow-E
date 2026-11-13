@@ -6,7 +6,7 @@ import { createHash, randomBytes } from 'node:crypto';
  * 32 random bytes; only its SHA-256 is stored, so a database leak reveals nothing usable.
  */
 
-export const AGENT_KEY_PREFIX = 'flowe_ak_';
+export const AGENT_KEY_PREFIX = 'mandate_ak_';
 /** Characters of the key shown in lists so people can tell keys apart (prefix + 6). */
 const VISIBLE = AGENT_KEY_PREFIX.length + 6;
 
@@ -24,9 +24,13 @@ export function newAgentKey(): { key: string; hash: string; prefix: string } {
   return { key, hash: sha256(key), prefix: key.slice(0, VISIBLE) };
 }
 
-/** A string that could be an agent key (cheap check before hashing and a database lookup). */
+/**
+ * A string that could be an agent key (cheap check before hashing and a database lookup). Keys
+ * issued before the rename to Mandate start with "flowe_ak_" and still work: only their hash is
+ * stored, so the prefix is part of what was hashed.
+ */
 export function looksLikeAgentKey(text: string): boolean {
-  return /^flowe_ak_[A-Za-z0-9_-]{43}$/.test(text);
+  return /^(?:mandate|flowe)_ak_[A-Za-z0-9_-]{43}$/.test(text);
 }
 
 export function looksLikeToken(text: string): boolean {

@@ -87,10 +87,15 @@ describe('the examples on /developers', () => {
 
   it('the signature check works exactly as shown', async () => {
     // Run the snippet exactly as the page shows it, as its own ES module.
-    const file = path.join(mkdtempSync(path.join(tmpdir(), 'flowe-')), 'verify.mjs');
+    const file = path.join(mkdtempSync(path.join(tmpdir(), 'mandate-')), 'verify.mjs');
     writeFileSync(file, VERIFY_WEBHOOK_SNIPPET);
-    const { verifyFloweSignature: verify } = (await import(pathToFileURL(file).href)) as {
-      verifyFloweSignature: (secret: string, header: string, body: string, now?: number) => boolean;
+    const { verifyMandateSignature: verify } = (await import(pathToFileURL(file).href)) as {
+      verifyMandateSignature: (
+        secret: string,
+        header: string,
+        body: string,
+        now?: number,
+      ) => boolean;
     };
     const body = '{"event":"payment.approved"}';
     const header = sign('whsec_test', 1_793_180_000, body);

@@ -1,7 +1,12 @@
 import type { KeyObject } from 'node:crypto';
 import { z } from 'zod';
 import { canonicalJson } from '../crypto/canonical.js';
-import { issuerIdFor, signPayload, verifyPayload } from '../crypto/ed25519.js';
+import {
+  LEGACY_ISSUER_PREFIX,
+  issuerIdFor,
+  signPayload,
+  verifyPayload,
+} from '../crypto/ed25519.js';
 import type { Credential, CredentialClaims, SignatureCheck } from '../engine/types.js';
 
 /**
@@ -9,13 +14,19 @@ import type { Credential, CredentialClaims, SignatureCheck } from '../engine/typ
  * against the issuer public key held by the owner, never against a key carried in the credential.
  */
 
-export const CREDENTIAL_FORMAT = 'flow-e-credential/v1';
-export const CREDENTIAL_DOMAIN = 'flow-e-credential-v1';
+export const CREDENTIAL_FORMAT = 'mandate-credential/v2';
+export const CREDENTIAL_DOMAIN = 'mandate-credential-v2';
+/**
+ * Credentials issued before the rename to Mandate. They still parse and verify (their claims name
+ * the issuer as "flow-e-issuer:…"), so existing agents keep working until they are reissued.
+ */
+export const LEGACY_CREDENTIAL_FORMAT = 'flow-e-credential/v1';
+export const LEGACY_CREDENTIAL_DOMAIN = 'flow-e-credential-v1';
 export const PAYMENT_SCOPE = 'payments:request';
 export const MAX_VALID_DAYS = 3650;
 
 export interface CredentialFile extends Credential {
-  format: typeof CREDENTIAL_FORMAT;
+  format: typeof CREDENTIAL_FORMAT | typeof LEGACY_CREDENTIAL_FORMAT;
 }
 
 export class CredentialError extends Error {
@@ -59,18 +70,20 @@ export function issueCredential(o: IssueOptions): CredentialFile {
 
 /** The engine's signature check, bound to the trusted issuer public key. */
 export function signatureCheck(publicKey: KeyObject): SignatureCheck {
-  return (credential) =>
-    verifyPayload(
-      publicKey,
-      CREDENTIAL_DOMAIN,
-      canonicalJson(credential.claims),
-      credential.signature,
-    )
+  return (credential) => {
+    const payload = canonicalJson(credential.claims);
+    // A legacy credential names its issuer in the legacy form; a current one never does. So each
+    // domain is tried only for the claims it can belong to, and neither can stand in for the other.
+    const domain = credential.claims.issuer.startsWith(LEGACY_ISSUER_PREFIX)
+      ? LEGACY_CREDENTIAL_DOMAIN
+      : CREDENTIAL_DOMAIN;
+    return verifyPayload(publicKey, domain, payload, credential.signature)
       ? { valid: true }
       : {
           valid: false,
           reason: 'it does not match the issuer key (tampered or signed by another key).',
         };
+  };
 }
 
 const claimsSchema = z.strictObject({
@@ -85,7 +98,7 @@ const claimsSchema = z.strictObject({
 });
 
 const fileSchema = z.strictObject({
-  format: z.literal(CREDENTIAL_FORMAT),
+  format: z.enum([CREDENTIAL_FORMAT, LEGACY_CREDENTIAL_FORMAT]),
   claims: claimsSchema,
   signature: z.string(),
 });

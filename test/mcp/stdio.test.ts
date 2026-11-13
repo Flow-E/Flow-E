@@ -24,10 +24,10 @@ beforeAll(() => {
   });
 }, 120_000);
 
-describe('flow-e serve over stdio', () => {
+describe('mandate serve over stdio', () => {
   it('answers request_payment and writes a verifiable ledger entry', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'mandate-stdio-'));
-    const home = join(dir, '.flow-e');
+    const home = join(dir, '.mandate');
     const config = join(dir, 'mandate.yaml');
     runInit({ home, config });
     runAgentAdd({
@@ -100,7 +100,7 @@ describe('flow-e serve over stdio', () => {
 
   it('exits with a clear error when the agent has no credential', () => {
     const dir = mkdtempSync(join(tmpdir(), 'mandate-stdio-'));
-    const home = join(dir, '.flow-e');
+    const home = join(dir, '.mandate');
     const config = join(dir, 'mandate.yaml');
     runInit({ home, config });
     let failure: { status: number | null; stderr: string } | undefined;
@@ -118,6 +118,6 @@ describe('flow-e serve over stdio', () => {
       failure = { status: e.status, stderr: e.stderr.toString() };
     }
     expect(failure?.status).toBe(1);
-    expect(failure?.stderr).toMatch(/has no credential\. Run "flow-e agent add lab-procurement"/);
+    expect(failure?.stderr).toMatch(/has no credential\. Run "mandate agent add lab-procurement"/);
   });
 });

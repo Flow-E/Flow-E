@@ -103,8 +103,8 @@ describe('sessions', () => {
   });
 
   it('allows dev login only outside production', () => {
-    expect(authMode({ FLOWE_DEV_LOGIN: '1', NODE_ENV: 'development' })).toBe('dev');
-    expect(authMode({ FLOWE_DEV_LOGIN: '1', NODE_ENV: 'production' })).toBe('none');
+    expect(authMode({ MANDATE_DEV_LOGIN: '1', NODE_ENV: 'development' })).toBe('dev');
+    expect(authMode({ MANDATE_DEV_LOGIN: '1', NODE_ENV: 'production' })).toBe('none');
     expect(
       authMode({
         NODE_ENV: 'production',

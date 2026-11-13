@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 /** Building 60 days of history takes a few hundred store calls. */
 export const maxDuration = 300;
 
-/** Admins only (FLOWE_ADMIN_EMAILS); everyone else, signed in or not, gets the same 404. */
+/** Admins only (MANDATE_ADMIN_EMAILS); everyone else, signed in or not, gets the same 404. */
 export default async function DemoAdminPage() {
   const session = await getSession();
   if (!session || !isPilotAdmin(session)) notFound();
@@ -28,7 +28,7 @@ export default async function DemoAdminPage() {
   return (
     <main className="mx-auto max-w-2xl space-y-6 px-4 py-10 sm:px-6">
       <Link href="/app" className="text-sm text-ink-2 hover:text-ink">
-        Flow-E
+        Mandate
       </Link>
       <h1 className="font-serif text-3xl tracking-[-0.015em] sm:text-4xl">Demo organisation</h1>
       <p className="text-ink-2">
